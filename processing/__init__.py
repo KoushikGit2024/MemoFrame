@@ -1,0 +1,1 @@
+"""Processing stage: thumbnails, face outputs, grouping, pipeline, reporting."""

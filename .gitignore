@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime output (never commit photos, DBs, or models)
+workspace/
+*.db
+*.db-wal
+*.db-shm
+*.onnx
+*.part
+smoke_photos/
+smoke_ws/
+smoke_test/
+ws_test/
+smoke_4b.py
+
+# Local data
+data/*
+!data/.gitkeep
+docs/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

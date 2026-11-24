@@ -1,0 +1,1 @@
+"""Shared helpers: logging, validation, file utilities, model download."""
