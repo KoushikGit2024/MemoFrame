@@ -5,8 +5,8 @@ import random
 
 import pytest
 
-from core.duplicate_detector import UnionFind, choose_keeper, find_duplicates
-from core.image_similarity import hamming
+from memoframe.core.duplicate_detector import UnionFind, choose_keeper, find_duplicates
+from memoframe.core.image_similarity import hamming
 
 BASE = 0x0123456789ABCDEF
 

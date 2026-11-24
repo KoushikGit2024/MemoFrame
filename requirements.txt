@@ -4,6 +4,8 @@ numpy>=1.24
 Pillow>=10.0
 scikit-learn>=1.3
 tqdm>=4.65
+pillow-heif>=0.16       # HEIC/HEIF photos
+# rawpy>=0.19           # optional: RAW files (DNG, CR2, NEF, ARW ...)
 
 # Optional: InsightFace SCRFD detection backend (needs MSVC Build Tools on Windows)
 # insightface>=0.7

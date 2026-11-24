@@ -1,35 +1,36 @@
-# Python
+# Python bytecode & environments
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 *.egg-info/
 
-# Tooling
+# Build & packaging output
+build/
+dist/
+
+# Test & linter cache
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 
-# Runtime output (never commit photos, DBs, or models)
+# Runtime output & databases (never commit user photos, DBs, or binary weights)
 workspace/
+ws_*/
+smoke_*/
 *.db
 *.db-wal
 *.db-shm
 *.onnx
 *.part
-smoke_photos/
-smoke_ws/
-smoke_test/
-ws_test/
-smoke_4b.py
 
-# Local data
-data/*
-!data/.gitkeep
-docs/
-
-# OS / IDE
+# OS & IDE metadata
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+
+# Local testing website / scratch scripts
+test_server.py
+web_test/
+

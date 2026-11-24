@@ -6,11 +6,11 @@ import os
 
 import pytest
 
-from cli import build_parser, main
-from core.models import FaceBox
-from database import DatabaseManager
-from processing import pipeline
-from utils.logger import setup_logging
+from memoframe.cli import build_parser, main
+from memoframe.core.models import FaceBox
+from memoframe.database import DatabaseManager
+from memoframe.processing import pipeline
+from memoframe.utils.logger import setup_logging
 
 
 @pytest.fixture(autouse=True)

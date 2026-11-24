@@ -9,10 +9,10 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from core.image_loader import ImageLoadError, load_image
-from core.metadata_extractor import extract_metadata, parse_exif_datetime
-from core.models import TS_EXIF_DATETIME, TS_FILE_MTIME, TS_NONE
-from core.scanner import iter_image_files
+from memoframe.core.image_loader import ImageLoadError, load_image
+from memoframe.core.metadata_extractor import extract_metadata, parse_exif_datetime
+from memoframe.core.models import TS_EXIF_DATETIME, TS_FILE_MTIME, TS_NONE
+from memoframe.core.scanner import iter_image_files
 
 
 def test_loads_and_downscales(tmp_path, make_image):

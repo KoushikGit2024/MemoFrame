@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from processing.pipeline import PipelineError, find_missing_images, remove_images
-from processing.thumbnail_generator import shard_dir
+from memoframe.processing.pipeline import PipelineError, find_missing_images, remove_images
+from memoframe.processing.thumbnail_generator import shard_dir
 
 
 def _face():
@@ -51,7 +51,7 @@ def test_remove_deletes_records_outputs_and_rebuilds_duplicates(db, settings, tm
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_bytes(b"x")
 
-    from processing.pipeline import update_duplicates
+    from memoframe.processing.pipeline import update_duplicates
     assert update_duplicates(settings, db) == 1               # all three share one SHA-256
 
     b.unlink()

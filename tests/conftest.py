@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:          # fallback if pytest.ini is ignored
     sys.path.insert(0, str(ROOT))
 
-from config import Settings            # noqa: E402
-from database import DatabaseManager   # noqa: E402
+from memoframe.config import Settings            # noqa: E402
+from memoframe.database import DatabaseManager   # noqa: E402
 
 
 @pytest.fixture

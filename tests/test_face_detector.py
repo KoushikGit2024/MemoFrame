@@ -7,15 +7,15 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from config import YUNET_FILENAME, Settings
-from core.face_detector import (
+from memoframe.config import YUNET_FILENAME, Settings
+from memoframe.core.face_detector import (
     DetectorUnavailableError,
     FaceDetector,
     YuNetDetector,
     create_detector,
 )
-from core.image_loader import LoadedImage, load_image
-from processing.face_processor import assign_labels, expand_box
+from memoframe.core.image_loader import LoadedImage, load_image
+from memoframe.processing.face_processor import assign_labels, expand_box
 
 ROOT = Path(__file__).resolve().parent.parent
 MODEL = Path(os.environ.get("PHOTO_ORGANIZER_MODEL", ROOT / "workspace" / "models" / YUNET_FILENAME))
@@ -79,7 +79,7 @@ def test_labels_are_anonymous_and_positional():
 
 
 def test_expand_box_clips_to_image():
-    from core.models import FaceBox
+    from memoframe.core.models import FaceBox
     box = FaceBox(5, 5, 100, 100, 0.9)
     assert expand_box(box, 120, 120, 0.25) == (0, 0, 120, 120)
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from database import STATUS_DONE, STATUS_FAILED, STATUS_PENDING, DatabaseManager, ScanStats
+from memoframe.database import STATUS_DONE, STATUS_FAILED, STATUS_PENDING, DatabaseManager, ScanStats
 
 
 def _face(x=1, y=1, w=5, h=5, c=0.9):

@@ -7,10 +7,10 @@ import shutil
 
 import pytest
 
-from core.models import FaceBox
-from database import DatabaseManager
-from processing import pipeline
-from processing.pipeline import process_pending, scan_directory, update_duplicates, update_groups
+from memoframe.core.models import FaceBox
+from memoframe.database import DatabaseManager
+from memoframe.processing import pipeline
+from memoframe.processing.pipeline import process_pending, scan_directory, update_duplicates, update_groups
 
 
 class FakeDetector:

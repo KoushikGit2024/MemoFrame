@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from PIL import Image
 
-from core.image_similarity import compute_features
-from processing.image_grouper import group_images, haversine_km
+from memoframe.core.image_similarity import compute_features
+from memoframe.processing.image_grouper import group_images, haversine_km
 
 
 def row(i, ts, lat=None, lon=None, source="exif_original", features=None):
