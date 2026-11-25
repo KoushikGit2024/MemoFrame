@@ -24,6 +24,7 @@ DOCUMENTED = [
     "check_files", "forget_missing", "thumbnail", "cache_info", "clear_cache", "maintenance",
     "repair", "doctor", "export_diagnostics",
     "watch", "tag_existing", "get_tags", "list_tags", "similar", "rescan",
+    "recognize_existing",
     "get_persons", "get_person", "rename_person", "get_person_faces", "get_unassigned_faces",
     "assign_face", "create_person", "merge_persons", "confirm_person", "unlock_face",
 ]

@@ -129,7 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="photo_organizer",
-        description="Local photo organizer: face detection (no identity matching), "
+        description="Local photo organizer: face detection and offline person clustering, "
                     "duplicates and event grouping. Original photos are never modified.")
     sub = parser.add_subparsers(dest="command", required=True, metavar="<command>")
 
@@ -459,7 +459,7 @@ def cmd_maintain(args: argparse.Namespace, settings: Settings) -> int:
 
 
 def cmd_analyze(args: argparse.Namespace, settings: Settings) -> int:
-    from processing.enrich import enrich_existing
+    from services.pipeline.enrich import enrich_existing
     _require_db(settings)
     with DatabaseManager(settings.db_path) as db:
         print(f"Analysed {enrich_existing(settings, db)} photo(s).")
@@ -473,7 +473,7 @@ def cmd_analyze(args: argparse.Namespace, settings: Settings) -> int:
 
 
 def cmd_tag(args: argparse.Namespace, settings: Settings) -> int:
-    from processing.tagging import tag_existing
+    from services.intelligence.tagging import tag_existing
     _require_db(settings)
     if args.store_embeddings:
         settings = settings.with_overrides(store_embeddings=True)
@@ -489,8 +489,8 @@ def cmd_tag(args: argparse.Namespace, settings: Settings) -> int:
 
 def cmd_watch(args: argparse.Namespace, settings: Settings) -> int:
     from engine.profiles import apply_profile
-    from processing.control import RunControl
-    from processing.watcher import FolderWatcher
+    from services.pipeline.control import RunControl
+    from services.pipeline.watcher import FolderWatcher
 
     settings = apply_profile(settings, "gentle").with_overrides(
         watch_interval_s=args.interval, watch_settle_s=args.settle,

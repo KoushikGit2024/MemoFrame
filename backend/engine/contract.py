@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import inspect
 
-API_VERSION = "1.0.0"
+API_VERSION = "1.2.0"
 EVENT_FIELDS = ("stage", "done", "total", "failed", "current", "message")
 
 

@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from config import YUNET_SHA256, Settings
+from config import SFACE_SHA256, YUNET_SHA256, Settings
 from utils.file_utils import sha256_file
 from utils.system_info import available_memory_mb
 
@@ -81,6 +81,18 @@ def run_checks(settings: Settings, source_dirs: Iterable[Path | str] = ()) -> li
             else:
                 out.append(Check("model", "fail", "hash does not match",
                                  f"Delete {model} and let it download again."))
+
+    sface = settings.sface_path
+    if not sface.is_file():
+        out.append(Check("sface model", "warn", "SFace recognition model not downloaded yet",
+                         f"Downloads on first processing, or save the file as {sface}"))
+    else:
+        digest = sha256_file(sface)
+        if SFACE_SHA256 and digest.lower() != SFACE_SHA256.lower():
+            out.append(Check("sface model", "fail", f"hash mismatch (sha256 {digest})",
+                             "Run tools/verify_models.py; fix SFACE_SHA256 in config.py or re-download."))
+        else:
+            out.append(Check("sface model", "ok", "present, hash verified"))
 
     try:
         settings.workspace.mkdir(parents=True, exist_ok=True)

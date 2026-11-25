@@ -30,36 +30,29 @@ MemoFrame turns unorganized photo folders into a structured, searchable local li
 
 ## Architecture & Project Structure
 
-The engine uses a modern `src/` layout:
+The project is organized into `backend` and `frontend`:
 
 ```text
 MemoFrame/
-├── main.py                     # Root CLI entry point
-├── src/
-│   └── memoframe/
-│       ├── config.py           # Application settings, paths, and model configs
-│       ├── cli.py              # Command-line interface definitions
-│       ├── core/               # Pure algorithms & processing modules
-│       │   ├── face_detector.py      # YuNet & InsightFace face detection
-│       │   ├── face_recognizer.py    # SFace 128-d face embedding extractor
-│       │   ├── face_clusterer.py     # DBSCAN cosine face clustering
-│       │   ├── duplicate_detector.py # pHash / dHash multi-index duplicate clustering
-│       │   ├── image_loader.py       # Robust image decoding & EXIF auto-rotation
-│       │   ├── metadata_extractor.py # EXIF timestamps, GPS, camera metadata
-│       │   └── video_info.py         # Fast MP4/MOV header parser & poster extraction
-│       ├── database/           # SQLite persistence layer (schema v9 with WAL mode)
-│       │   ├── schema.sql            # Table definitions (images, faces, persons, groups)
-│       │   ├── migrations.py         # Versioned schema migrations
-│       │   └── db_manager.py         # Thread-safe database operations & FTS5 queries
-│       ├── engine/             # High-level Engine API & exclusive workspace lock
-│       │   ├── api.py                # Public Python SDK (Engine.find, Engine.rescan, etc.)
-│       │   └── lock.py               # Cross-process workspace file locking
-│       ├── processing/         # Pipeline stages & multiprocessing workers
-│       │   ├── pipeline.py           # Master 8-stage ingestion pipeline
-│       │   └── face_processor.py     # Face cropping, annotation & embedding computation
-│       └── utils/              # Logging, system info, and model downloader
-├── tests/                      # Full pytest test suite (194 tests)
-└── workspace/                  # Default user workspace (database, models, thumbnails)
+├── backend/                    # Core organization and face clustering engine
+│   ├── config.py               # Settings, model URLs, derived directories
+│   ├── cli.py                  # CLI entry point (memoframe command)
+│   ├── database/               # SQLite persistence, migrations, schema.sql
+│   ├── engine/                 # Public Engine API, lock, contract, profiles
+│   ├── services/               # Service modules
+│   │   ├── face/               # YuNet detector, SFace recognizer, clustering
+│   │   ├── intelligence/       # Scene tagger, reverse geocoding, quality
+│   │   ├── organization/       # Duplicates, bursts, event grouper
+│   │   ├── pipeline/           # Pipeline orchestrator, watcher, scanner
+│   │   └── vision/             # Image/video decoding, thumbnails, metadata
+│   ├── tests/                  # Backend pytest test suite
+│   └── workspace/              # Default user workspace (database, models, thumbnails)
+├── frontend/                   # Modern PyQt6 desktop application
+│   ├── gui/                    # UI views (gallery, people, duplicates, timeline, settings)
+│   ├── tests/                  # Frontend tests (test_gui.py)
+│   ├── run_gui.py              # GUI launcher script
+│   └── requirements.txt        # Frontend dependencies
+└── README.md
 ```
 
 ---
@@ -81,34 +74,45 @@ When scanning or rescanning, MemoFrame processes photos through 8 distinct, faul
 
 ## Command Line Usage
 
+Run commands from the `backend/` directory:
+
 ### 1. Ingest & Organize a Photo Folder
 ```powershell
-python main.py process --input "D:\Photos"
+python main.py scan --input "D:\Photos"
+python main.py process
 ```
-Scans `D:\Photos`, runs face detection and recognition, clusters people, finds duplicates, and builds event groups.
+Or run the all-in-one pipeline:
+```powershell
+python main.py process --input "D:\Photos"   # scan + analyse in one go
+```
 
 ### 2. On-Demand Incremental Rescan
 ```powershell
-python main.py rescan
+python cli.py rescan
 ```
-Discovers any newly added or modified photos across all known source folders, updates face clusters and groups, and immediately terminates.
 
 ### 3. Search & Query Photos
 ```powershell
 # Find photos with 2 or more people
-python main.py search --min-faces 2
+python cli.py search --min-faces 2
 
 # Search by date range and location
-python main.py search --from 2024-01-01 --until 2024-12-31 --path "Vacation"
+python cli.py search --from 2024-01-01 --until 2024-12-31 --path "Vacation"
 ```
 
 ### 4. Duplicate Check & Reporting
 ```powershell
 # List duplicate clusters and suggested keepers
-python main.py duplicates
+python cli.py duplicates
 
 # Generate comprehensive JSON and CSV statistics
-python main.py report
+python cli.py report
+```
+
+### 5. Desktop GUI
+Run the graphical interface from the `frontend/` directory:
+```powershell
+python run_gui.py
 ```
 
 ---

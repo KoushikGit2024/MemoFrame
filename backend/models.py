@@ -1,8 +1,8 @@
 """Plain data containers shared across the pipeline.
 
 These are picklable dataclasses, so worker processes can return them to the
-parent process. Faces carry geometry and confidence only: there is no
-embedding field anywhere, by design.
+parent process. Faces carry geometry, confidence, and 128-d embeddings for
+offline person clustering.
 """
 from __future__ import annotations
 

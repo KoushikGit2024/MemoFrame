@@ -4,20 +4,19 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
 ROOT = Path(SPECPATH).parent
-datas = [(str(ROOT / "src" / "memoframe" / "database" / "schema.sql"), "database"),
-         (str(ROOT / "src" / "memoframe" / "database" / "schema.sql"), "memoframe/database")]
+datas = [(str(ROOT / "database" / "schema.sql"), "database")]
 binaries, hiddenimports = [], ["sklearn.utils._typedefs", "sklearn.neighbors._partition_nodes"]
 try:
     d, b, h = collect_all("pillow_heif")
     datas += d; binaries += b; hiddenimports += h
 except Exception:
     pass
-model = ROOT / "models" / "face_detection_yunet_2023mar.onnx"   # optional: ship it
+model = ROOT / "workspace" / "models" / "face_detection_yunet_2023mar.onnx"   # optional: ship it
 if model.is_file():
     datas.append((str(model), "models"))
 
 a = Analysis([str(ROOT / "packaging" / "engine_entry.py")],
-             pathex=[str(ROOT), str(ROOT / "src"), str(ROOT / "src" / "memoframe")],
+             pathex=[str(ROOT)],
              datas=datas, binaries=binaries, hiddenimports=hiddenimports,
              excludes=["tkinter", "matplotlib", "IPython", "pytest"])
 pyz = PYZ(a.pure)

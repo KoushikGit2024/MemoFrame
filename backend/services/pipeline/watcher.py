@@ -1,4 +1,4 @@
-"""Watch mode: poll folders (read-only) and process new or changed photos when they are stable.
+"""Watch mode: poll folders in the background and process new or changed photos when they are stable.
 
 Nothing is ever written next to the photos. Offline folders are skipped, and nothing is marked
 missing here.

@@ -16,16 +16,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import cv2  # noqa: E402
-from config import Settings  # noqa: E402
+from config import VIDEO_EXTENSIONS, Settings  # noqa: E402
 from services.intelligence.tagger import TaggerUnavailableError, create_tagger  # noqa: E402
-from utils.file_utils import is_supported_image  # noqa: E402
+from services.vision.loader import load_image
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("folder", type=Path, help="folder of test photos")
     parser.add_argument("--workspace", type=Path, default=Path("workspace"),
-                        help="workspace containing models/tagger/ (default: workspace)")
+                        help="workspace containing models/tags/ (default: workspace)")
     parser.add_argument("--limit", type=int, default=50, help="max photos to benchmark (default 50)")
     args = parser.parse_args(argv)
 
@@ -40,7 +40,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: tagger not available: {exc}", file=sys.stderr)
         return 1
 
-    files = [p for p in sorted(args.folder.rglob("*")) if is_supported_image(p)]
+    exts = Settings().extensions - VIDEO_EXTENSIONS
+    files = [p for p in sorted(args.folder.rglob("*")) if p.is_file() and p.suffix.lower() in exts]
     if not files:
         print(f"No supported images found in {args.folder}")
         return 0
@@ -54,15 +55,16 @@ def main(argv: list[str] | None = None) -> int:
 
     for path in files:
         t0 = time.perf_counter()
-        img = cv2.imread(str(path))
-        if img is None:
+        try:
+            loaded = load_image(path, max_side=1280)
+            tags, emb = tagger.tag(loaded.pil)
+        except Exception:
             failed += 1
             continue
-        tags, emb = tagger.tag(img)
         dt = (time.perf_counter() - t0) * 1000.0
         times.append(dt)
-        for t in tags:
-            tag_counts[t.label] = tag_counts.get(t.label, 0) + 1
+        for label, conf in tags:
+            tag_counts[label] = tag_counts.get(label, 0) + 1
 
     if not times:
         print(f"All {failed} image(s) failed to decode.")

@@ -18,7 +18,7 @@ DEFAULT_COSINE_DISTANCE_EPS = 0.38
 DEFAULT_MIN_SAMPLES = 2
 
 
-def _unit(blob: bytes) -> np.ndarray:
+def _unit(blob: bytes) -> np.ndarray | None:
     """128-d unit-length float32 vector from a 512-byte raw embedding."""
     if not blob or len(blob) != 512:
         return None
@@ -82,7 +82,7 @@ def attach_faces(
     if not clusters or not weak:
         return clusters
 
-    emb_by_id = {fid: _unit(b) for fid, b in pool}
+    emb_by_id = {fid: v for fid, b in pool if (v := _unit(b)) is not None}
     centroids: dict[int, np.ndarray] = {}
     for cidx, fids in clusters.items():
         vecs = [emb_by_id[f] for f in fids if f in emb_by_id]
@@ -99,6 +99,8 @@ def attach_faces(
 
     for fid, b in weak:
         v = _unit(b)
+        if v is None:
+            continue
         # Cosine distance = 1 - dot product (both unit vectors)
         dists = 1.0 - (C @ v)
         best_idx = int(np.argmin(dists))
@@ -126,7 +128,6 @@ def cluster_face_embeddings(
     if not face_records:
         return {}
 
-    face_ids = [rec[0] for rec in face_records]
     vectors = []
     valid_face_ids = []
 

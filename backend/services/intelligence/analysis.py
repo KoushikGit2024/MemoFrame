@@ -19,7 +19,7 @@ _ISO = "%Y-%m-%dT%H:%M:%S"
 
 
 def compute_dhash(pil: Image.Image) -> str:
-    """64-bit difference hash as 16 hex chars (compare with ``image_similarity.hamming``)."""
+    """64-bit difference hash as 16 hex chars (compare with ``services.organization.similarity.hamming``)."""
     grey = np.asarray(pil.convert("L").resize((9, 8), Image.Resampling.LANCZOS), dtype=np.int16)
     value = 0
     for bit in (grey[:, 1:] > grey[:, :-1]).flatten():

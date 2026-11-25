@@ -7,6 +7,7 @@ import numpy as np
 
 _BUILTIN = [
     ("Imphal", "IN", 24.8170, 93.9368), ("Guwahati", "IN", 26.1445, 91.7362),
+    ("Agartala", "IN", 23.8315, 91.2868),
     ("Kolkata", "IN", 22.5726, 88.3639), ("Delhi", "IN", 28.6139, 77.2090),
     ("Mumbai", "IN", 19.0760, 72.8777), ("Bengaluru", "IN", 12.9716, 77.5946),
     ("Chennai", "IN", 13.0827, 80.2707), ("Hyderabad", "IN", 17.3850, 78.4867),
@@ -51,8 +52,10 @@ class PlaceIndex:
     def lookup_many(self, points: np.ndarray, max_km: float) -> list[str | None]:
         """Nearest place per ``(lat, lon)`` row, or ``None`` if farther than ``max_km``."""
         out: list[str | None] = []
-        for start in range(0, len(points), 256):
-            p = np.radians(np.asarray(points[start:start + 256], dtype=np.float64))
+        # Cap intermediate distance-matrix memory at ~32 MB (float64: 8 bytes per cell).
+        step = max(1, min(256, (32 * 1024 * 1024) // (max(1, len(self.labels)) * 8)))
+        for start in range(0, len(points), step):
+            p = np.radians(np.asarray(points[start:start + step], dtype=np.float64))
             dlat = p[:, 0, None] - self.lat[None, :]
             dlon = p[:, 1, None] - self.lon[None, :]
             a = (np.sin(dlat / 2) ** 2

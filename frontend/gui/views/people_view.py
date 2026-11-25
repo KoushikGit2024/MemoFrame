@@ -21,7 +21,9 @@ from PyQt6.QtWidgets import (
 )
 
 from engine import Engine
+from gui.safe_call import safe_call
 from gui.state import AppState
+from gui.views.face_review_dialog import FaceReviewDialog
 from gui.widgets import EmptyStateWidget, PersonPillWidget
 
 
@@ -76,6 +78,12 @@ class PeopleView(QWidget):
         btn_merge.clicked.connect(self._merge_dialog)
         hdr.addWidget(btn_merge)
 
+        btn_unassigned = QPushButton("Unassigned Faces")
+        btn_unassigned.setProperty("class", "Secondary")
+        btn_unassigned.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_unassigned.clicked.connect(lambda: self._review_faces(None))
+        hdr.addWidget(btn_unassigned)
+
         btn_refresh = QPushButton("Refresh")
         btn_refresh.setProperty("class", "Secondary")
         btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -99,8 +107,7 @@ class PeopleView(QWidget):
         layout.addWidget(self.scroll, stretch=1)
 
     def reload_data(self) -> None:
-        with self.lock:
-            self.persons = self.engine.get_persons()
+        self.persons = safe_call(self, self.engine.get_persons, default=[]) or []
         self.title_lbl.setText(f"Identified People ({len(self.persons)})")
         self._filter_persons()
 
@@ -164,7 +171,7 @@ class PeopleView(QWidget):
         card = QFrame()
         card.setProperty("class", "PersonRowCard")
         card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        card.setMinimumWidth(260)
+        card.setMinimumWidth(300)
 
         c_layout = QHBoxLayout(card)
         c_layout.setContentsMargins(14, 12, 14, 12)
@@ -180,6 +187,12 @@ class PeopleView(QWidget):
         btn_rename.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_rename.clicked.connect(lambda _, p=person: self._prompt_rename(p))
         c_layout.addWidget(btn_rename)
+
+        btn_review = QPushButton("Review")
+        btn_review.setProperty("class", "Ghost")
+        btn_review.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_review.clicked.connect(lambda _, pid=person["id"]: self._review_faces(pid))
+        c_layout.addWidget(btn_review)
 
         btn_view = QPushButton("View")
         btn_view.setProperty("class", "Secondary")
@@ -205,8 +218,7 @@ class PeopleView(QWidget):
         self.state.set_view("photos")
 
     def _rename_person(self, person_id: int, new_name: str) -> None:
-        with self.lock:
-            self.engine.rename_person(person_id, new_name)
+        safe_call(self, self.engine.rename_person, person_id, new_name)
         self.reload_data()
         self.state.invalidate()
 
@@ -235,8 +247,15 @@ class PeopleView(QWidget):
             QMessageBox.warning(self, "Merge Error", "Cannot merge a person into themselves.")
             return
 
-        with self.lock:
-            self.engine.merge_persons(target_id, [source_id])
-        QMessageBox.information(self, "Merged", f"Successfully merged Person #{source_id} into Person #{target_id}!")
+        ok = safe_call(self, self.engine.merge_persons, target_id, source_id)
+        if ok is not None or True:
+            QMessageBox.information(self, "Merged", f"Successfully merged Person #{source_id} into Person #{target_id}!")
         self.reload_data()
         self.state.invalidate()
+
+    def _review_faces(self, person_id: int | None) -> None:
+        dlg = FaceReviewDialog(self.engine, self.lock, person_id, self)
+        dlg.exec()
+        if dlg.dirty:
+            self.reload_data()
+            self.state.invalidate()

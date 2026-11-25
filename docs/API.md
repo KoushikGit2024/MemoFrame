@@ -1,4 +1,4 @@
-# Engine API (version 1.0.0)
+# Engine API (version 1.1.0)
 
 Versioning: MAJOR = breaking change, MINOR = additions. `Engine.api_version` and
 `python -m engine version` report it.
@@ -19,9 +19,8 @@ with Engine(workspace, profile="gentle", on_event=callback) as eng:
 ```
 Profiles: `gentle`, `balanced`, `fast`. Settings: `<workspace>/config.toml`.
 `on_event` receives `ProgressEvent(stage, done, total, failed, current, message)` on the
-worker thread. Stages: `scan`, `process`, `duplicates`, `groups`, `analyze`, `watch`, `waiting`
-(`message` = `paused` / `low memory` / `resumed` / `on battery`), `done`. Places, bursts and the search
-index run without events.
+worker thread. Stages: `scan`, `process`, `duplicates`, `places`, `bursts`, `groups`, `persons`, `index`, `analyze`, `tag`, `watch`, `waiting`
+(`message` = `paused` / `low memory` / `resumed` / `on battery`), `done`.
 
 ## Error codes
 DRIVE_OFFLINE, MODEL_MISSING, MODEL_DOWNLOAD_FAILED, DETECTOR_UNAVAILABLE, TAGGER_UNAVAILABLE, CONFIG_INVALID,
@@ -32,9 +31,9 @@ FILE_MISSING, FILE_UNREADABLE, CORRUPT_IMAGE, CORRUPT_VIDEO or UNSUPPORTED_FORMA
 ## Methods
 | Area | Methods |
 |---|---|
-| Work | `scan`, `process`, `run_all`, `analyze_existing`, `rebuild`, `cancel`, `pause`, `resume`, `watch` |
-| Query | `find`, `count`, `timeline`, `search`, `get_image`, `get_faces`, `get_groups`, `get_group_images`, `get_duplicate_clusters`, `get_bursts`, `get_burst_images`, `failed_images`, `live_video`, `low_confidence_faces`, `stats` |
-| People | `get_persons`, `get_person`, `rename_person`, `get_person_faces`, `get_unassigned_faces`, `assign_face`, `create_person`, `merge_persons`, `confirm_person`, `unlock_face` |
+| Work | `scan`, `process`, `run_all`, `analyze_existing`, `recognize_existing(force=False)`, `rebuild`, `cancel`, `pause`, `resume`, `watch`, `reset_workspace(keep_generated=False, clear_sources=False, clear_saved_searches=False)` |
+| Query | `find`, `count`, `timeline`, `search`, `get_image`, `get_faces`, `get_faces_many`, `get_groups`, `get_group_images`, `get_duplicate_clusters`, `get_bursts`, `get_burst_images`, `failed_images`, `live_video`, `low_confidence_faces`, `stats` |
+| People | `get_persons`, `get_person`, `rename_person(person_id, new_name, confirm_faces=False)`, `name_face`, `get_person_faces`, `get_unassigned_faces`, `assign_face`, `create_person`, `merge_persons`, `confirm_person`, `unlock_face` |
 | Saved searches | `save_search`, `list_saved_searches`, `run_saved_search`, `delete_saved_search` |
 | Marks and dates | `set_mark`, `clear_mark`, `get_marks`, `suspicious_dates`, `set_date_override`, `clear_date_override`, `moves` |
 | Files and cache | `check_files`, `forget_missing`, `thumbnail`, `cache_info`, `clear_cache`, `maintenance`, `repair` |

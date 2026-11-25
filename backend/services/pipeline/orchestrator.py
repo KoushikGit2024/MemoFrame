@@ -89,13 +89,15 @@ def _init_worker(settings: Settings, ignore_sigint: bool) -> None:
     global _settings, _detector, _recognizer, _tagger
     if ignore_sigint:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
+        from utils.logger import setup_worker_logging
+        setup_worker_logging(settings.workspace)
     cv2.setNumThreads(settings.cv_threads)
-    if settings.low_priority:
+    if settings.low_priority and ignore_sigint:
         lower_process_priority()
     _settings = settings
     _detector = create_detector(settings)
     _tagger = create_tagger(settings)
-    if settings.sface_path.is_file():
+    if settings.face_recognition and settings.sface_path.is_file():
         try:
             _recognizer = FaceRecognizerSF(settings.sface_path, use_gpu=settings.use_gpu)
         except Exception as exc:
@@ -145,6 +147,7 @@ def _process_video(image_id: int, path: Path, mtime_ns: int, settings: Settings)
         }
         return True, image_id, res
     except Exception as exc:
+        log.exception("Video indexing failed for %s", path)
         return False, image_id, f"VIDEO_INDEX_FAILED: {exc}"
 
 
@@ -175,8 +178,9 @@ def _process_one_inner(task: _Task) -> _Outcome:
             big = load_image_bytes(data, path.name, settings.tile_source_side)
             faces = merge_faces(faces + detector.detect_tiled(big, settings.tile_size))
             del big
+        record.faces = process_faces(image_id, path, faces, settings,
+                                     recognizer=_recognizer, data=data)
         del data
-        record.faces = process_faces(image_id, path, faces, settings, recognizer=_recognizer)
         try:
             record.thumb_path = str(save_thumbnail(
                 loaded.pil, image_id, path, settings.thumbnails_dir,
@@ -197,6 +201,7 @@ def _process_one_inner(task: _Task) -> _Outcome:
     except ImageLoadError as exc:
         return False, image_id, str(exc)
     except Exception as exc:  # noqa: BLE001 - one bad file must not stop the run
+        log.exception("Failed processing %s", path_str)
         return False, image_id, f"{type(exc).__name__}: {exc}"
 
 
@@ -245,6 +250,27 @@ def scan_directory(
     return stats
 
 
+def _ensure_sface(settings: Settings) -> None:
+    marker = settings.models_dir / ".sface_download_failed"
+    try:
+        if (not settings.sface_path.is_file() and marker.is_file()
+                and time.time() - marker.stat().st_mtime < 3600):
+            log.warning("SFace download failed recently; people grouping disabled for now "
+                        "(delete %s to retry now)", marker)
+            return
+    except OSError:
+        pass
+    try:
+        ensure_model(settings.sface_path, SFACE_URL, SFACE_SHA256)
+        marker.unlink(missing_ok=True)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Face recognition model unavailable, people grouping disabled: %s", exc)
+        try:
+            marker.write_text(str(exc)[:500], encoding="utf-8")
+        except OSError:
+            pass
+
+
 def process_pending(
     settings: Settings,
     db: DatabaseManager,
@@ -271,10 +297,7 @@ def process_pending(
     settings.ensure_dirs()
     if settings.detector_backend.lower() == "yunet":
         ensure_model(settings.yunet_path)
-    try:
-        ensure_model(settings.sface_path, SFACE_URL, SFACE_SHA256)
-    except Exception as exc:
-        log.warning("Face recognition model unavailable, people grouping disabled: %s", exc)
+    _ensure_sface(settings)
     create_tagger(settings)                 # fail fast if tagging is on but its files are missing
     if settings.low_priority:
         lower_process_priority()
@@ -289,9 +312,12 @@ def process_pending(
         create_detector(settings).close()        # fail fast, before spawning workers
         # On Windows, OpenCV C++ threads/ONNX runtime handles deadlock if max_tasks_per_child recycles workers
         recycle = None if sys.platform == "win32" else (settings.worker_recycle_tasks or None)
+        import multiprocessing
+        mp_context = None if sys.platform == "win32" else multiprocessing.get_context("spawn")
         executor = ProcessPoolExecutor(
             max_workers=workers,
             max_tasks_per_child=recycle,
+            mp_context=mp_context,
             initializer=_init_worker,
             initargs=(settings, True),
         )
@@ -392,7 +418,9 @@ def update_places(settings: Settings, db: DatabaseManager, force: bool = False) 
         if not rows:
             return named
         if index is None:
-            index = load_place_index(settings.workspace / "data")
+            places_dir = settings.workspace / "data" / "places"
+            data_dir = places_dir if places_dir.is_dir() else (settings.workspace / "data")
+            index = load_place_index(data_dir)
         points = np.array([[r["gps_lat"], r["gps_lon"]] for r in rows], dtype=np.float64)
         labels = index.lookup_many(points, settings.place_max_km)
         db.set_places([(int(r["id"]), label or "") for r, label in zip(rows, labels)])
@@ -529,7 +557,7 @@ def run_pipeline(
             try:
                 update_fn()
             except Exception as exc:
-                log.warning("Stage %s failed: %s", stage_name, exc)
+                log.error("Stage %s failed", stage_name, exc_info=True)
                 if control:
                     control.emit(ProgressEvent(stage_name, message=f"{stage_name} warning: {exc}"))
 

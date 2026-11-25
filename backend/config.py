@@ -79,6 +79,7 @@ class Settings:
 
     # --- Face detection --------------------------------------------------
     detector_backend: str = "yunet"          # "yunet" | "insightface"
+    face_recognition: bool = True            # extract 128-d embeddings with SFace
     confidence_threshold: float = 0.7
     nms_threshold: float = 0.3
     max_detect_side: int = 1280              # downscale long side before detection
@@ -157,6 +158,10 @@ class Settings:
     @property
     def reports_dir(self) -> Path:
         return self.workspace / "reports"
+
+    @property
+    def generated_dir(self) -> Path:
+        return self.thumbnails_dir
 
     @property
     def log_path(self) -> Path:

@@ -367,12 +367,15 @@ class DatabaseManager:
         rows = self._query(
             """SELECT d.cluster_id, d.kind, i.id, i.path, i.size, i.width, i.height, i.quality
                  FROM duplicates d JOIN images i ON i.id = d.image_id
+                WHERE i.state != 'missing'
+                  AND NOT EXISTS (SELECT 1 FROM marks h
+                                   WHERE h.image_id = i.id AND h.kind = 'hidden')
                 ORDER BY d.cluster_id, i.id"""
         )
         clusters: dict[int, list[sqlite3.Row]] = {}
         for row in rows:
             clusters.setdefault(row["cluster_id"], []).append(row)
-        return clusters
+        return {k: v for k, v in clusters.items() if len(v) > 1}
 
     # ------------------------------------------------------------------
     # Grouping
@@ -429,8 +432,28 @@ class DatabaseManager:
         return rows[0] if rows else None
 
     def get_faces(self, image_id: int) -> list[sqlite3.Row]:
-        """Face boxes for one image (labels are local to that image)."""
-        return self._query("SELECT * FROM faces WHERE image_id = ? ORDER BY id", (image_id,))
+        """Face boxes for one image, with the owning person's name (labels are local to the image)."""
+        return self._query(
+            "SELECT f.*, p.name AS person_name FROM faces f "
+            "LEFT JOIN persons p ON p.id = f.person_id "
+            "WHERE f.image_id = ? ORDER BY f.id", (image_id,))
+
+    def faces_for_images(self, image_ids: Iterable[int],
+                         chunk_size: int = 500) -> dict[int, list[sqlite3.Row]]:
+        """Faces of many images in a few queries (no embeddings). Fixes the N+1 in the GUI."""
+        ids = [int(i) for i in image_ids]
+        out: dict[int, list[sqlite3.Row]] = {i: [] for i in ids}
+        for start in range(0, len(ids), chunk_size):
+            part = ids[start:start + chunk_size]
+            marks = ",".join("?" for _ in part)
+            rows = self._query(
+                "SELECT f.id, f.image_id, f.person_id, f.label, f.x, f.y, f.w, f.h, "
+                "f.confidence, f.crop_path, f.locked, p.name AS person_name "
+                "FROM faces f LEFT JOIN persons p ON p.id = f.person_id "
+                f"WHERE f.image_id IN ({marks}) ORDER BY f.image_id, f.id", part)
+            for r in rows:
+                out[int(r["image_id"])].append(r)
+        return out
 
     def search_images(
         self,
@@ -705,6 +728,15 @@ class DatabaseManager:
             n = conn.execute("UPDATE faces SET locked = 1 WHERE person_id = ?", (person_id,)).rowcount
             self._bump_persons(conn)
             return n
+
+    def set_face_locked(self, face_id: int, locked: bool = True) -> bool:
+        """Explicitly set the locked flag on a face."""
+        with self._tx() as conn:
+            changed = conn.execute("UPDATE faces SET locked = ? WHERE id = ?",
+                                   (1 if locked else 0, face_id)).rowcount > 0
+            if changed:
+                self._bump_persons(conn)
+            return changed
 
     def unlock_face(self, face_id: int) -> bool:
         """Hand a face back to automatic clustering (applies on the next people rebuild)."""
@@ -1387,6 +1419,15 @@ class DatabaseManager:
         with self._lock:
             self._db.execute("VACUUM")
         log.info("Database reset.")
+
+    def clear_sources(self) -> None:
+        """Forget scanned root folders (the 'rescan all known sources' list)."""
+        with self._tx() as conn:
+            conn.execute("DELETE FROM sources")
+
+    def clear_saved_searches(self) -> None:
+        with self._tx() as conn:
+            conn.execute("DELETE FROM saved_searches")
 
     # ------------------------------------------------------------------
     # Pruning

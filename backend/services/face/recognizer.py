@@ -6,6 +6,10 @@ vectors used for person clustering and face matching across photos.
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
+import shutil
+import sys
+import tempfile
 import cv2
 import numpy as np
 
@@ -14,12 +18,34 @@ from utils.logger import get_logger
 log = get_logger("core.face_recognizer")
 
 
+def _ascii_path(p: Path) -> str:
+    """Return a path safe for OpenCV's ASCII-only C++ loader on Windows."""
+    s = str(p)
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            buf = ctypes.create_unicode_buffer(512)
+            if ctypes.windll.kernel32.GetShortPathNameW(s, buf, 512):
+                return buf.value
+        except Exception:
+            pass
+    return s
+
+
 class FaceRecognizerSF:
     """Wrapper around cv2.FaceRecognizerSF for robust feature extraction."""
 
     def __init__(self, model_path: Path, use_gpu: bool = False) -> None:
         self.model_path = model_path
         self._recognizer = self._create(use_gpu)
+
+    def _ascii_copy(self) -> str:
+        """ASCII-named temp copy for OpenCV builds that cannot open non-ASCII paths."""
+        digest = hashlib.sha1(str(self.model_path).encode("utf-8")).hexdigest()[:10]
+        dest = Path(tempfile.gettempdir()) / f"memoframe_{digest}_{self.model_path.name}"
+        if not dest.is_file() or dest.stat().st_size != self.model_path.stat().st_size:
+            shutil.copyfile(self.model_path, dest)
+        return _ascii_path(dest)
 
     def _create(self, use_gpu: bool):
         attempts = [(cv2.dnn.DNN_BACKEND_OPENCV, cv2.dnn.DNN_TARGET_CPU)]
@@ -31,7 +57,8 @@ class FaceRecognizerSF:
         for backend, target in attempts:
             creators = (
                 lambda: cv2.FaceRecognizerSF.create("onnx", data, np.empty(0, np.uint8), backend, target),
-                lambda: cv2.FaceRecognizerSF.create(str(self.model_path), "", backend, target),
+                lambda: cv2.FaceRecognizerSF.create(_ascii_path(self.model_path), "", backend, target),
+                lambda: cv2.FaceRecognizerSF.create(self._ascii_copy(), "", backend, target),
             )
             for create in creators:
                 try:

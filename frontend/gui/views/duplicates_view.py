@@ -20,7 +20,9 @@ from PyQt6.QtWidgets import (
 )
 
 from engine import Engine
+from gui.safe_call import safe_call
 from gui.state import AppState
+from gui.tasks import enrich_photos
 from gui.widgets import EmptyStateWidget, HorizontalStripScrollArea, PhotoCardWidget
 
 
@@ -54,6 +56,7 @@ class DuplicatesView(QWidget):
 
         sub = QLabel("Compare duplicate candidates side-by-side and keep the sharpest version in one click.")
         sub.setProperty("class", "PageSubtitle")
+        self.sub_lbl = sub
         title_block.addWidget(sub)
         hdr.addLayout(title_block, stretch=1)
 
@@ -121,14 +124,8 @@ class DuplicatesView(QWidget):
                 item.widget().deleteLater()
 
     def reload_data(self) -> None:
-        with self.lock:
-            dups = self.engine.find(duplicate="any", limit=300)
-            cluster_map: dict[int, list[dict[str, Any]]] = {}
-            for d in dups:
-                cid = d.get("cluster_id") or d.get("id")
-                cluster_map.setdefault(cid, []).append(d)
-
-            self.clusters = [c for c in cluster_map.values() if len(c) > 1]
+        clusters_map = safe_call(self, self.engine.get_duplicate_clusters, default={}) or {}
+        self.clusters = [m for m in clusters_map.values() if len(m) > 1]
 
         self.title_lbl.setText(f"Duplicate Clusters ({len(self.clusters)})")
         self.cluster_list.clear()
@@ -145,7 +142,7 @@ class DuplicatesView(QWidget):
             return
 
         for idx, cl in enumerate(self.clusters):
-            kind = str(cl[0].get("dup_kind", "near")).capitalize()
+            kind = str(cl[0].get("kind", "near")).capitalize()
             item = QListWidgetItem(f"Cluster #{idx + 1}  ·  {len(cl)} copies ({kind})")
             self.cluster_list.addItem(item)
 
@@ -159,12 +156,10 @@ class DuplicatesView(QWidget):
         self.cluster_title.setText(f"Comparing Cluster #{row + 1}  ·  {len(cluster)} Photos")
         self._clear_comparison()
 
-        best_id = max(
-            cluster,
-            key=lambda x: (x.get("quality") or 0, (x.get("width") or 0) * (x.get("height") or 0)),
-        )["id"]
+        best_id = next((p["id"] for p in cluster if p.get("suggested_keep")), cluster[0]["id"])
+        enriched_cluster = enrich_photos(self.engine, cluster)
 
-        for idx, photo in enumerate(cluster):
+        for idx, photo in enumerate(enriched_cluster):
             is_best = photo["id"] == best_id
             wrapper = QFrame()
             wrapper.setProperty("class", "KeeperCard" if is_best else "DuplicateCard")
@@ -182,12 +177,10 @@ class DuplicatesView(QWidget):
             badge_row.addStretch()
             card_box.addLayout(badge_row)
 
-            with self.lock:
-                try:
-                    thumb = self.engine.thumbnail(photo["id"])
-                except Exception:
-                    thumb = None
-                photo["faces"] = [dict(f) for f in self.engine.get_faces(photo["id"])]
+            try:
+                thumb = self.engine.thumbnail(photo["id"])
+            except Exception:
+                thumb = None
 
             card = PhotoCardWidget(photo, thumb_path=thumb)
             card.clicked.connect(lambda _, p=photo: self.photo_opened.emit(p))

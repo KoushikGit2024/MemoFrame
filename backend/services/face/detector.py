@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
@@ -185,16 +186,19 @@ class InsightFaceDetector(FaceDetector):
             det_size=(640, 640),
         )
 
-    def _detect_bgr(self, bgr: np.ndarray) -> list[RawBox]:
+    def _detect_bgr(self, bgr: np.ndarray) -> list[Any]:
         try:
             faces = self._app.get(bgr)
         except Exception as exc:  # noqa: BLE001 - onnxruntime raises varied errors
             log.warning("InsightFace failed: %s", exc)
             return []
-        out: list[RawBox] = []
+        out: list[Any] = []
         for f in faces:
             x1, y1, x2, y2 = (float(v) for v in f.bbox)
-            out.append((x1, y1, x2 - x1, y2 - y1, float(f.det_score)))
+            kps = getattr(f, "kps", None)       # 5 points: eyes, nose, mouth corners
+            lm = (tuple(float(v) for v in np.asarray(kps).reshape(-1))
+                  if kps is not None and np.asarray(kps).size == 10 else None)
+            out.append((x1, y1, x2 - x1, y2 - y1, float(f.det_score), lm))
         return out
 
 

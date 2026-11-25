@@ -7,17 +7,21 @@ from pathlib import Path
 from typing import Any
 
 from PIL import Image, ImageOps
-from PyQt6.QtCore import QRectF, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QPainter, QPen, QPixmap, QWheelEvent
+from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
+from PyQt6.QtGui import QBrush, QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap, QWheelEvent
 from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
+    QGraphicsItem,
     QGraphicsPixmapItem,
     QGraphicsRectItem,
     QGraphicsScene,
+    QGraphicsSimpleTextItem,
     QGraphicsView,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -27,13 +31,29 @@ from PyQt6.QtWidgets import (
 )
 
 from engine import Engine
+from gui.face_labels import face_display_name
+from gui.safe_call import safe_call
 from gui.theme_manager import get_active_theme
+from gui.views.date_dialogs import DateOverrideDialog
+from gui.widgets import clear_pixmap_cache
+
+_FAIL = object()
+
+
+class FaceRectItem(QGraphicsRectItem):
+    """Clickable face rectangle that carries face metadata."""
+
+    def __init__(self, rect: QRectF, face_data: dict[str, Any], parent: QGraphicsItem | None = None) -> None:
+        super().__init__(rect, parent)
+        self.face_data = face_data
+        self.setAcceptHoverEvents(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
 
 class InteractivePhotoView(QGraphicsView):
     """High-resolution zoomable and pannable image canvas with toggleable face bounding boxes."""
 
-    face_clicked = pyqtSignal(dict)
+    face_clicked = pyqtSignal(dict, object)  # face_data, screen_pos
     zoom_changed = pyqtSignal(int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -49,7 +69,7 @@ class InteractivePhotoView(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.pixmap_item: QGraphicsPixmapItem | None = None
-        self.face_items: list[QGraphicsRectItem] = []
+        self.face_items: list[QGraphicsItem] = []
         self.faces: list[dict[str, Any]] = []
         self._user_zoomed: bool = False
         self._zoom_factor: float = 1.0
@@ -70,21 +90,63 @@ class InteractivePhotoView(QGraphicsView):
         theme = get_active_theme()
         accent_col = QColor(theme.accent_hover if theme.is_dark else theme.accent)
         fill_col = QColor(accent_col)
-        fill_col.setAlpha(42)
-        pen = QPen(accent_col, 2.5)
+        fill_col.setAlpha(36)
+
+        solid_pen = QPen(accent_col, 2.2)
+        dashed_pen = QPen(accent_col, 1.8)
+        dashed_pen.setStyle(Qt.PenStyle.DashLine)
+
+        tag_bg_col = QColor(0, 0, 0, 190) if theme.is_dark else QColor(255, 255, 255, 220)
+        tag_text_col = QColor(255, 255, 255) if theme.is_dark else QColor(20, 20, 20)
+        font = QFont()
+        font.setPointSize(9)
+        font.setBold(True)
+        fm = QFontMetrics(font)
 
         for f in faces:
             bx = float(f.get("x", 0)) * sx
             by = float(f.get("y", 0)) * sy
             bw = float(f.get("w", 0)) * sx
             bh = float(f.get("h", 0)) * sy
+            rect = QRectF(bx, by, bw, bh)
 
-            rect_item = self.scene.addRect(QRectF(bx, by, bw, bh), pen, fill_col)
-            rect_item.setCursor(Qt.CursorShape.PointingHandCursor)
-            rect_item.setToolTip(f"Face Confidence: {round(float(f.get('confidence', 0)) * 100)}%")
-            self.face_items.append(rect_item)
+            display_name = face_display_name(f)
+            if display_name:
+                rect_item = FaceRectItem(rect, f)
+                rect_item.setPen(solid_pen)
+                rect_item.setBrush(fill_col)
+                rect_item.setToolTip(f"{display_name} (Click to manage)")
+                self.scene.addItem(rect_item)
+                self.face_items.append(rect_item)
+
+                # Label tag
+                tag_w = fm.horizontalAdvance(display_name) + 12
+                tag_h = fm.height() + 4
+                tag_x = bx + (bw - tag_w) / 2.0
+                tag_y = by + bh + 4 if (by + bh + tag_h + 4 < pixmap.height()) else max(0.0, by - tag_h - 4)
+                tag_rect = QRectF(tag_x, tag_y, tag_w, tag_h)
+
+                bg_item = self.scene.addRect(tag_rect, QPen(Qt.PenStyle.NoPen), tag_bg_col)
+                txt_item = self.scene.addSimpleText(display_name, font)
+                txt_item.setBrush(tag_text_col)
+                txt_item.setPos(tag_x + 6, tag_y + 2)
+                self.face_items.extend([bg_item, txt_item])
+            else:
+                rect_item = FaceRectItem(rect, f)
+                rect_item.setPen(dashed_pen)
+                rect_item.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+                rect_item.setToolTip("Click to name it")
+                self.scene.addItem(rect_item)
+                self.face_items.append(rect_item)
 
         self.reset_fit()
+
+    def mouseReleaseEvent(self, event) -> None:
+        super().mouseReleaseEvent(event)
+        if event.button() == Qt.MouseButton.LeftButton:
+            item = self.itemAt(event.pos())
+            if isinstance(item, FaceRectItem):
+                self.face_clicked.emit(item.face_data, event.globalPosition().toPoint())
 
     def set_faces_visible(self, visible: bool) -> None:
         for item in self.face_items:
@@ -127,6 +189,8 @@ class PhotoDetailDialog(QDialog):
         self.lock = lock
         self.image_id = photo_data.get("id", 0)
         self.file_path = photo_data.get("path", "")
+        self._changed: bool = False
+        self._meta_labels: dict[str, QLabel] = {}
 
         self.setWindowTitle(f"MemoFrame — {Path(self.file_path).name}")
         self.resize(1120, 760)
@@ -199,6 +263,7 @@ class PhotoDetailDialog(QDialog):
 
         self.canvas = InteractivePhotoView()
         self.canvas.zoom_changed.connect(lambda pct: self.zoom_lbl.setText(f"{pct}%"))
+        self.canvas.face_clicked.connect(self._on_face_clicked)
         c_layout.addWidget(self.canvas, stretch=1)
         splitter.addWidget(canvas_container)
 
@@ -231,12 +296,16 @@ class PhotoDetailDialog(QDialog):
         info_layout.setContentsMargins(0, 0, 4, 0)
         info_layout.setSpacing(12)
 
+        tags_str = ", ".join(t["label"] for t in (
+            safe_call(self, self.engine.get_tags, self.image_id, default=[]) or [])) or "—"
+
         meta_rows = [
             ("Date Taken", self.photo_data.get("effective_ts") or self.photo_data.get("exif_ts") or "Unknown"),
             ("Resolution", f"{self.photo_data.get('width', 0)} × {self.photo_data.get('height', 0)}"),
             ("Format", (self.photo_data.get("format") or "Unknown").upper()),
             ("Faces Detected", str(len(self.photo_data.get("faces", [])))),
             ("Quality Score", f"{round(float(self.photo_data.get('quality', 0)))}%" if self.photo_data.get("quality") else "N/A"),
+            ("Tags", tags_str),
             ("File Path", self.file_path or "—"),
         ]
 
@@ -249,6 +318,7 @@ class PhotoDetailDialog(QDialog):
             v_lbl.setProperty("class", "MetaValue")
             v_lbl.setWordWrap(True)
             v_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            self._meta_labels[label] = v_lbl
             box.addWidget(lbl)
             box.addWidget(v_lbl)
             info_layout.addLayout(box)
@@ -258,10 +328,39 @@ class PhotoDetailDialog(QDialog):
         d_layout.addWidget(scroll, stretch=1)
 
         # Quick Actions
-        btn_fav = QPushButton("★  Mark as Favourite")
-        btn_fav.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_fav.clicked.connect(self._toggle_favourite)
-        d_layout.addWidget(btn_fav)
+        self.btn_fav = QPushButton()
+        self.btn_fav.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_fav.clicked.connect(lambda: self._toggle_mark("favourite"))
+        d_layout.addWidget(self.btn_fav)
+
+        self.btn_hide = QPushButton()
+        self.btn_hide.setProperty("class", "Secondary")
+        self.btn_hide.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_hide.clicked.connect(lambda: self._toggle_mark("hidden"))
+        d_layout.addWidget(self.btn_hide)
+        self._refresh_mark_buttons()
+
+        date_row = QHBoxLayout()
+        b_date = QPushButton("Correct Date…")
+        b_date.setProperty("class", "Secondary")
+        b_date.clicked.connect(self._correct_date)
+        b_orig = QPushButton("Restore Date")
+        b_orig.setProperty("class", "Secondary")
+        b_orig.clicked.connect(self._restore_date)
+        date_row.addWidget(b_date)
+        date_row.addWidget(b_orig)
+        d_layout.addLayout(date_row)
+
+        b_sim = QPushButton("Find Similar")
+        b_sim.setProperty("class", "Secondary")
+        b_sim.clicked.connect(self._find_similar)
+        d_layout.addWidget(b_sim)
+
+        self._live = safe_call(self, self.engine.live_video, self.image_id, default=None)
+        self.btn_live = QPushButton("▶  Play Live Photo")
+        self.btn_live.setVisible(bool(self._live and Path(self._live.get("path", "")).is_file()))
+        self.btn_live.clicked.connect(self._play_live)
+        d_layout.addWidget(self.btn_live)
 
         btn_close = QPushButton("Close")
         btn_close.setProperty("class", "Secondary")
@@ -297,7 +396,104 @@ class PhotoDetailDialog(QDialog):
         except Exception as exc:
             QMessageBox.warning(self, "Load Error", f"Could not load image: {exc}")
 
-    def _toggle_favourite(self) -> None:
-        with self.lock:
-            self.engine.set_mark(self.image_id, "favourite")
-        QMessageBox.information(self, "Success", "Photo marked as Favourite!")
+    def _marks(self) -> set[str]:
+        rows = safe_call(self, self.engine.get_marks, self.image_id, default=[]) or []
+        return {m["kind"] for m in rows}
+
+    def _refresh_mark_buttons(self) -> None:
+        marks = self._marks()
+        self.btn_fav.setText("★  Remove from Favourites" if "favourite" in marks
+                             else "☆  Mark as Favourite")
+        self.btn_hide.setText("Unhide Photo" if "hidden" in marks else "Hide Photo")
+
+    def _toggle_mark(self, kind: str) -> None:
+        if kind in self._marks():
+            safe_call(self, self.engine.clear_mark, self.image_id, kind)
+        else:
+            safe_call(self, self.engine.set_mark, self.image_id, kind)
+        self._changed = True                      # gallery refreshes on close
+        self._refresh_mark_buttons()
+
+    def _correct_date(self) -> None:
+        cur = self.photo_data.get("effective_ts") or self.photo_data.get("exif_ts")
+        dlg = DateOverrideDialog(cur, self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        iso = dlg.value_iso()
+        if safe_call(self, self.engine.set_date_override, self.image_id, iso,
+                     "manual (lightbox)", default=_FAIL) is _FAIL:
+            return
+        self.photo_data["effective_ts"] = iso
+        if "Date Taken" in self._meta_labels:
+            self._meta_labels["Date Taken"].setText(iso)
+        self._changed = True
+
+    def _restore_date(self) -> None:
+        safe_call(self, self.engine.clear_date_override, self.image_id)
+        row = safe_call(self, self.engine.get_image, self.image_id, default=None) or {}
+        ts = row.get("exif_ts") or "Unknown"
+        self.photo_data["effective_ts"] = row.get("exif_ts")
+        if "Date Taken" in self._meta_labels:
+            self._meta_labels["Date Taken"].setText(ts)
+        self._changed = True
+
+    def _find_similar(self) -> None:
+        from gui.views.similar_dialog import SimilarDialog
+        dlg = SimilarDialog(self.engine, self.lock, self.image_id, self)
+        dlg.photo_opened.connect(
+            lambda p: PhotoDetailDialog(p, self.engine, self.lock, self).exec())
+        dlg.exec()
+
+    def _play_live(self) -> None:
+        try:
+            from gui.views.live_dialog import LivePhotoDialog
+            dlg = LivePhotoDialog(self._live["path"], self)
+        except ImportError:
+            QMessageBox.information(self, "Live Photo", "Video playback (QtMultimedia) is not available.")
+            return
+        dlg.exec()
+
+    def _on_face_clicked(self, face_data: dict[str, Any], screen_pos: Any) -> None:
+        face_id = face_data.get("id")
+        if not face_id:
+            return
+
+        menu = QMenu(self)
+        act_name = menu.addAction("Name this face...")
+        act_assign = menu.addAction("Assign to existing person...")
+        act_remove = menu.addAction("Remove from person")
+
+        chosen = menu.exec(screen_pos)
+        if not chosen:
+            return
+
+        if chosen == act_name:
+            current_name = face_data.get("person_name") or ""
+            name, ok = QInputDialog.getText(self, "Name Face", "Enter person's name:", text=current_name)
+            if ok and name.strip():
+                safe_call(self, self.engine.name_face, face_id, name.strip())
+                clear_pixmap_cache()
+                self._reload_faces_and_canvas()
+        elif chosen == act_assign:
+            persons = safe_call(self, self.engine.get_persons, default=[]) or []
+            if not persons:
+                QMessageBox.information(self, "Assign", "No persons exist yet.")
+                return
+            items = [f"{p['id']}: {p['name']}" for p in persons]
+            sel, ok = QInputDialog.getItem(self, "Assign Person", "Choose person:", items, 0, False)
+            if ok and sel:
+                pid = int(sel.split(":")[0])
+                safe_call(self, self.engine.assign_face, face_id, pid)
+                clear_pixmap_cache()
+                self._reload_faces_and_canvas()
+        elif chosen == act_remove:
+            safe_call(self, self.engine.assign_face, face_id, None)
+            clear_pixmap_cache()
+            self._reload_faces_and_canvas()
+
+    def _reload_faces_and_canvas(self) -> None:
+        faces_dict = safe_call(self, self.engine.get_faces_many, [self.image_id], default={}) or {}
+        new_faces = faces_dict.get(self.image_id, [])
+        self.photo_data["faces"] = new_faces
+        self.btn_faces.setText(f"Face Boxes ({len(new_faces)})")
+        self._load_photo()

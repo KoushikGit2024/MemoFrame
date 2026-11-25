@@ -49,6 +49,13 @@ def build_bundle(settings: Settings, doctor: dict, stats: dict, include_log: boo
                 fh.seek(0, 2)
                 fh.seek(max(0, fh.tell() - LOG_TAIL_BYTES))
                 z.writestr("photo_organizer.log.tail", fh.read())
+        for extra in ("photo_organizer.workers.log", "native_crash.log"):
+            p = settings.workspace / extra
+            if include_log and p.is_file():
+                with p.open("rb") as fh:
+                    fh.seek(0, 2)
+                    fh.seek(max(0, fh.tell() - LOG_TAIL_BYTES))
+                    z.writestr(extra + ".tail", fh.read())
     for old in sorted(folder.glob("diagnostics-*.zip"))[:-KEEP]:
         try:
             old.unlink()

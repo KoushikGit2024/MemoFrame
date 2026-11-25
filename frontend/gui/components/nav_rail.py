@@ -112,6 +112,7 @@ class NavigationRail(QFrame):
             ("photos", "◫", "Photos"),
             ("people", "◎", "People"),
             ("duplicates", "⧉", "Duplicates"),
+            ("bursts", "▤", "Bursts"),
             ("timeline", "◷", "Timeline"),
             ("settings", "⚙", "Settings"),
         ]
@@ -151,7 +152,7 @@ class NavigationRail(QFrame):
         tb_layout.addLayout(theme_hdr)
 
         # Quick Light / Dark Toggle Button
-        self.btn_mode_toggle = QPushButton("☀  Light Mode")
+        self.btn_mode_toggle = QPushButton("Light Mode")
         self.btn_mode_toggle.setProperty("class", "ThemeModeToggle")
         self.btn_mode_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_mode_toggle.setToolTip("Quickly toggle between Dark and Light mode")
@@ -192,6 +193,6 @@ class NavigationRail(QFrame):
             return
         palette = THEMES[theme_name]
         self.active_theme_lbl.setText(theme_name.split()[0])
-        self.btn_mode_toggle.setText("☾  Dark Mode" if not palette.is_dark else "☀  Light Mode")
+        self.btn_mode_toggle.setText("Dark Mode" if not palette.is_dark else "Light Mode")
         for name, btn in self.theme_swatches.items():
             btn.set_selected(name == theme_name)

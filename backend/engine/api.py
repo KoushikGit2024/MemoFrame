@@ -7,6 +7,8 @@ writes go to the workspace.
 from __future__ import annotations
 
 import functools
+import logging
+import shutil
 import sqlite3
 from dataclasses import asdict
 from pathlib import Path
@@ -23,7 +25,10 @@ from engine.profiles import apply_profile
 from services.pipeline import maintenance
 from services.pipeline import orchestrator as pipeline
 from services.pipeline.control import ProgressCallback, RunControl
+from utils.file_utils import is_within
 from utils.model_downloader import install_bundled_model
+
+_log = logging.getLogger("photo_organizer.engine")
 
 MARK_KINDS = ("keep", "reviewed", "favourite", "hidden")
 _HIDDEN_COLUMNS = {"features", "embedding", "vec"}
@@ -40,8 +45,10 @@ def _translated(fn: F) -> F:
         try:
             return fn(*args, **kwargs)
         except EngineError:
+            _log.warning("%s failed", fn.__name__, exc_info=True)
             raise
         except Exception as exc:  # noqa: BLE001
+            _log.error("Engine call %s failed", fn.__name__, exc_info=True)
             raise translate(exc) from exc
     return wrapper  # type: ignore[return-value]
 
@@ -68,9 +75,16 @@ class Engine:
         profile: str | None = None,
         on_event: ProgressCallback | None = None,
         settings: Settings | None = None,
+        strict_config: bool = True,
     ) -> None:
+        self.config_warnings: list[str] = []
         if settings is None:
-            settings = load_settings(Path(workspace or DEFAULT_WORKSPACE), profile)
+            settings = load_settings(
+                Path(workspace or DEFAULT_WORKSPACE),
+                profile,
+                strict=strict_config,
+                warnings=self.config_warnings,
+            )
         elif profile:
             settings = apply_profile(settings, profile)
         self.settings = settings
@@ -78,12 +92,25 @@ class Engine:
         self._db: DatabaseManager | None = None
         self._lock = WorkspaceLock(settings.workspace / ".workspace.lock")
 
+    @property
+    def on_event(self) -> ProgressCallback | None:
+        """Currently registered progress callback."""
+        return self.control._on_progress
+
+    @on_event.setter
+    def on_event(self, callback: ProgressCallback | None) -> None:
+        """Safely attach or swap the progress callback."""
+        self.control.set_callback(callback)
+
     # ---- lifecycle ------------------------------------------------------
     @_translated
     def open(self) -> "Engine":
         """Open the workspace. Raises WORKSPACE_LOCKED if another process has it open."""
         if self._db is None:
             self.settings.ensure_dirs()
+            from utils.logger import setup_logging
+            if not logging.getLogger("photo_organizer").handlers:
+                setup_logging(self.settings.log_path)
             self._lock.acquire()
             try:
                 write_default_config(self.settings.workspace)
@@ -231,8 +258,9 @@ class Engine:
         from services.organization.duplicates import choose_keeper
         out = {}
         for cid, members in self.db.get_duplicate_clusters().items():
-            keeper = choose_keeper(members)
-            out[cid] = [{**_row(m), "suggested_keep": int(m["id"]) == keeper} for m in members]
+            dict_members = [_row(m) for m in members]
+            keeper = choose_keeper(dict_members)
+            out[cid] = [{**m, "suggested_keep": int(m["id"]) == keeper} for m in dict_members]
         return out
 
     @_translated
@@ -247,8 +275,9 @@ class Engine:
         return _row(row) if row else None
 
     @_translated
-    def rename_person(self, person_id: int, new_name: str) -> bool:
-        """Assign or update a name for a person cluster."""
+    def rename_person(self, person_id: int, new_name: str, confirm_faces: bool = False) -> bool:
+        """Name a person. Faces are only locked (and their boxes labeled) when
+        ``confirm_faces`` is True; otherwise name faces individually with name_face()."""
         clean = (new_name or "").strip()
         if not clean:
             raise EngineError(ErrorCode.INVALID_INPUT, "Person name cannot be empty.")
@@ -256,6 +285,8 @@ class Engine:
             raise EngineError(ErrorCode.INVALID_INPUT, f"No person with id {person_id}.")
         ok = self.db.rename_person(person_id, clean)
         if ok:
+            if confirm_faces:
+                self.db.confirm_person(person_id)
             pipeline.update_search_index(self.settings, self.db)
         return ok
 
@@ -377,18 +408,33 @@ class Engine:
         return self.db.repair()
 
     # ---- Phase D ----------------------------------------------------------
+    def _recog_sig(self) -> str:
+        return f"{self.settings.detector_backend}|{self.settings.sface_path.stat().st_size}"
+
     @_translated
-    def recognize_existing(self) -> dict[str, int]:
-        """Backfill face recognition on photos processed before SFace was downloaded."""
+    def recognize_existing(self, force: bool = False) -> dict[str, int]:
+        """Backfill face recognition on photos processed before SFace was downloaded.
+        Runs once per (detector backend, SFace file); faces that still get no embedding
+        (too small, no landmarks) are not retried until one of those changes or force=True."""
+        if not self.settings.sface_path.is_file():
+            raise EngineError(ErrorCode.MODEL_MISSING,
+                              f"Face recognition model not found at {self.settings.sface_path}. "
+                              "Run doctor or process a photo to download it.")
+        sig = self._recog_sig()
+        if not force and self.db.get_meta("recog_backfill") == sig:
+            return {"requeued": 0, "processed": 0}
+        self.control.reset()
         requeued = self.db.requeue_faces_without_embeddings()
         processed = 0
+        interrupted = False
         if requeued:
             summary = pipeline.process_pending(
-                self.settings, self.db, show_progress=False, control=self.control
-            )
-            processed = summary.processed
+                self.settings, self.db, show_progress=False, control=self.control)
+            processed, interrupted = summary.processed, summary.interrupted
             pipeline.update_persons(self.settings, self.db)
             pipeline.update_search_index(self.settings, self.db)
+        if not interrupted:
+            self.db.set_meta("recog_backfill", sig)
         return {"requeued": requeued, "processed": processed}
 
     @_translated
@@ -545,3 +591,49 @@ class Engine:
         checks = run_checks(self.settings, source_dirs or [])
         return {"ok": not any(c.status == "fail" for c in checks),
                 "checks": [c.to_dict() for c in checks]}
+
+    @_translated
+    def get_faces_many(self, image_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+        """Faces of many images in a few queries, with `person_name` populated."""
+        return {
+            img_id: [_row(r) for r in rows]
+            for img_id, rows in self.db.faces_for_images(image_ids).items()
+        }
+
+    @_translated
+    def name_face(self, face_id: int, name: str) -> int:
+        """Name a single face: reuses a person with `name` or creates one, and locks the face."""
+        clean = (name or "").strip()
+        if not clean:
+            raise EngineError(ErrorCode.INVALID_INPUT, "Person name cannot be empty.")
+        # Find existing person by this exact name (case-insensitive)
+        existing = [p for p in self.get_persons() if p.get("name", "").lower() == clean.lower()]
+        if existing:
+            pid = int(existing[0]["id"])
+            self.db.assign_face(face_id, pid)
+        else:
+            pid = self.db.create_person(clean, [face_id])
+        self.db.set_face_locked(face_id, True)
+        self._people_changed()
+        return pid
+
+    @_translated
+    def reset_workspace(self, *, keep_generated: bool = False, clear_sources: bool = False,
+                        clear_saved_searches: bool = False) -> dict[str, int]:
+        """Clear the database and generated files. Original photos are never touched.
+        Scanned folders and saved searches are kept unless you ask to clear them."""
+        before = self.db.report_stats()["total_images"]
+        self.db.reset()
+        self.db.rebuild_fts()
+        if clear_sources:
+            self.db.clear_sources()
+        if clear_saved_searches:
+            self.db.clear_saved_searches()
+        if not keep_generated:
+            maintenance.clear_cache(self.settings, self.db,
+                                    ("thumbnails", "face_crops", "annotated"))
+            grouped = self.settings.grouped_dir
+            if grouped.is_dir() and is_within(grouped, self.settings.workspace):
+                shutil.rmtree(grouped, ignore_errors=True)
+            self.settings.ensure_dirs()
+        return {"images_removed": before, "cleared_images": before}

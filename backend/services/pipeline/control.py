@@ -47,6 +47,10 @@ class RunControl:
         self._running.set()
         self._waiting = None
 
+    def set_callback(self, callback: ProgressCallback | None) -> None:
+        """Replace the progress callback (safe to call between runs)."""
+        self._on_progress = callback
+
     def cancel(self) -> None:
         self._cancel.set()
 

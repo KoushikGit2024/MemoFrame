@@ -1,11 +1,16 @@
 """Settings, Theme Studio, Doctor Diagnostics, and Cache Maintenance View."""
 from __future__ import annotations
 
+import logging
+import os
+import subprocess
 import threading
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QComboBox,
+    QDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -19,8 +24,14 @@ from PyQt6.QtWidgets import (
 )
 
 from engine import Engine
+from gui.safe_call import safe_call
 from gui.state import AppState
+from gui.tasks import EngineTask
 from gui.theme_manager import THEMES, ThemePalette
+from gui.views.date_dialogs import SuspiciousDatesDialog
+from gui.views.failed_dialog import FailedImagesDialog
+from gui.views.reset_dialog import ResetDialog
+from gui.widgets import clear_pixmap_cache
 
 
 class _ThemePreviewCard(QFrame):
@@ -85,6 +96,11 @@ class SettingsView(QWidget):
         self.lock = lock
         self._stat_values: dict[str, QLabel] = {}
         self._theme_cards: dict[str, _ThemePreviewCard] = {}
+        self._task: EngineTask | None = None
+        self._maint_buttons: list[QPushButton] = []
+        self.maint_status = QLabel("")
+        self.maint_status.setProperty("class", "Dim")
+        self.maint_status.setWordWrap(True)
 
         self._build_ui()
         self.state.theme_changed.connect(self._sync_theme_controls)
@@ -244,9 +260,33 @@ class SettingsView(QWidget):
         btn_clean.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_clean.clicked.connect(self._clean_cache)
         ch_row.addWidget(btn_clean)
+
+        btn_logs = QPushButton("Show Log File")
+        btn_logs.setProperty("class", "Secondary")
+        btn_logs.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_logs.clicked.connect(self._open_logs)
+        ch_row.addWidget(btn_logs)
+
+        btn_diag = QPushButton("Export Diagnostics")
+        btn_diag.setProperty("class", "Secondary")
+        btn_diag.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_diag.clicked.connect(self._export_diag)
+        ch_row.addWidget(btn_diag)
+
         ch_row.addStretch()
         ch_box.addLayout(ch_row)
         c_box.addWidget(cache_card)
+
+        # 5. Scene Tags and Similar Photos
+        c_box.addWidget(self._build_tags_card())
+
+        # 6. Database & Maintenance
+        maint_card = self._build_maintenance_card()
+        c_box.addWidget(maint_card)
+
+        # 7. Danger Zone: Reset Workspace
+        reset_card = self._build_reset_card()
+        c_box.addWidget(reset_card)
 
         c_box.addStretch()
         outer_layout.addWidget(content_col)
@@ -285,8 +325,7 @@ class SettingsView(QWidget):
             card.set_selected(name == theme_name)
 
     def refresh_stats(self) -> None:
-        with self.lock:
-            stats = self.engine.stats()
+        stats = safe_call(self, self.engine.stats, default={}) or {}
 
         for key, lbl in self._stat_values.items():
             lbl.setText(str(stats.get(key, 0)))
@@ -299,8 +338,12 @@ class SettingsView(QWidget):
         self.stats_lbl.setText(text)
 
     def _run_doctor(self) -> None:
-        with self.lock:
-            issues = self.engine.doctor()
+        report = safe_call(self, self.engine.doctor, default={}) or {}
+        issues = [
+            f"{c['name']}: {c['detail']}" + (f"  (fix: {c['fix']})" if c.get("fix") else "")
+            for c in report.get("checks", [])
+            if c.get("status") != "ok"
+        ]
         self.doc_result.setVisible(True)
         if not issues:
             self.doc_result.setText("✓ All checks passed. Workspace and models are healthy.")
@@ -314,7 +357,219 @@ class SettingsView(QWidget):
             style.polish(self.doc_result)
 
     def _clean_cache(self) -> None:
-        with self.lock:
-            freed = self.engine.clear_cache()
-        QMessageBox.information(self, "Cache Cleaned", f"Successfully reclaimed {freed} bytes of thumbnail cache.")
+        res = safe_call(self, self.engine.clear_cache, default={}) or {}
+        freed_mb = sum(res.values())
+        QMessageBox.information(self, "Cache Cleaned", f"Reclaimed about {freed_mb} MB of thumbnail cache.")
         self.refresh_stats()
+
+    def _open_logs(self) -> None:
+        log_file = self.engine.settings.log_path
+        if os.name == "nt" and log_file.is_file():
+            subprocess.Popen(["explorer.exe", f"/select,{log_file}"])    # highlights the file
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(log_file.parent)))
+
+    def _export_diag(self) -> None:
+        path = safe_call(self, self.engine.export_diagnostics)
+        if path:
+            QMessageBox.information(self, "Diagnostics", f"Saved to:\n{path}")
+
+    def _run_task(self, label: str, fn, on_done=None) -> None:
+        if self._task is not None and self._task.isRunning():
+            return
+        self.maint_status.setText(f"{label}…")
+        for b in self._maint_buttons:
+            b.setEnabled(False)
+
+        def success(res):
+            self._task_end()
+            if on_done:
+                on_done(res)
+
+        def failed(err):
+            self._task_end()
+            self.maint_status.setText(f"Failed: {err}")
+            QMessageBox.critical(self, "Error", err)
+
+        self._task = EngineTask(fn, parent=self)
+        self._task.success.connect(success)
+        self._task.failed.connect(failed)
+        self._task.start()
+
+    def _task_end(self) -> None:
+        if self._task is not None:
+            self._task.wait()
+        for b in self._maint_buttons:
+            b.setEnabled(True)
+        self.maint_status.setText("")
+
+    def shutdown(self) -> None:
+        if self._task is not None and self._task.isRunning():
+            self.engine.cancel()
+            self._task.wait(15000)
+
+    def _build_maintenance_card(self) -> QFrame:
+        card = self._create_card(
+            "Library & Record Maintenance",
+            "Verify source photo files on disk, purge stale missing records, and repair database anomalies.",
+        )
+        box = card.layout()
+
+        grid = QGridLayout()
+        grid.setSpacing(10)
+        buttons = (
+            ("Verify Files", self._verify_files),
+            ("Prune Missing Records", self._prune_missing),
+            ("Detect Moved Files", self._detect_moves),
+            ("Suspicious Dates…", self._suspicious_dates),
+            ("Rebuild Groups and Index", self._rebuild),
+            ("Repair and Optimize Database", self._repair_db),
+            ("Failed Photos…", self._show_failed),
+        )
+        for i, (text, slot) in enumerate(buttons):
+            b = QPushButton(text)
+            b.setProperty("class", "Secondary")
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(slot)
+            self._maint_buttons.append(b)
+            grid.addWidget(b, i // 4, i % 4)
+        box.addLayout(grid)
+        box.addWidget(self.maint_status)
+        return card
+
+    def _build_tags_card(self) -> QFrame:
+        card = self._create_card(
+            "Scene Tags and Similar Photos",
+            "Tags every processed photo with scene labels and enables 'Find Similar'. Needs "
+            "tagging_enabled = true and store_embeddings = true in config.toml (restart afterwards) "
+            "and the model files in workspace/models/tags/.",
+        )
+        row = QHBoxLayout()
+        b = QPushButton("Tag Existing Photos")
+        b.setProperty("class", "Secondary")
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        b.clicked.connect(self._tag_existing)
+        self._maint_buttons.append(b)
+        row.addWidget(b)
+        row.addStretch()
+        card.layout().addLayout(row)
+        return card
+
+    def _tag_existing(self) -> None:
+        def done(res: dict) -> None:
+            self.maint_status.setText(f"Tagged {res.get('tagged', 0)} photo(s).")
+            self.state.invalidate()
+        self._run_task("Tagging photos", self.engine.tag_existing, done)
+
+    def _build_reset_card(self) -> QFrame:
+        card = self._create_card(
+            "Danger Zone: Reset Workspace",
+            "Clear all indexed photos, faces, duplicates, and timeline data from this workspace. Original files are never touched.",
+        )
+        box = card.layout()
+
+        row = QHBoxLayout()
+        row.setSpacing(12)
+
+        btn_reset = QPushButton("Reset Workspace Data...")
+        btn_reset.setProperty("class", "Danger")
+        btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_reset.clicked.connect(self._reset_workspace)
+        row.addWidget(btn_reset)
+
+        row.addStretch()
+        box.addLayout(row)
+        return card
+
+    def _verify_files(self) -> None:
+        def done(res: dict) -> None:
+            QMessageBox.information(
+                self,
+                "Verification Complete",
+                f"Checked {res.get('checked', 0)} files:\n"
+                f"• {res.get('missing', 0)} missing\n"
+                f"• {res.get('modified', 0)} modified",
+            )
+            self.refresh_stats()
+        self._run_task("Verifying files", self.engine.verify_files, done)
+
+    def _prune_missing(self) -> None:
+        reply = QMessageBox.question(
+            self,
+            "Prune Missing Records",
+            "This will remove database records for files that no longer exist on disk. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            def done(pruned: int) -> None:
+                QMessageBox.information(self, "Prune Complete", f"Pruned {pruned} missing record(s).")
+                self.refresh_stats()
+                self.state.invalidate()
+            self._run_task("Pruning missing records", self.engine.prune, done)
+
+    def _detect_moves(self) -> None:
+        def done(rows: list) -> None:
+            self.maint_status.setText(
+                f"{len(rows)} photo(s) were moved or renamed. Favourite/keep marks followed them."
+                if rows
+                else "No moved files found. (Scan the new location first, then run this again.)"
+            )
+        self._run_task("Looking for moved files", self.engine.moves, done)
+
+    def _suspicious_dates(self) -> None:
+        dlg = SuspiciousDatesDialog(self.engine, self.lock, self)
+        dlg.exec()
+        if dlg.changed:
+            self._rebuild()
+
+    def _rebuild(self) -> None:
+        def done(res: dict) -> None:
+            self.maint_status.setText(
+                f"Rebuilt: {res.get('groups', 0)} groups, "
+                f"{res.get('duplicate_clusters', 0)} duplicate clusters, "
+                f"{res.get('persons', 0)} people."
+            )
+            self.state.invalidate()
+            self.refresh_stats()
+        self._run_task("Rebuilding groups and index", self.engine.rebuild, done)
+
+    def _repair_db(self) -> None:
+        def done(res: dict) -> None:
+            QMessageBox.information(
+                self,
+                "Database Repair",
+                f"Repair finished:\n"
+                f"• Fixed face counts: {res.get('face_counts_fixed', 0)}\n"
+                f"• Requeued pending: {res.get('requeued', 0)}\n"
+                f"• Orphan faces removed: {res.get('orphan_faces_removed', 0)}",
+            )
+            self.refresh_stats()
+        self._run_task("Repairing database", self.engine.repair, done)
+
+    def _show_failed(self) -> None:
+        dlg = FailedImagesDialog(self.engine, self)
+        dlg.exec()
+
+    def _reset_workspace(self) -> None:
+        dlg = ResetDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        sources, saved = dlg.clear_sources, dlg.clear_saved
+
+        def done(res: dict) -> None:
+            clear_pixmap_cache()
+            self.state.select_person(None)
+            self.state.invalidate()
+            self.refresh_stats()
+            QMessageBox.information(
+                self,
+                "Reset complete",
+                f"Removed {res.get('images_removed', 0)} photo record(s).",
+            )
+        self._run_task(
+            "Resetting",
+            lambda: self.engine.reset_workspace(
+                clear_sources=sources, clear_saved_searches=saved
+            ),
+            done,
+        )

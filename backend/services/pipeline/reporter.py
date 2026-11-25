@@ -33,7 +33,7 @@ def format_report(stats: dict[str, int]) -> str:
         f"Duplicate images (extra copies): {stats['duplicate_images']}",
         f"Groups generated:               {stats['groups']}",
         "",
-        "Note: counts are detected faces, not identified people.",
+        "Note: counts are detected faces; see 'people' for identified clusters.",
     ]
     return "\n".join(lines)
 

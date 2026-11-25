@@ -1,6 +1,5 @@
 -- Photo organizer schema, version 1.
--- Face rows store geometry and detector confidence ONLY. There is deliberately
--- no embedding/feature column for faces: identity matching is not supported.
+-- Face rows store geometry, detector confidence, and 128-d SFace embeddings for offline person clustering.
 
 CREATE TABLE IF NOT EXISTS groups (
     id           INTEGER PRIMARY KEY,

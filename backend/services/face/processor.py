@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from config import Settings
 from services.face.recognizer import FaceRecognizerSF
-from services.vision.loader import ImageLoadError, load_image
+from services.vision.loader import ImageLoadError, load_image, load_image_bytes
 from models import FaceBox
 from services.vision.thumbnails import encode_jpeg, resize_to_fit, shard_dir
 from utils.file_utils import atomic_write_bytes, output_name
@@ -66,12 +66,22 @@ def draw_annotations(pil: Image.Image, faces: list[FaceBox], scale: float) -> Im
     return out
 
 
+def _to_decoded(face: FaceBox, scale: float) -> FaceBox:
+    """Full-resolution face -> coordinates of an image decoded at 1/scale."""
+    if scale == 1.0:
+        return face
+    lm = tuple(v / scale for v in face.landmarks) if face.landmarks else None
+    return replace(face, x=round(face.x / scale), y=round(face.y / scale),
+                   w=round(face.w / scale), h=round(face.h / scale), landmarks=lm)
+
+
 def process_faces(
     image_id: int,
     source: Path,
     faces: list[FaceBox],
     settings: Settings,
     recognizer: FaceRecognizerSF | None = None,
+    data: bytes | None = None,
 ) -> list[FaceBox]:
     """Label faces and write crops, annotated copy, and compute 128-d face embeddings.
 
@@ -87,8 +97,10 @@ def process_faces(
     if not (settings.save_face_crops or settings.save_annotated or recognizer is not None):
         return labelled
 
+    max_side = None if settings.save_face_crops else 2400
     try:
-        full = load_image(source, max_side=None if settings.save_face_crops else 2400)
+        full = (load_image_bytes(data, source.name, max_side) if data is not None
+                else load_image(source, max_side=max_side))
     except ImageLoadError as exc:
         log.warning("Face outputs skipped (cannot reopen image): %s", exc)
         return labelled
@@ -104,7 +116,7 @@ def process_faces(
             embedding: bytes | None = None
 
             if recognizer is not None and full_bgr is not None:
-                embedding = recognizer.embed_face(full_bgr, face)
+                embedding = recognizer.embed_face(full_bgr, _to_decoded(face, full.scale))
 
             if settings.save_face_crops:
                 crop = full.pil.crop(expand_box(face, full.width, full.height,

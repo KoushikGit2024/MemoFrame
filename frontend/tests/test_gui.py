@@ -110,7 +110,11 @@ def test_main_window_lifecycle_and_pagination(qapp, tmp_path):
     assert win.state.current_page == 0
     assert win.state.page_size == 40
 
-    # Test pagination
+    win.engine.db.register_files([(f"{i}.jpg", 1, i) for i in range(1, 101)])
+    win.engine.db.save_results([{"image_id": i, "exif_ts": "2024-01-01T10:00:00"}
+                                for i in range(1, 101)])
+    win.gallery_view.reload_data()                 # 100 photos -> 3 pages
+
     win.gallery_view._next_page()
     assert win.state.current_page == 1
     win.gallery_view._prev_page()

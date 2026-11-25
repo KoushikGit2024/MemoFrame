@@ -9,7 +9,7 @@ A~B~C even if A and C differ by more than the threshold.
 """
 from __future__ import annotations
 
-from typing import Iterable, Iterator, Mapping, Sequence
+from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 import numpy as np
 
@@ -143,20 +143,30 @@ def find_duplicates(
     return rows
 
 
-def choose_keeper(members: Sequence[Mapping[str, Any]]) -> int:
+def choose_keeper(members: Sequence[Any]) -> int:
     """Suggest which member to keep: highest quality, then most pixels, then largest
-    file, then lowest id. ``quality`` is optional (treated as 0 when absent)."""
-    def quality(m: Mapping[str, Any]) -> int:
+    file, then lowest id. ``quality`` is optional (treated as 0 when absent). Accepts
+    mappings or sqlite3.Row objects."""
+    def get_val(m: Any, key: str) -> Any:
         try:
-            val = m.get("quality")
+            return m[key]
+        except (KeyError, IndexError, TypeError):
+            return None
+
+    def quality(m: Any) -> int:
+        try:
+            val = get_val(m, "quality")
             return round(float(val)) if val is not None else 0
         except (TypeError, ValueError):
             return 0
 
-    def rank(m: Mapping[str, Any]) -> tuple[int, int, int, int]:
-        w = int(m["width"]) if m.get("width") is not None else 0
-        h = int(m["height"]) if m.get("height") is not None else 0
-        size = int(m["size"]) if m.get("size") is not None else 0
+    def rank(m: Any) -> tuple[int, int, int, int]:
+        w_val = get_val(m, "width")
+        h_val = get_val(m, "height")
+        s_val = get_val(m, "size")
+        w = int(w_val) if w_val is not None else 0
+        h = int(h_val) if h_val is not None else 0
+        size = int(s_val) if s_val is not None else 0
         img_id = int(m["id"])
         return (-quality(m), -(w * h), -size, img_id)
 

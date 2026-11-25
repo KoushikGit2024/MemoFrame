@@ -16,8 +16,13 @@ from PyQt6.QtWidgets import (
 )
 
 from engine import Engine
+from gui.safe_call import safe_call
 from gui.state import AppState
+from gui.tasks import enrich_photos
 from gui.widgets import EmptyStateWidget, HorizontalStripScrollArea, PhotoCardWidget
+
+
+GROUPS_PER_PAGE = 20
 
 
 class TimelineView(QWidget):
@@ -31,6 +36,7 @@ class TimelineView(QWidget):
         self.engine = engine
         self.lock = lock
         self.groups: list[dict[str, Any]] = []
+        self._shown = GROUPS_PER_PAGE
 
         self._build_ui()
 
@@ -74,27 +80,39 @@ class TimelineView(QWidget):
         layout.addWidget(scroll, stretch=1)
 
     def reload_data(self) -> None:
-        with self.lock:
-            self.groups = self.engine.get_groups()
+        groups = safe_call(self, self.engine.get_groups, default=[]) or []
+        dated = sorted((g for g in groups if g.get("start_ts")),
+                       key=lambda g: g["start_ts"], reverse=True)      # newest first
+        undated = [g for g in groups if not g.get("start_ts")]
+        self.groups = dated + undated
+        self._shown = GROUPS_PER_PAGE
+        self._rebuild()
 
+    def _rebuild(self) -> None:
         self.title_lbl.setText(f"Events & Timeline Groups ({len(self.groups)})")
         while self.events_layout.count() > 1:
             item = self.events_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-
         if not self.groups:
-            empty = EmptyStateWidget(
-                "◷",
-                "No Timeline Events Yet",
-                "Event groups will appear here once photos with timestamps are indexed.",
-            )
-            self.events_layout.insertWidget(0, empty)
+            self.events_layout.insertWidget(0, EmptyStateWidget(
+                "◷", "No Timeline Events Yet",
+                "Event groups will appear here once photos with timestamps are indexed."))
             return
+        visible = self.groups[:self._shown]
+        for idx, g in enumerate(visible):
+            self.events_layout.insertWidget(idx, self._create_event_section(g))
+        remaining = len(self.groups) - len(visible)
+        if remaining > 0:
+            btn = QPushButton(f"Show {min(GROUPS_PER_PAGE, remaining)} more  ({remaining} remaining)")
+            btn.setProperty("class", "Secondary")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(self._show_more)
+            self.events_layout.insertWidget(len(visible), btn)
 
-        for idx, g in enumerate(self.groups[:20]):
-            event_card = self._create_event_section(g)
-            self.events_layout.insertWidget(idx, event_card)
+    def _show_more(self) -> None:
+        self._shown += GROUPS_PER_PAGE
+        self._rebuild()
 
     def _create_event_section(self, group: dict[str, Any]) -> QFrame:
         frame = QFrame()
@@ -137,17 +155,22 @@ class TimelineView(QWidget):
         h_box.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         h_box.addStretch()
 
-        with self.lock:
-            photos = self.engine.get_group_images(group["id"], limit=8)
-            for p_idx, p in enumerate(photos):
-                try:
-                    thumb = self.engine.thumbnail(p["id"])
-                except Exception:
-                    thumb = None
-                p["faces"] = [dict(f) for f in self.engine.get_faces(p["id"])]
-                card = PhotoCardWidget(p, thumb_path=thumb)
-                card.clicked.connect(lambda _, item=p: self.photo_opened.emit(item))
-                h_box.insertWidget(p_idx, card)
+        raw_photos = safe_call(self, self.engine.get_group_images, group["id"], limit=8, default=[]) or []
+        photos = enrich_photos(self.engine, raw_photos)
+        for p_idx, p in enumerate(photos):
+            try:
+                thumb = self.engine.thumbnail(p["id"])
+            except Exception:
+                thumb = None
+            card = PhotoCardWidget(p, thumb_path=thumb)
+            card.clicked.connect(lambda _, item=p: self.photo_opened.emit(item))
+            h_box.insertWidget(p_idx, card)
+
+        extra = int(group.get("image_count", 0)) - len(photos)
+        if extra > 0:
+            more = QLabel(f"+{extra} more")
+            more.setProperty("class", "Dim")
+            h_box.insertWidget(len(photos), more)
 
         strip.setWidget(h_widget)
         vbox.addWidget(strip)

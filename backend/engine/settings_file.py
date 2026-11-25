@@ -1,6 +1,7 @@
 """Load and validate ``config.toml`` from the workspace."""
 from __future__ import annotations
 
+import logging
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,8 @@ from config import VIDEO_EXTENSIONS, Settings
 from engine.errors import EngineError, ErrorCode
 from engine.profiles import DEFAULT_PROFILE, apply_profile
 from utils.file_utils import atomic_write_bytes
+
+_log = logging.getLogger("photo_organizer.config")
 
 CONFIG_NAME = "config.toml"
 
@@ -38,6 +41,7 @@ _FIELDS: dict[str, tuple[type, float | None, float | None]] = {
     "detector_backend": (str, None, None),
     "storage_type": (str, None, None),
     "thumb_cache_max_mb": (int, 0, 1_000_000),
+    "face_recognition": (bool, None, None),
     "index_videos": (bool, None, None),
     "tiled_detection": (bool, None, None),
     "tile_size": (int, 320, 2048),
@@ -130,12 +134,21 @@ def write_default_config(workspace: Path) -> Path:
     return path
 
 
-def load_settings(workspace: Path, profile: str | None = None) -> Settings:
+def load_settings(workspace: Path, profile: str | None = None, *,
+                  strict: bool = True, warnings: list[str] | None = None) -> Settings:
     """Build :class:`Settings`: defaults, then profile, then explicit config values.
 
-    Raises:
-        EngineError (CONFIG_INVALID): unreadable file, unknown key or bad value.
+    strict=True  : any problem raises EngineError(CONFIG_INVALID).
+    strict=False : bad lines are skipped and described in ``warnings`` (used by the GUI).
     """
+    notes = warnings if warnings is not None else []
+
+    def problem(message: str) -> None:
+        if strict:
+            raise _bad(message)
+        _log.warning("%s: %s (ignored)", CONFIG_NAME, message)
+        notes.append(message)
+
     workspace = Path(workspace).expanduser().resolve()
     path = workspace / CONFIG_NAME
     data: dict[str, Any] = {}
@@ -143,17 +156,37 @@ def load_settings(workspace: Path, profile: str | None = None) -> Settings:
         try:
             data = tomllib.loads(path.read_text(encoding="utf-8"))
         except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as exc:
-            raise _bad(f"cannot read file: {exc}") from exc
+            problem(f"cannot read file: {exc}")
+            data = {}
     file_profile = data.pop("profile", None)
     if file_profile is not None and not isinstance(file_profile, str):
-        raise _bad("'profile' must be text")
+        problem("'profile' must be text")
+        file_profile = None
     unknown = sorted(set(data) - set(_FIELDS))
     if unknown:
-        raise _bad(f"unknown setting(s): {', '.join(unknown)}")
+        problem(f"unknown setting(s): {', '.join(unknown)}")
+        for key in unknown:
+            data.pop(key)
 
-    index_videos = data.pop("index_videos", False)
+    clean: dict[str, Any] = {}
+    for key, value in data.items():
+        try:
+            clean[key] = _check(key, value)
+        except EngineError as exc:
+            if strict:
+                raise
+            notes.append(exc.message)
+            _log.warning("%s (ignored)", exc.message)
+
+    index_videos = clean.pop("index_videos", False)
     settings = Settings(workspace=workspace).with_overrides(**ENGINE_DEFAULTS)
-    settings = apply_profile(settings, profile or file_profile or DEFAULT_PROFILE)
+    try:
+        settings = apply_profile(settings, profile or file_profile or DEFAULT_PROFILE)
+    except EngineError as exc:
+        if strict:
+            raise
+        notes.append(exc.message)
+        settings = apply_profile(settings, DEFAULT_PROFILE)
     if not index_videos:
         settings = settings.with_overrides(extensions=settings.extensions - VIDEO_EXTENSIONS)
-    return settings.with_overrides(**{k: _check(k, v) for k, v in data.items()})
+    return settings.with_overrides(**clean)

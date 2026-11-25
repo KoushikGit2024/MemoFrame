@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from PyQt6.QtCore import QObject, QRectF, QRunnable, Qt, QThreadPool, pyqtSignal
-from PyQt6.QtGui import QColor, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap, QWheelEvent
+from PyQt6.QtGui import QColor, QFontMetrics, QImage, QPainter, QPainterPath, QPen, QPixmap, QWheelEvent
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -26,10 +26,16 @@ from PyQt6.QtWidgets import (
 )
 
 from gui.theme_manager import get_active_theme
+from gui.face_labels import face_display_name
 
 # Global memory cache for loaded and scaled QPixmaps
 _PIXMAP_CACHE: dict[str, QPixmap] = {}
 _MAX_CACHE_ENTRIES = 500
+
+
+def clear_pixmap_cache() -> None:
+    """Clear memory pixmap cache when data changes."""
+    _PIXMAP_CACHE.clear()
 
 
 def get_cached_pixmap(key: str) -> QPixmap | None:
@@ -105,13 +111,13 @@ class EmptyStateWidget(QFrame):
 
 
 class _ImageLoadSignals(QObject):
-    loaded = pyqtSignal(str, QPixmap)
+    loaded = pyqtSignal(str, QImage)
 
 
 class AsyncThumbnailLoader(QRunnable):
-    """Background worker that reads image bytes and produces a scaled QPixmap off the UI thread."""
+    """Background worker that reads image bytes and produces a scaled QImage off the UI thread."""
 
-    def __init__(self, key: str, file_path: str, max_w: int, max_h: int, on_loaded: Callable[[str, QPixmap], None]) -> None:
+    def __init__(self, key: str, file_path: str, max_w: int, max_h: int, on_loaded: Callable[[str, QImage], None]) -> None:
         super().__init__()
         self.key = key
         self.file_path = file_path
@@ -123,10 +129,10 @@ class AsyncThumbnailLoader(QRunnable):
     def run(self) -> None:
         if not self.file_path or not Path(self.file_path).is_file():
             return
-        pix = QPixmap(self.file_path)
-        if pix.isNull():
+        img = QImage(self.file_path)
+        if img.isNull():
             return
-        scaled = pix.scaled(
+        scaled = img.scaled(
             self.max_w,
             self.max_h,
             Qt.AspectRatioMode.KeepAspectRatio,
@@ -149,7 +155,7 @@ class AsyncAvatarLoader(QRunnable):
         y: int,
         w: int,
         h: int,
-        on_loaded: Callable[[str, QPixmap], None],
+        on_loaded: Callable[[str, QImage], None],
     ) -> None:
         super().__init__()
         self.key = key
@@ -165,6 +171,8 @@ class AsyncAvatarLoader(QRunnable):
             from PIL import Image, ImageOps
 
             with Image.open(self.img_path) as im:
+                # Transpose first so orientation matches full unrotated pixels if any
+                im = ImageOps.exif_transpose(im)
                 mx = int(self.w * 0.2)
                 my = int(self.h * 0.2)
                 box = (
@@ -174,14 +182,13 @@ class AsyncAvatarLoader(QRunnable):
                     min(im.height, self.y + self.h + my),
                 )
                 crop = im.crop(box)
-                crop = ImageOps.exif_transpose(crop)
                 crop.thumbnail((96, 96), Image.Resampling.BILINEAR)
                 buf = io.BytesIO()
                 crop.save(buf, format="JPEG", quality=85)
-                pix = QPixmap()
-                pix.loadFromData(buf.getvalue())
-                if not pix.isNull():
-                    self.signals.loaded.emit(self.key, pix)
+                qimg = QImage()
+                qimg.loadFromData(buf.getvalue())
+                if not qimg.isNull():
+                    self.signals.loaded.emit(self.key, qimg)
         except Exception:
             pass
 
@@ -207,6 +214,7 @@ class PersonPillWidget(QFrame):
         self.name = person_data.get("name", "Person")
         self.image_count = person_data.get("image_count", 0)
         self.cover_crop_path = person_data.get("cover_crop_path")
+        self.cover_face_id = person_data.get("cover_face_id")
         self.is_selected = is_selected
         self._flat = flat
         self._avatar_size = avatar_size
@@ -321,7 +329,8 @@ class PersonPillWidget(QFrame):
         return out
 
     def _load_avatar(self) -> None:
-        cache_key = f"avatar_{self.person_id}_{self._avatar_size}_{self.cover_crop_path}"
+        cache_key = (f"avatar_{self.person_id}_{self.person_data.get('cover_face_id')}_"
+                     f"{self._avatar_size}_{self.cover_crop_path}")
         cached = get_cached_pixmap(cache_key)
         if cached:
             self.avatar_label.setPixmap(cached)
@@ -358,8 +367,9 @@ class PersonPillWidget(QFrame):
             )
             QThreadPool.globalInstance().start(loader)
 
-    def _on_avatar_ready(self, key: str, raw_pix: QPixmap) -> None:
+    def _on_avatar_ready(self, key: str, raw_img: QImage) -> None:
         try:
+            raw_pix = QPixmap.fromImage(raw_img)
             avatar_pix = self._render_circle_avatar(raw_pix)
             set_cached_pixmap(key, avatar_pix)
             self.avatar_label.setPixmap(avatar_pix)
@@ -478,18 +488,55 @@ class PhotoCardWidget(QFrame):
 
             theme = get_active_theme()
             accent_col = QColor(theme.accent_hover if theme.is_dark else theme.accent)
-            fill_col = QColor(accent_col)
-            fill_col.setAlpha(42)
+            solid_pen = QPen(accent_col, 1.8)
 
-            painter.setPen(QPen(accent_col, 1.8))
-            painter.setBrush(fill_col)
+            dashed_pen = QPen(accent_col, 1.4)
+            dashed_pen.setStyle(Qt.PenStyle.DashLine)
+
+            fill_col = QColor(accent_col)
+            fill_col.setAlpha(36)
+
+            tag_bg = QColor(0, 0, 0, 180) if theme.is_dark else QColor(255, 255, 255, 210)
+            tag_text_col = QColor(255, 255, 255) if theme.is_dark else QColor(20, 20, 20)
+
+            font = painter.font()
+            font.setPointSize(8)
+            painter.setFont(font)
+            fm = QFontMetrics(font)
 
             for f in self.faces:
                 bx = dx + float(f.get("x", 0)) * sx
                 by = dy + float(f.get("y", 0)) * sy
                 bw = float(f.get("w", 0)) * sx
                 bh = float(f.get("h", 0)) * sy
-                painter.drawRoundedRect(QRectF(bx, by, bw, bh), 3.0, 3.0)
+                rect = QRectF(bx, by, bw, bh)
+
+                display_name = face_display_name(f)
+                if display_name:
+                    # Named & confirmed face: solid border + name pill
+                    painter.setPen(solid_pen)
+                    painter.setBrush(fill_col)
+                    painter.drawRoundedRect(rect, 3.0, 3.0)
+
+                    # Draw small name pill below or top of box
+                    tag_w = min(bw + 10, fm.horizontalAdvance(display_name) + 8)
+                    tag_h = fm.height() + 2
+                    tag_x = max(0.0, bx + (bw - tag_w) / 2.0)
+                    tag_y = by + bh + 2 if (by + bh + tag_h + 2 < canvas_h) else max(0.0, by - tag_h - 2)
+                    tag_rect = QRectF(tag_x, tag_y, tag_w, tag_h)
+
+                    painter.setPen(Qt.PenStyle.NoPen)
+                    painter.setBrush(tag_bg)
+                    painter.drawRoundedRect(tag_rect, 2.0, 2.0)
+
+                    painter.setPen(tag_text_col)
+                    elided = fm.elidedText(display_name, Qt.TextElideMode.ElideRight, int(tag_w - 4))
+                    painter.drawText(tag_rect, Qt.AlignmentFlag.AlignCenter, elided)
+                else:
+                    # Unnamed / unconfirmed: dashed border, no label
+                    painter.setPen(dashed_pen)
+                    painter.setBrush(Qt.BrushStyle.NoBrush)
+                    painter.drawRoundedRect(rect, 3.0, 3.0)
 
         painter.end()
         return canvas
@@ -499,7 +546,8 @@ class PhotoCardWidget(QFrame):
             self.img_lbl.setText("No Preview")
             return
 
-        cache_key = f"thumb_{self.image_id}_{self._canvas_w}x{self._canvas_h}_{self.thumb_path}"
+        faces_sig = "-".join(str(f.get("id", "")) + ":" + str(face_display_name(f)) for f in self.faces)
+        cache_key = f"thumb_{self.image_id}_{self._canvas_w}x{self._canvas_h}_{faces_sig}_{self.thumb_path}"
         cached = get_cached_pixmap(cache_key)
         if cached:
             self.img_lbl.setPixmap(cached)
@@ -515,8 +563,9 @@ class PhotoCardWidget(QFrame):
         )
         QThreadPool.globalInstance().start(loader)
 
-    def _on_thumbnail_ready(self, key: str, scaled: QPixmap) -> None:
+    def _on_thumbnail_ready(self, key: str, scaled_img: QImage) -> None:
         try:
+            scaled = QPixmap.fromImage(scaled_img)
             composite = self._composite_thumbnail(scaled)
             set_cached_pixmap(key, composite)
             self.img_lbl.setPixmap(composite)

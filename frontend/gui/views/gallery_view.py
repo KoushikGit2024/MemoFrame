@@ -4,15 +4,17 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
+    QMenu,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -23,7 +25,9 @@ from PyQt6.QtWidgets import (
 
 from engine import Engine
 from gui.components.photo_table import PhotoTableWidget
+from gui.safe_call import safe_call
 from gui.state import AppState
+from gui.tasks import ThumbRepairWorker, enrich_photos
 from gui.widgets import (
     EmptyStateWidget,
     HorizontalStripScrollArea,
@@ -46,6 +50,8 @@ class GalleryView(QWidget):
         self._person_pills: dict[int | None, PersonPillWidget] = {}
         self._card_widgets: list[QWidget] = []
         self._last_cols: int = 0
+        self._thumb_repair: ThumbRepairWorker | None = None
+        self._extra_filters: dict[str, Any] = {}
 
         self._build_ui()
         self._connect_signals()
@@ -67,6 +73,11 @@ class GalleryView(QWidget):
         self.search_input.setClearButtonEnabled(True)
         self.search_input.setMinimumWidth(180)
         self.search_input.returnPressed.connect(self.reload_data)
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(350)
+        self._search_timer.timeout.connect(self.reload_data)
+        self.search_input.textChanged.connect(lambda _: self._search_timer.start())
         top_bar.addWidget(self.search_input, stretch=2)
 
         # Min faces filter
@@ -83,7 +94,7 @@ class GalleryView(QWidget):
 
         # Duplicate filter
         self.combo_dups = QComboBox()
-        self.combo_dups.addItems(["All Photos", "Unique Only", "Duplicates Only"])
+        self.combo_dups.addItems(["All Photos", "Unique Only", "Duplicates Only", "Hidden Only"])
         self.combo_dups.setMinimumWidth(122)
         self.combo_dups.currentIndexChanged.connect(lambda _: self.reload_data())
         top_bar.addWidget(self.combo_dups)
@@ -94,6 +105,20 @@ class GalleryView(QWidget):
         self.combo_sort.setMinimumWidth(130)
         self.combo_sort.currentIndexChanged.connect(lambda _: self.reload_data())
         top_bar.addWidget(self.combo_sort)
+
+        self.combo_tag = QComboBox()
+        self.combo_tag.addItem("Any Tag", None)
+        self.combo_tag.setMinimumWidth(110)
+        self.combo_tag.setVisible(False)                  # shown only when tags exist
+        self.combo_tag.currentIndexChanged.connect(lambda _: self.reload_data())
+        top_bar.addWidget(self.combo_tag)
+
+        self.btn_saved = QPushButton("Saved ▾")
+        self.btn_saved.setProperty("class", "Secondary")
+        self.saved_menu = QMenu(self)
+        self.saved_menu.aboutToShow.connect(self._rebuild_saved_menu)
+        self.btn_saved.setMenu(self.saved_menu)
+        top_bar.addWidget(self.btn_saved)
 
         # Sleek Segmented Control for Layout Mode (Grid, Compact, Table)
         seg_frame = QFrame()
@@ -212,10 +237,17 @@ class GalleryView(QWidget):
         self.btn_prev.clicked.connect(self._prev_page)
         footer.addWidget(self.btn_prev)
 
-        self.page_lbl = QLabel("Page 1")
+        self.page_lbl = QLabel("Page 1 of 1")
         self.page_lbl.setProperty("class", "CardTitle")
         self.page_lbl.setContentsMargins(8, 0, 8, 0)
         footer.addWidget(self.page_lbl)
+
+        self.spin_page = QSpinBox()
+        self.spin_page.setRange(1, 1)
+        self.spin_page.setFixedWidth(55)
+        self.spin_page.setToolTip("Go to page")
+        self.spin_page.valueChanged.connect(self._on_page_spin_changed)
+        footer.addWidget(self.spin_page)
 
         self.btn_next = QPushButton("Next →")
         self.btn_next.setProperty("class", "Secondary")
@@ -253,14 +285,18 @@ class GalleryView(QWidget):
         self.state.set_page(self.state.current_page + 1)
         self.reload_data(reset_page=False)
 
+    def _on_page_spin_changed(self, val: int) -> None:
+        target = val - 1
+        if target != self.state.current_page and target >= 0:
+            self.state.set_page(target)
+            self.reload_data(reset_page=False)
+
     def _rename_person_from_pill(self, person_id: int, new_name: str) -> None:
-        with self.lock:
-            self.engine.rename_person(person_id, new_name)
+        safe_call(self, self.engine.rename_person, person_id, new_name)
         self.reload_persons()
 
     def reload_persons(self) -> None:
-        with self.lock:
-            persons = self.engine.get_persons()
+        persons = safe_call(self, self.engine.get_persons, default=[]) or []
 
         self._person_pills.clear()
         while self.person_bar_layout.count() > 1:
@@ -291,11 +327,55 @@ class GalleryView(QWidget):
             self._person_pills[p["id"]] = pill
             self.person_bar_layout.insertWidget(idx, pill)
 
-    def reload_data(self, reset_page: bool = True) -> None:
-        if reset_page:
-            self.state.current_page = 0
+    _SORT_LABELS = {
+        "date": "Date (Oldest)",
+        "date_desc": "Date (Newest)",
+        "quality": "Quality Score",
+        "path": "Path Name",
+    }
 
-        filters: dict[str, Any] = {}
+    def shutdown(self) -> None:
+        if self._thumb_repair is not None and self._thumb_repair.isRunning():
+            self._thumb_repair.requestInterruption()
+            self._thumb_repair.wait(5000)
+
+    def reload_tags(self) -> None:
+        tags = safe_call(self, self.engine.list_tags, 80, default=[]) or []
+        current = self.combo_tag.currentData()
+        self.combo_tag.blockSignals(True)
+        self.combo_tag.clear()
+        self.combo_tag.addItem("Any Tag", None)
+        for t in tags:
+            self.combo_tag.addItem(f"{t['label']} ({t['count']})", t["label"])
+        self.combo_tag.setCurrentIndex(max(0, self.combo_tag.findData(current)) if current else 0)
+        self.combo_tag.blockSignals(False)
+        self.combo_tag.setVisible(bool(tags))
+
+    def _rebuild_saved_menu(self) -> None:
+        self.saved_menu.clear()
+        saved = safe_call(self, self.engine.list_saved_searches, default=[]) or []
+        for s in saved:
+            act = self.saved_menu.addAction(s["name"])
+            act.triggered.connect(lambda _=False, f=s["filters"]: self._apply_filters(f))
+        if saved:
+            self.saved_menu.addSeparator()
+        self.saved_menu.addAction("Save current search…").triggered.connect(self._save_current)
+        if saved:
+            delete = self.saved_menu.addMenu("Delete")
+            for s in saved:
+                delete.addAction(s["name"]).triggered.connect(
+                    lambda _=False, n=s["name"]: safe_call(self, self.engine.delete_saved_search, n))
+        self.saved_menu.addAction("Reset all filters").triggered.connect(
+            lambda _=False: self._apply_filters({}))
+
+    def _save_current(self) -> None:
+        name, ok = QInputDialog.getText(self, "Save search", "Name:")
+        if ok and name.strip():
+            filters, sort = self._current_filters()
+            safe_call(self, self.engine.save_search, name.strip(), {**filters, "sort": sort})
+
+    def _current_filters(self) -> tuple[dict[str, Any], str]:
+        filters: dict[str, Any] = dict(self._extra_filters)
         txt = self.search_input.text().strip()
         if txt:
             filters["path_contains"] = txt
@@ -304,11 +384,17 @@ class GalleryView(QWidget):
         if self.state.selected_person_id is not None:
             filters["person_id"] = self.state.selected_person_id
 
-        dup_choice = self.combo_dups.currentText()
-        if dup_choice == "Unique Only":
+        tag = self.combo_tag.currentData()
+        if tag:
+            filters["tag"] = tag
+
+        dup = self.combo_dups.currentText()
+        if dup == "Unique Only":
             filters["duplicate"] = "none"
-        elif dup_choice == "Duplicates Only":
+        elif dup == "Duplicates Only":
             filters["duplicate"] = "any"
+        elif dup == "Hidden Only":
+            filters["mark"] = "hidden"
 
         sort_choice = {
             "Date (Oldest)": "date",
@@ -316,26 +402,103 @@ class GalleryView(QWidget):
             "Quality Score": "quality",
             "Path Name": "path",
         }.get(self.combo_sort.currentText(), "date")
+        return filters, sort_choice
+
+    def _apply_filters(self, saved: dict[str, Any]) -> None:
+        f = dict(saved)
+        sort = f.pop("sort", "date")
+        extras: dict[str, Any] = {}
+        label = "All Photos"
+        if f.get("mark") == "hidden":
+            f.pop("mark")
+            label = "Hidden Only"
+            if "duplicate" in f:
+                extras["duplicate"] = f.pop("duplicate")
+        elif f.get("duplicate") in ("none", "any"):
+            label = "Unique Only" if f.pop("duplicate") == "none" else "Duplicates Only"
+        tag = f.pop("tag", None)
+        tag_idx = self.combo_tag.findData(tag) if tag else 0
+        if tag and tag_idx < 0:
+            extras["tag"], tag_idx = tag, 0
+        pid = f.pop("person_id", None)
+        path_txt = f.pop("path_contains", "") or ""
+        min_faces = int(f.pop("min_faces", 0) or 0)
+        extras.update(f)
+        self._extra_filters = extras
+
+        widgets = (self.search_input, self.spin_faces, self.combo_dups, self.combo_sort, self.combo_tag)
+        for w in widgets:
+            w.blockSignals(True)
+        self.search_input.setText(path_txt)
+        self.spin_faces.setValue(min_faces)
+        self.combo_dups.setCurrentText(label)
+        self.combo_sort.setCurrentText(self._SORT_LABELS.get(sort, "Date (Oldest)"))
+        self.combo_tag.setCurrentIndex(tag_idx)
+        for w in widgets:
+            w.blockSignals(False)
+        if pid != self.state.selected_person_id:
+            self.state.select_person(pid)
+        else:
+            self.reload_data()
+
+    def reload_data(self, reset_page: bool = True) -> None:
+        pid = self.state.selected_person_id
+        if pid is not None and safe_call(self, self.engine.get_person, pid, default=None) is None:
+            self.state.selected_person_id = None
+            self.btn_clear_person.setVisible(False)
+
+        if reset_page:
+            self.state.current_page = 0
+
+        filters, sort_choice = self._current_filters()
+
+        total_matched = safe_call(self, self.engine.count, kind="photo", default=0, **filters) or 0
+        total_pages = max(1, (total_matched + self.state.page_size - 1) // self.state.page_size)
 
         offset = self.state.current_page * self.state.page_size
-        with self.lock:
-            items = self.engine.find(sort=sort_choice, limit=self.state.page_size, offset=offset, **filters)
-            for it in items:
-                it["faces"] = [dict(f) for f in self.engine.get_faces(it["id"])]
-                try:
-                    it["thumb_path"] = self.engine.thumbnail(it["id"])
-                except Exception:
-                    it["thumb_path"] = None
+        raw_items = safe_call(
+            self,
+            self.engine.find,
+            kind="photo",
+            sort=sort_choice,
+            limit=self.state.page_size,
+            offset=offset,
+            default=[],
+            **filters,
+        ) or []
+
+        # Batch-enrich faces and get thumbnail paths
+        items = enrich_photos(self.engine, raw_items)
+        missing_thumbs = []
+        for it in items:
+            try:
+                t = self.engine.thumbnail(it["id"])
+                it["thumb_path"] = t
+            except Exception:
+                it["thumb_path"] = None
+                missing_thumbs.append(it.get("path"))
+
+        if missing_thumbs:
+            self._thumb_repair = ThumbRepairWorker(self.engine, missing_thumbs, self)
+            self._thumb_repair.start()
 
         self.current_items = items
         total_shown = len(items)
         start_idx = offset + 1 if total_shown > 0 else 0
         end_idx = offset + total_shown
 
-        self.status_lbl.setText(f"Showing {start_idx}–{end_idx} photos" if total_shown else "No photos matched")
-        self.page_lbl.setText(f"Page {self.state.current_page + 1}")
+        extra = f"  ·  {len(self._extra_filters)} saved filter(s) active" if self._extra_filters else ""
+        self.status_lbl.setText(
+            (f"Showing {start_idx}–{end_idx} of {total_matched} photos" if total_shown else "No photos matched") + extra
+        )
+        self.page_lbl.setText(f"Page {self.state.current_page + 1} of {total_pages}")
+        self.spin_page.blockSignals(True)
+        self.spin_page.setRange(1, total_pages)
+        self.spin_page.setValue(self.state.current_page + 1)
+        self.spin_page.blockSignals(False)
+
         self.btn_prev.setEnabled(self.state.current_page > 0)
-        self.btn_next.setEnabled(total_shown == self.state.page_size)
+        self.btn_next.setEnabled(self.state.current_page + 1 < total_pages)
 
         if self.state.layout_mode == "table":
             self.table_view.set_photos(self.current_items)

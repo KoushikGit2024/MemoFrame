@@ -26,17 +26,15 @@ class ModelDownloadError(RuntimeError):
 
 
 def _verify(path: Path, expected_sha256: str) -> bool:
-    """Size sanity check, plus hash check when a hash is configured."""
     if not path.is_file() or path.stat().st_size < _MIN_PLAUSIBLE_BYTES:
         return False
     actual = sha256_file(path)
+    if os.environ.get("MEMOFRAME_SKIP_MODEL_HASH") == "1":
+        log.warning("Hash check skipped for %s (sha256 %s)", path.name, actual)
+        return True
     if expected_sha256:
         return actual.lower() == expected_sha256.lower()
-    log.warning(
-        "No SHA-256 pinned for %s. Computed %s. Set YUNET_SHA256 in config.py to pin it.",
-        path.name,
-        actual,
-    )
+    log.warning("No SHA-256 pinned for %s. Computed %s.", path.name, actual)
     return True
 
 
@@ -73,14 +71,16 @@ def ensure_model(
 
     atomic_write_bytes(dest, data)
     if not _verify(dest, expected_sha256):
+        actual = sha256_file(dest)
         try:
             os.unlink(dest)
         except OSError:
             pass
         raise ModelDownloadError(
-            "Downloaded model failed verification (wrong size or SHA-256). "
-            "The file was removed. Check YUNET_URL / YUNET_SHA256 in config.py."
-        )
+            f"Downloaded {dest.name} failed verification.\n"
+            f"  expected sha256: {expected_sha256 or '(none)'}\n  got:             {actual}\n"
+            "If you trust the source, put the 'got' value into config.py "
+            "(or set MEMOFRAME_SKIP_MODEL_HASH=1 once).")
 
     log.info("Model saved to %s (%s)", dest, human_size(dest.stat().st_size))
     return dest

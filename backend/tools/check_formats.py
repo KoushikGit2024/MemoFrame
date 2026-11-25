@@ -10,10 +10,11 @@ import sys
 import time
 from pathlib import Path
 
-from PIL import Image
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from services.vision.loader import load_image_bytes
-from services.organization.similarity import compute_phash, phash_distance
+from PIL import Image  # noqa: E402
+from services.vision.loader import load_image_bytes  # noqa: E402
+from services.organization.similarity import compute_phash, hamming  # noqa: E402
 
 
 def check_folder(folder: Path) -> int:
@@ -40,14 +41,14 @@ def check_folder(folder: Path) -> int:
                 dt = (time.perf_counter() - t0) * 1000
                 h = compute_phash(loaded.pil)
                 hashes[p.name] = (h, dt, loaded.format)
-                print(f"  {p.name:<30} fmt={loaded.format:<6} decode={dt:>6.1f}ms  phash={h:016x}")
+                print(f"  {p.name:<30} fmt={loaded.format:<6} decode={dt:>6.1f}ms  phash={h}")
             except Exception as exc:
                 print(f"  {p.name:<30} FAILED: {exc}")
 
         names = list(hashes.keys())
         for i in range(len(names)):
             for j in range(i + 1, len(names)):
-                d = phash_distance(hashes[names[i]][0], hashes[names[j]][0])
+                d = hamming(hashes[names[i]][0], hashes[names[j]][0])
                 print(f"    Distance({names[i]} <-> {names[j]}): {d} bits")
 
     return 0

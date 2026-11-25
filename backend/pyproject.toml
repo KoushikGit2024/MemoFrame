@@ -19,8 +19,15 @@ dependencies = [
 [project.scripts]
 memoframe = "cli:main"
 
+[tool.setuptools]
+py-modules = ["cli", "config", "models"]
+
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["database*", "engine*", "services*", "utils*"]
+
+[tool.setuptools.package-data]
+database = ["schema.sql"]
 
 [tool.pyright]
 extraPaths = [".", ".."]

@@ -13,6 +13,13 @@ class WorkspaceLock:
         self.path = path
         self._fh: BinaryIO | None = None
 
+    def __enter__(self) -> WorkspaceLock:
+        self.acquire()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.release()
+
     def acquire(self) -> None:
         if self._fh is not None:
             return

@@ -61,8 +61,10 @@ def translate(exc: BaseException) -> EngineError:
         return EngineError(ErrorCode.WORKER_CRASH, text, "Use the gentle profile or fewer workers.")
     if isinstance(exc, (DatabaseError, sqlite3.Error)):
         return EngineError(ErrorCode.DB_ERROR, text)
-    if isinstance(exc, (ValidationError, ValueError, TypeError)):
+    if isinstance(exc, (ValidationError, ValueError)):
         return EngineError(ErrorCode.INVALID_INPUT, text)
+    if isinstance(exc, TypeError):
+        return EngineError(ErrorCode.UNKNOWN, f"TypeError (internal bug): {text}")
     if isinstance(exc, FileNotFoundError):
         return EngineError(ErrorCode.DRIVE_OFFLINE, text, "Is the drive connected?")
     if isinstance(exc, OSError):
