@@ -1,4 +1,5 @@
 """Stdio NDJSON-RPC bridge server connecting Electron to MemoFrame's Python Engine."""
+
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
@@ -88,8 +89,8 @@ class BridgeServer:
         line = encode_line(payload)
         with self._write_lock:
             try:
-                if hasattr(self._out, 'buffer'):
-                    self._out.buffer.write(line.encode('utf-8'))
+                if hasattr(self._out, "buffer"):
+                    self._out.buffer.write(line.encode("utf-8"))
                     self._out.buffer.flush()
                 else:
                     self._out.write(line)

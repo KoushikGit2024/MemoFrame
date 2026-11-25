@@ -1,4 +1,5 @@
 """Tests for person clustering and face embedding pipeline."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -13,7 +14,7 @@ from services.pipeline import orchestrator as pipeline
 def test_cluster_face_embeddings():
     v1 = np.ones(128, dtype=np.float32)
     v1 /= np.linalg.norm(v1)
-    
+
     # Very similar vector to v1 (same person)
     v2 = v1.copy()
     v2[0] += 0.05
@@ -36,17 +37,21 @@ def test_person_database_operations(tmp_path):
     with DatabaseManager(tmp_path / "test.db") as db:
         # Insert dummy image and faces
         with db._tx() as conn:
-            conn.execute("INSERT INTO images (id, path, size, mtime_ns, status) VALUES (1, 'p1.jpg', 100, 100, 'done')")
-            conn.execute("INSERT INTO images (id, path, size, mtime_ns, status) VALUES (2, 'p2.jpg', 100, 100, 'done')")
+            conn.execute(
+                "INSERT INTO images (id, path, size, mtime_ns, status) VALUES (1, 'p1.jpg', 100, 100, 'done')"
+            )
+            conn.execute(
+                "INSERT INTO images (id, path, size, mtime_ns, status) VALUES (2, 'p2.jpg', 100, 100, 'done')"
+            )
             conn.execute(
                 "INSERT INTO faces (id, image_id, label, x, y, w, h, confidence, embedding) "
                 "VALUES (10, 1, 'Face 001', 0, 0, 50, 50, 0.9, ?)",
-                (b"x" * 512,)
+                (b"x" * 512,),
             )
             conn.execute(
                 "INSERT INTO faces (id, image_id, label, x, y, w, h, confidence, embedding) "
                 "VALUES (11, 2, 'Face 001', 0, 0, 50, 50, 0.9, ?)",
-                (b"x" * 512,)
+                (b"x" * 512,),
             )
 
         # Cluster face 10 and 11 into Person 1
@@ -74,16 +79,36 @@ def test_person_database_operations(tmp_path):
 def test_person_names_survive_recluster(tmp_path):
     with DatabaseManager(tmp_path / "test.db") as db:
         with db._tx() as conn:
-            conn.execute("INSERT INTO images (id, path, size, mtime_ns, status) VALUES (1, 'p1.jpg', 100, 100, 'done')")
-            conn.execute("INSERT INTO images (id, path, size, mtime_ns, status) VALUES (2, 'p2.jpg', 100, 100, 'done')")
-            conn.execute("INSERT INTO images (id, path, size, mtime_ns, status) VALUES (3, 'p3.jpg', 100, 100, 'done')")
-            conn.execute("INSERT INTO faces (id, image_id, label, x, y, w, h, confidence, embedding) VALUES (1, 1, 'Face 001', 0, 0, 50, 50, 0.9, ?)", (b"x"*512,))
-            conn.execute("INSERT INTO faces (id, image_id, label, x, y, w, h, confidence, embedding) VALUES (2, 2, 'Face 001', 0, 0, 50, 50, 0.9, ?)", (b"x"*512,))
-            conn.execute("INSERT INTO faces (id, image_id, label, x, y, w, h, confidence, embedding) VALUES (3, 3, 'Face 001', 0, 0, 50, 50, 0.9, ?)", (b"x"*512,))
+            conn.execute(
+                "INSERT INTO images (id, path, size, mtime_ns, status) VALUES (1, 'p1.jpg', 100, 100, 'done')"
+            )
+            conn.execute(
+                "INSERT INTO images (id, path, size, mtime_ns, status) VALUES (2, 'p2.jpg', 100, 100, 'done')"
+            )
+            conn.execute(
+                "INSERT INTO images (id, path, size, mtime_ns, status) VALUES (3, 'p3.jpg', 100, 100, 'done')"
+            )
+            conn.execute(
+                "INSERT INTO faces (id, image_id, label, x, y, w, h, confidence, embedding) VALUES (1, 1, 'Face 001', 0, 0, 50, 50, 0.9, ?)",
+                (b"x" * 512,),
+            )
+            conn.execute(
+                "INSERT INTO faces (id, image_id, label, x, y, w, h, confidence, embedding) VALUES (2, 2, 'Face 001', 0, 0, 50, 50, 0.9, ?)",
+                (b"x" * 512,),
+            )
+            conn.execute(
+                "INSERT INTO faces (id, image_id, label, x, y, w, h, confidence, embedding) VALUES (3, 3, 'Face 001', 0, 0, 50, 50, 0.9, ?)",
+                (b"x" * 512,),
+            )
 
         # Cluster 1: [1, 2], Cluster 2: [3]
         db.replace_person_clusters({1: [1, 2], 2: [3]})
-        p1 = [p for p in db.list_persons() if 1 in [r["id"] for r in db._query("SELECT id FROM faces WHERE person_id = ?", (p["id"],))]][0]
+        p1 = [
+            p
+            for p in db.list_persons()
+            if 1
+            in [r["id"] for r in db._query("SELECT id FROM faces WHERE person_id = ?", (p["id"],))]
+        ][0]
         pid1 = p1["id"]
         db.rename_person(pid1, "Alice")
         assert db.get_person(pid1)["name"] == "Alice"
@@ -94,7 +119,10 @@ def test_person_names_survive_recluster(tmp_path):
         # Alice should still be mapped to cluster containing [1, 2]
         p_alice = [p for p in db.list_persons() if p["name"] == "Alice"]
         assert len(p_alice) == 1
-        alice_faces = [r["id"] for r in db._query("SELECT id FROM faces WHERE person_id = ?", (p_alice[0]["id"],))]
+        alice_faces = [
+            r["id"]
+            for r in db._query("SELECT id FROM faces WHERE person_id = ?", (p_alice[0]["id"],))
+        ]
         assert sorted(alice_faces) == [1, 2]
         # Revision should NOT have bumped (only persons_rev bumped)
         assert db.revision() == rev_before
@@ -111,22 +139,33 @@ def test_manual_corrections_survive_recluster(tmp_path):
     with DatabaseManager(tmp_path / "t.db") as db:
         with db._tx() as c:
             for i in range(1, 6):
-                c.execute("INSERT INTO images (id, path, size, mtime_ns, status) "
-                          "VALUES (?, ?, 1, 1, 'done')", (i, f"p{i}.jpg"))
-            for fid, img, emb in ((10, 1, _vec(0)), (11, 2, _vec(0)),
-                                  (12, 3, _vec(1)), (13, 4, _vec(1)), (14, 5, _vec(1))):
-                c.execute("INSERT INTO faces (id, image_id, label, x, y, w, h, confidence, embedding) "
-                          "VALUES (?, ?, 'Face 001', 0, 0, 60, 60, 0.95, ?)", (fid, img, emb))
+                c.execute(
+                    "INSERT INTO images (id, path, size, mtime_ns, status) "
+                    "VALUES (?, ?, 1, 1, 'done')",
+                    (i, f"p{i}.jpg"),
+                )
+            for fid, img, emb in (
+                (10, 1, _vec(0)),
+                (11, 2, _vec(0)),
+                (12, 3, _vec(1)),
+                (13, 4, _vec(1)),
+                (14, 5, _vec(1)),
+            ):
+                c.execute(
+                    "INSERT INTO faces (id, image_id, label, x, y, w, h, confidence, embedding) "
+                    "VALUES (?, ?, 'Face 001', 0, 0, 60, 60, 0.95, ?)",
+                    (fid, img, emb),
+                )
         pid = lambda fid: db._query("SELECT person_id FROM faces WHERE id = ?", (fid,))[0][0]
 
         pipeline.update_persons(s, db, force=True)
-        bob = db.create_person("Bob", [12])               # user pins one face
+        bob = db.create_person("Bob", [12])  # user pins one face
         pipeline.update_persons(s, db, force=True)
-        assert pid(12) == pid(13) == pid(14) == bob       # Bob claims look-alikes
+        assert pid(12) == pid(13) == pid(14) == bob  # Bob claims look-alikes
         assert pid(10) == pid(11) not in (None, bob)
         assert db.get_person(bob)["name"] == "Bob"
 
-        db.assign_face(13, None)                          # "not a person I care about"
+        db.assign_face(13, None)  # "not a person I care about"
         pipeline.update_persons(s, db, force=True)
         assert pid(13) is None and pid(14) == bob
 

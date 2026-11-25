@@ -1,4 +1,5 @@
 """Image loading, corrupted-file handling, scanner and metadata extraction."""
+
 from __future__ import annotations
 
 import os
@@ -18,7 +19,7 @@ from services.pipeline.scanner import iter_image_files
 def test_loads_and_downscales(tmp_path, make_image):
     p = make_image(tmp_path / "big.jpg", size=(3000, 2000))
     li = load_image(p, 1280)
-    assert (li.width, li.height) == (3000, 2000)       # full-resolution size is kept
+    assert (li.width, li.height) == (3000, 2000)  # full-resolution size is kept
     assert max(li.pil.size) <= 1280
     assert li.scale == pytest.approx(3000 / li.pil.width)
     assert li.to_bgr().shape == (li.pil.height, li.pil.width, 3)
@@ -33,12 +34,12 @@ def test_no_downscale_means_scale_one(tmp_path, make_image):
 def test_exif_orientation_applied_in_memory(tmp_path):
     p = tmp_path / "rot.jpg"
     exif = Image.Exif()
-    exif[0x0112] = 6                                   # rotate 90 degrees
+    exif[0x0112] = 6  # rotate 90 degrees
     Image.new("RGB", (200, 100), "red").save(p, exif=exif)
     li = load_image(p)
     assert (li.width, li.height) == (100, 200)
     assert li.pil.size == (100, 200)
-    with Image.open(p) as original:                    # file itself is untouched
+    with Image.open(p) as original:  # file itself is untouched
         assert original.size == (200, 100)
 
 

@@ -1,4 +1,5 @@
 """Person and face management mixin for the Engine public interface."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -11,7 +12,8 @@ class PersonEngineMixin:
 
     def _people_changed(self) -> None:
         from services.pipeline import orchestrator as pipeline
-        pipeline.update_search_index(self.settings, self.db)   # names in the text index
+
+        pipeline.update_search_index(self.settings, self.db)  # names in the text index
 
     def get_persons(self) -> list[dict[str, Any]]:
         """List all identified person clusters with names, cover faces, and counts."""
@@ -55,7 +57,9 @@ class PersonEngineMixin:
 
         return _impl()
 
-    def get_person_faces(self, person_id: int, limit: int = 200, offset: int = 0) -> list[dict[str, Any]]:
+    def get_person_faces(
+        self, person_id: int, limit: int = 200, offset: int = 0
+    ) -> list[dict[str, Any]]:
         """Faces of one person, best first."""
         from engine.api import _row, _translated
 

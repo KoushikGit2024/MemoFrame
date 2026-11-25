@@ -1,4 +1,5 @@
 """Pipeline end to end with a fake detector: batching, failures, resume, interruption."""
+
 from __future__ import annotations
 
 import hashlib
@@ -10,7 +11,12 @@ import pytest
 from models import FaceBox
 from database import DatabaseManager
 from services.pipeline import orchestrator as pipeline
-from services.pipeline.orchestrator import process_pending, scan_directory, update_duplicates, update_groups
+from services.pipeline.orchestrator import (
+    process_pending,
+    scan_directory,
+    update_duplicates,
+    update_groups,
+)
 
 
 class FakeDetector:
@@ -33,10 +39,12 @@ class FakeDetector:
 @pytest.fixture
 def use_detector(monkeypatch):
     """Install a fake detector; no model download, no network."""
+
     def install(detector):
         monkeypatch.setattr(pipeline, "create_detector", lambda settings: detector)
         monkeypatch.setattr(pipeline, "ensure_model", lambda path: path)
         return detector
+
     return install
 
 
@@ -58,9 +66,19 @@ def test_processes_good_files_and_records_failure(settings, photos, use_detector
     with DatabaseManager(settings.db_path) as db:
         assert scan_directory(settings, db, photos).new == 4
         summary = process_pending(settings, db, show_progress=False)
-        assert (summary.processed, summary.failed, summary.remaining, summary.interrupted) == (3, 1, 0, False)
+        assert (summary.processed, summary.failed, summary.remaining, summary.interrupted) == (
+            3,
+            1,
+            0,
+            False,
+        )
         stats = db.report_stats()
-        assert (stats["processed"], stats["failed"], stats["total_faces"], stats["multi_face_images"]) == (3, 1, 6, 3)
+        assert (
+            stats["processed"],
+            stats["failed"],
+            stats["total_faces"],
+            stats["multi_face_images"],
+        ) == (3, 1, 6, 3)
         faces = db.get_faces(db.search_images()[0]["id"])
         assert [f["label"] for f in faces] == ["Face 001", "Face 002"]
         assert all(os.path.isfile(f["crop_path"]) for f in faces)
@@ -77,7 +95,7 @@ def test_second_run_does_nothing(settings, photos, use_detector):
         assert (stats.new, stats.changed, stats.unchanged) == (0, 0, 4)
         summary = process_pending(settings, db, show_progress=False)
         assert (summary.processed, summary.failed, summary.remaining) == (0, 0, 0)
-        assert detector.calls == calls                      # nothing was re-detected
+        assert detector.calls == calls  # nothing was re-detected
 
 
 def test_interrupt_then_resume(settings, tmp_path, make_image, use_detector):
@@ -87,10 +105,13 @@ def test_interrupt_then_resume(settings, tmp_path, make_image, use_detector):
     with DatabaseManager(settings.db_path) as db:
         scan_directory(settings, db, root)
 
-        use_detector(FakeDetector(interrupt_on=4))          # Ctrl+C during the 4th image
+        use_detector(FakeDetector(interrupt_on=4))  # Ctrl+C during the 4th image
         first = process_pending(settings, db, show_progress=False)
         assert first.interrupted
-        assert (first.processed, first.remaining) == (3, 2)  # batch 1 + the image finished before the interrupt
+        assert (first.processed, first.remaining) == (
+            3,
+            2,
+        )  # batch 1 + the image finished before the interrupt
 
         use_detector(FakeDetector())
         second = process_pending(settings, db, show_progress=False)
@@ -98,7 +119,7 @@ def test_interrupt_then_resume(settings, tmp_path, make_image, use_detector):
 
         stats = db.report_stats()
         assert (stats["processed"], stats["pending"]) == (5, 0)
-        assert stats["total_faces"] == 10                   # no duplicate face rows after resume
+        assert stats["total_faces"] == 10  # no duplicate face rows after resume
 
 
 def test_changed_file_is_reprocessed(settings, photos, make_image, use_detector):
@@ -120,9 +141,9 @@ def test_failed_files_need_retry_flag(settings, photos, make_image, use_detector
     with DatabaseManager(settings.db_path) as db:
         scan_directory(settings, db, photos)
         process_pending(settings, db, show_progress=False)
-        assert db.count_pending() == 0                      # failed file is not retried by default
+        assert db.count_pending() == 0  # failed file is not retried by default
 
-        make_image(photos / "bad.jpg", seed=50)             # "fix" the file without rescanning
+        make_image(photos / "bad.jpg", seed=50)  # "fix" the file without rescanning
         summary = process_pending(settings, db, retry_failed=True, show_progress=False)
         assert (summary.processed, summary.failed) == (1, 0)
 
@@ -136,7 +157,7 @@ def test_originals_are_never_modified(settings, photos, use_detector):
         update_duplicates(settings, db)
         update_groups(settings, db)
     assert {p.name: _sha(p) for p in photos.glob("*.jpg")} == before
-    assert sorted(p.name for p in photos.iterdir()) == sorted(before)   # no extra files beside them
+    assert sorted(p.name for p in photos.iterdir()) == sorted(before)  # no extra files beside them
 
 
 def test_duplicates_and_groups_after_processing(settings, photos, use_detector):
@@ -155,8 +176,8 @@ def test_duplicates_and_groups_after_processing(settings, photos, use_detector):
 def test_workspace_inside_photo_folder_is_not_scanned(settings, tmp_path, photos, use_detector):
     use_detector(FakeDetector())
     with DatabaseManager(settings.db_path) as db:
-        scan_directory(settings, db, tmp_path)              # root contains both photos/ and ws/
+        scan_directory(settings, db, tmp_path)  # root contains both photos/ and ws/
         process_pending(settings, db, show_progress=False)
-        again = scan_directory(settings, db, tmp_path)      # thumbnails now exist in ws/
+        again = scan_directory(settings, db, tmp_path)  # thumbnails now exist in ws/
         assert (again.new, again.changed) == (0, 0)
         assert again.total == 4

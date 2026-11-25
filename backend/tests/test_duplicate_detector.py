@@ -1,4 +1,5 @@
 """Exact and near-duplicate clustering, including a brute-force recall check."""
+
 from __future__ import annotations
 
 import random
@@ -29,7 +30,9 @@ def _clusters(rows):
 
 
 def test_exact_duplicates_by_sha():
-    rows = find_duplicates([(1, "aaa", _hex(BASE)), (2, "aaa", _hex(BASE)), (3, "bbb", _hex(~BASE & (2**64 - 1)))])
+    rows = find_duplicates(
+        [(1, "aaa", _hex(BASE)), (2, "aaa", _hex(BASE)), (3, "bbb", _hex(~BASE & (2**64 - 1)))]
+    )
     assert _clusters(rows) == [{1, 2}]
     assert {kind for _, _, kind in rows} == {"exact"}
 
@@ -40,8 +43,9 @@ def test_exact_by_sha_even_if_phash_missing():
 
 
 def test_near_duplicate_within_threshold():
-    rows = find_duplicates([(1, "a", _hex(BASE)), (2, "b", _hex(_flip(BASE, [0, 20, 40])))],
-                           near_threshold=6)
+    rows = find_duplicates(
+        [(1, "a", _hex(BASE)), (2, "b", _hex(_flip(BASE, [0, 20, 40])))], near_threshold=6
+    )
     assert _clusters(rows) == [{1, 2}]
     assert {kind for _, _, kind in rows} == {"near"}
 
@@ -61,8 +65,10 @@ def test_threshold_zero_only_identical_hashes():
 def test_chaining_is_transitive():
     a = BASE
     b = _flip(a, [0, 1, 2, 3, 4])
-    c = _flip(b, [10, 11, 12, 13, 14])         # 10 bits from a, 5 from b
-    rows = find_duplicates([(1, "x", _hex(a)), (2, "y", _hex(b)), (3, "z", _hex(c))], near_threshold=6)
+    c = _flip(b, [10, 11, 12, 13, 14])  # 10 bits from a, 5 from b
+    rows = find_duplicates(
+        [(1, "x", _hex(a)), (2, "y", _hex(b)), (3, "z", _hex(c))], near_threshold=6
+    )
     assert _clusters(rows) == [{1, 2, 3}]
 
 
@@ -78,8 +84,9 @@ def test_many_identical_images_one_cluster():
 
 def test_cluster_ids_ordered_by_smallest_member():
     other = ~BASE & (2**64 - 1)
-    rows = find_duplicates([(5, "a", _hex(other)), (6, "b", _hex(other)),
-                            (1, "c", _hex(BASE)), (2, "d", _hex(BASE))])
+    rows = find_duplicates(
+        [(5, "a", _hex(other)), (6, "b", _hex(other)), (1, "c", _hex(BASE)), (2, "d", _hex(BASE))]
+    )
     by_image = {i: c for i, c, _ in rows}
     assert by_image[1] == by_image[2] == 1 and by_image[5] == by_image[6] == 2
 
@@ -123,5 +130,12 @@ def test_choose_keeper_prefers_resolution_then_size_then_id():
         {"id": 2, "width": 200, "height": 100, "size": 900},
     ]
     assert choose_keeper(members) == 2
-    assert choose_keeper([{"id": 7, "width": 10, "height": 10, "size": 5},
-                          {"id": 4, "width": 10, "height": 10, "size": 5}]) == 4
+    assert (
+        choose_keeper(
+            [
+                {"id": 7, "width": 10, "height": 10, "size": 5},
+                {"id": 4, "width": 10, "height": 10, "size": 5},
+            ]
+        )
+        == 4
+    )

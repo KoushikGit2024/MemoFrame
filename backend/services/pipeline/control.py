@@ -1,4 +1,5 @@
 """Progress events, pause/cancel and the memory guard for a pipeline run."""
+
 from __future__ import annotations
 
 import threading
@@ -33,7 +34,9 @@ ProgressCallback = Callable[[ProgressEvent], None]
 class RunControl:
     """Thread-safe handle shared by the pipeline and the caller (e.g. the app)."""
 
-    def __init__(self, on_progress: ProgressCallback | None = None, min_free_mem_mb: int = 0) -> None:
+    def __init__(
+        self, on_progress: ProgressCallback | None = None, min_free_mem_mb: int = 0
+    ) -> None:
         self._on_progress = on_progress
         self.min_free_mem_mb = min_free_mem_mb
         self._cancel = threading.Event()

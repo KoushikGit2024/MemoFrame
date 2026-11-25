@@ -1,4 +1,5 @@
 """Stable error codes for the app, and translation of internal exceptions."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -47,11 +48,15 @@ def translate(exc: BaseException) -> EngineError:
     if isinstance(exc, EngineError):
         return exc
     if isinstance(exc, ModelDownloadError):
-        return EngineError(ErrorCode.MODEL_DOWNLOAD_FAILED, text,
-                           "Check the internet connection once, or place the model file manually.")
+        return EngineError(
+            ErrorCode.MODEL_DOWNLOAD_FAILED,
+            text,
+            "Check the internet connection once, or place the model file manually.",
+        )
     if isinstance(exc, TaggerUnavailableError):
-        return EngineError(ErrorCode.TAGGER_UNAVAILABLE, text,
-                           "Check the tag model and labels files (run doctor).")
+        return EngineError(
+            ErrorCode.TAGGER_UNAVAILABLE, text, "Check the tag model and labels files (run doctor)."
+        )
     if isinstance(exc, DetectorUnavailableError):
         code = ErrorCode.MODEL_MISSING if "not found" in text else ErrorCode.DETECTOR_UNAVAILABLE
         return EngineError(code, text, "Run the environment check (doctor).")

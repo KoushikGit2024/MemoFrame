@@ -1,4 +1,5 @@
 """Multi-stage monotonic progress tracking for folder scanning and analysis."""
+
 from __future__ import annotations
 
 from typing import Any, Mapping

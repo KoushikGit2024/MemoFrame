@@ -2,6 +2,7 @@
 
 Faces are never examined here.
 """
+
 from __future__ import annotations
 
 import math
@@ -33,8 +34,9 @@ def quality_metrics(pil: Image.Image, full_pixels: int) -> dict[str, float]:
     h, w = grey.shape
     scale = 512 / max(h, w)
     if scale < 1:
-        grey = cv2.resize(grey, (max(1, round(w * scale)), max(1, round(h * scale))),
-                          interpolation=cv2.INTER_AREA)
+        grey = cv2.resize(
+            grey, (max(1, round(w * scale)), max(1, round(h * scale))), interpolation=cv2.INTER_AREA
+        )
     sharp = float(cv2.Laplacian(grey, cv2.CV_64F).var())
     mean = float(grey.mean())
     clipped = float(((grey <= 5) | (grey >= 250)).mean())
@@ -46,7 +48,11 @@ def quality_metrics(pil: Image.Image, full_pixels: int) -> dict[str, float]:
         exposure *= max(0.0, (255 - mean) / 45)
     resolution = min(1.0, full_pixels / 12e6)
     quality = 100 * (0.6 * sharp_score + 0.25 * exposure + 0.15 * resolution)
-    return {"quality": round(quality, 2), "sharpness": round(sharp, 2), "brightness": round(mean, 1)}
+    return {
+        "quality": round(quality, 2),
+        "sharpness": round(sharp, 2),
+        "brightness": round(mean, 1),
+    }
 
 
 def classify_content(loaded: LoadedImage, name: str) -> str:
@@ -55,11 +61,13 @@ def classify_content(loaded: LoadedImage, name: str) -> str:
     if "screenshot" in lower or "screen shot" in lower:
         return "screenshot"
     if loaded.exif.get(_MAKE) or loaded.exif.get(_MODEL):
-        return "photo"                                   # a camera wrote this file
+        return "photo"  # a camera wrote this file
     small = loaded.pil.convert("RGB").copy()
     small.thumbnail((128, 128))
     arr = np.asarray(small)
-    codes = (arr[..., 0] // 32).astype(np.int32) * 64 + (arr[..., 1] // 32) * 8 + (arr[..., 2] // 32)
+    codes = (
+        (arr[..., 0] // 32).astype(np.int32) * 64 + (arr[..., 1] // 32) * 8 + (arr[..., 2] // 32)
+    )
     counts = np.bincount(codes.ravel(), minlength=512)
     dominant = float(np.sort(counts)[-3:].sum() / codes.size)
     used = int((counts >= 0.002 * codes.size).sum())
@@ -69,7 +77,9 @@ def classify_content(loaded: LoadedImage, name: str) -> str:
     return "document" if float(arr.mean()) >= 170 and sat < 0.12 else "screenshot"
 
 
-def date_flag(exif_ts: str | None, ts_source: str | None, now: datetime | None = None) -> str | None:
+def date_flag(
+    exif_ts: str | None, ts_source: str | None, now: datetime | None = None
+) -> str | None:
     """``none`` | ``future`` | ``implausible`` | ``mtime_only`` | ``None`` (date looks fine)."""
     if not exif_ts:
         return "none"
@@ -85,7 +95,9 @@ def date_flag(exif_ts: str | None, ts_source: str | None, now: datetime | None =
     return "mtime_only" if ts_source == "file_mtime" else None
 
 
-def analyze_image(loaded: LoadedImage, name: str, exif_ts: str | None, ts_source: str | None) -> dict[str, Any]:
+def analyze_image(
+    loaded: LoadedImage, name: str, exif_ts: str | None, ts_source: str | None
+) -> dict[str, Any]:
     """All Phase D per-image values, ready to merge into a ``save_results`` mapping."""
     out: dict[str, Any] = quality_metrics(loaded.pil, loaded.width * loaded.height)
     out["dhash"] = compute_dhash(loaded.pil)

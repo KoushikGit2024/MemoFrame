@@ -1,4 +1,5 @@
 """Database mixin for image analysis, bursts, places, and date overrides."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -106,9 +107,7 @@ class AnalysisDbMixin:
     def clear_date_override(self, image_id: int) -> bool:
         with self._tx() as conn:
             removed = (
-                conn.execute(
-                    "DELETE FROM date_overrides WHERE image_id = ?", (image_id,)
-                ).rowcount
+                conn.execute("DELETE FROM date_overrides WHERE image_id = ?", (image_id,)).rowcount
                 > 0
             )
             if removed:

@@ -1,4 +1,5 @@
 """Logging setup: console (tqdm-safe) plus rotating file log."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -86,8 +87,9 @@ def install_crash_logging(workspace: Path) -> None:
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc, tb)
             return
-        log.critical("Unhandled exception:\n%s",
-                     "".join(traceback.format_exception(exc_type, exc, tb)))
+        log.critical(
+            "Unhandled exception:\n%s", "".join(traceback.format_exception(exc_type, exc, tb))
+        )
 
     sys.excepthook = hook
     threading.excepthook = lambda a: hook(a.exc_type, a.exc_value, a.exc_traceback)
@@ -96,7 +98,7 @@ def install_crash_logging(workspace: Path) -> None:
         _crash_fh = open(workspace / "native_crash.log", "a", encoding="utf-8")
         _crash_fh.write(f"\n--- session start {datetime.now().isoformat(timespec='seconds')} ---\n")
         _crash_fh.flush()
-        faulthandler.enable(file=_crash_fh, all_threads=True)   # keep the handle open
+        faulthandler.enable(file=_crash_fh, all_threads=True)  # keep the handle open
     except OSError as exc:
         log.warning("Native crash log unavailable: %s", exc)
 

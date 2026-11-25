@@ -1,4 +1,5 @@
 """Lazy, recursive discovery of image files."""
+
 from __future__ import annotations
 
 import os

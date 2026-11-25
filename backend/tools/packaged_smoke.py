@@ -1,4 +1,5 @@
 """Smoke-test a packaged engine:  python tools/packaged_smoke.py dist/photo_engine/photo_engine.exe"""
+
 from __future__ import annotations
 
 import json
@@ -27,8 +28,12 @@ def main(exe: str) -> int:
         print("version:", out[-1]["api_version"])
         code, out = run(exe, "doctor", "--workspace", str(ws))
         assert out[-1]["type"] == "doctor", out
-        print("doctor:", [(c["name"], c["status"]) for c in out[-1]["checks"] if c["status"] != "ok"])
-        code, out = run(exe, "run", "--workspace", str(ws), "--input", str(root), "--profile", "gentle")
+        print(
+            "doctor:", [(c["name"], c["status"]) for c in out[-1]["checks"] if c["status"] != "ok"]
+        )
+        code, out = run(
+            exe, "run", "--workspace", str(ws), "--input", str(root), "--profile", "gentle"
+        )
         print("run exit code:", code, "| last event:", out[-1])
         assert out[-1]["type"] in ("done", "error"), out
         if out[-1]["type"] == "done":

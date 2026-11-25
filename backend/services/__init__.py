@@ -1,4 +1,5 @@
 """Services facade package providing clean domain access."""
+
 from .face import (
     DEFAULT_COSINE_DISTANCE_EPS,
     FaceDetector,

@@ -1,4 +1,5 @@
 """Database mixin for tag classification and embedding persistence."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -17,7 +18,9 @@ class TagDbMixin:
             "INSERT OR REPLACE INTO tags (image_id, label, score) VALUES (?, ?, ?)",
             [(image_id, str(l), float(s)) for l, s in res.get("tags", [])],
         )
-        conn.execute("UPDATE images SET tagged_with = ? WHERE id = ?", (res.get("tag_model"), image_id))
+        conn.execute(
+            "UPDATE images SET tagged_with = ? WHERE id = ?", (res.get("tag_model"), image_id)
+        )
         emb = res.get("embedding")
         if emb is None:
             conn.execute("DELETE FROM embeddings WHERE image_id = ?", (image_id,))
@@ -53,8 +56,7 @@ class TagDbMixin:
 
     def get_tags(self, image_id: int) -> list[sqlite3.Row]:
         return self._query(
-            "SELECT label, score, source FROM tags WHERE image_id = ? "
-            "ORDER BY score DESC, label",
+            "SELECT label, score, source FROM tags WHERE image_id = ? ORDER BY score DESC, label",
             (image_id,),
         )
 

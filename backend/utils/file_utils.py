@@ -1,4 +1,5 @@
 """Filesystem helpers: hashing, fingerprints, safe and atomic output."""
+
 from __future__ import annotations
 
 import hashlib
@@ -105,9 +106,11 @@ def lower_process_priority() -> None:
     try:
         if os.name == "nt":
             import ctypes
+
             BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
             ctypes.windll.kernel32.SetPriorityClass(
-                ctypes.windll.kernel32.GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS)
+                ctypes.windll.kernel32.GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS
+            )
         else:
             os.nice(10)
     except Exception:  # noqa: BLE001 - best effort only

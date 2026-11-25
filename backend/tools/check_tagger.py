@@ -5,6 +5,7 @@ Reads each photo with cv2.imread, runs SceneTagger, and reports:
 - top tags assigned
 - failure count
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,9 +25,15 @@ from services.vision.loader import load_image
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("folder", type=Path, help="folder of test photos")
-    parser.add_argument("--workspace", type=Path, default=Path("workspace"),
-                        help="workspace containing models/tags/ (default: workspace)")
-    parser.add_argument("--limit", type=int, default=50, help="max photos to benchmark (default 50)")
+    parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=Path("workspace"),
+        help="workspace containing models/tags/ (default: workspace)",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=50, help="max photos to benchmark (default 50)"
+    )
     args = parser.parse_args(argv)
 
     if not args.folder.is_dir():
@@ -46,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No supported images found in {args.folder}")
         return 0
 
-    files = files[:args.limit]
+    files = files[: args.limit]
     print(f"Benchmarking {len(files)} photo(s)...")
 
     times: list[float] = []

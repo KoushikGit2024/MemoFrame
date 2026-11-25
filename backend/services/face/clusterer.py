@@ -3,6 +3,7 @@
 Uses DBSCAN with cosine distance over 128-dimensional normalized SFace embeddings
 to group appearances of the same person across photographs without any internet access.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -53,11 +54,11 @@ def attach_to_anchors(
     matrix = np.stack(vecs).astype(np.float32)
     pids = sorted(set(owners))
     masks = [np.array([o == p for o in owners]) for p in pids]
-    chunk = max(100, 4_000_000 // len(vecs))              # caps memory of one block
+    chunk = max(100, 4_000_000 // len(vecs))  # caps memory of one block
     out: dict[int, list[int]] = {}
     for start in range(0, len(cand), chunk):
-        part = cand[start:start + chunk]
-        sims = np.stack([v for _, v in part]) @ matrix.T                  # (n, anchors)
+        part = cand[start : start + chunk]
+        sims = np.stack([v for _, v in part]) @ matrix.T  # (n, anchors)
         best = np.stack([sims[:, m].max(axis=1) for m in masks], axis=1)  # (n, people)
         order = np.argsort(-best, axis=1)
         for i, (fid, _) in enumerate(part):

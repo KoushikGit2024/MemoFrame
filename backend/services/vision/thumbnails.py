@@ -1,4 +1,5 @@
 """Thumbnail creation and shared JPEG/resize helpers."""
+
 from __future__ import annotations
 
 import io

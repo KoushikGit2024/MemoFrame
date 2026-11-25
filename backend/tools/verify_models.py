@@ -1,4 +1,5 @@
 """Print model hashes next to the pins in config.py:  python tools/verify_models.py [workspace]"""
+
 from __future__ import annotations
 
 import sys
@@ -6,9 +7,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import (DEFAULT_WORKSPACE, SFACE_FILENAME, SFACE_SHA256,           # noqa: E402
-                    YUNET_FILENAME, YUNET_SHA256, Settings)
-from utils.file_utils import sha256_file                                       # noqa: E402
+from config import (
+    DEFAULT_WORKSPACE,
+    SFACE_FILENAME,
+    SFACE_SHA256,  # noqa: E402
+    YUNET_FILENAME,
+    YUNET_SHA256,
+    Settings,
+)
+from utils.file_utils import sha256_file  # noqa: E402
 
 
 def main() -> int:

@@ -1,4 +1,5 @@
 """Regression tests for real backend/database/settings_file + bridge integration."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -55,19 +56,29 @@ def test_update_config_file_atomic_and_reload(tmp_path: Path) -> None:
 def test_db_sorts_and_failed_images_include_id(tmp_path: Path) -> None:
     db = DatabaseManager(tmp_path / "photos.db").open()
     try:
-        db.register_files([
-            (str(tmp_path / "a.jpg"), 100, 1),
-            (str(tmp_path / "b.jpg"), 500, 2),
-            (str(tmp_path / "c.jpg"), 300, 3),
-        ])
+        db.register_files(
+            [
+                (str(tmp_path / "a.jpg"), 100, 1),
+                (str(tmp_path / "b.jpg"), 500, 2),
+                (str(tmp_path / "c.jpg"), 300, 3),
+            ]
+        )
         pending = db.fetch_pending(10)
         ids = {Path(r["path"]).name: int(r["id"]) for r in pending}
         img1, img2, img3 = ids["a.jpg"], ids["b.jpg"], ids["c.jpg"]
 
-        db.save_results([
-            {"image_id": img1, "sha256": "s1", "width": 100, "height": 100, "faces": [{"x": 0, "y": 0, "w": 10, "h": 10, "confidence": 0.9}]},
-            {"image_id": img2, "sha256": "s2", "width": 100, "height": 100, "faces": []},
-        ])
+        db.save_results(
+            [
+                {
+                    "image_id": img1,
+                    "sha256": "s1",
+                    "width": 100,
+                    "height": 100,
+                    "faces": [{"x": 0, "y": 0, "w": 10, "h": 10, "confidence": 0.9}],
+                },
+                {"image_id": img2, "sha256": "s2", "width": 100, "height": 100, "faces": []},
+            ]
+        )
         db.save_failures([(img3, "decode error")])
 
         assert [r["id"] for r in db.find_images(sort="path_desc")] == [img2, img1]

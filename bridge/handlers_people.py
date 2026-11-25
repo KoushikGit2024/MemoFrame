@@ -1,4 +1,5 @@
 """RPC handlers for people management, face review, naming, assignment, and merging."""
+
 from __future__ import annotations
 
 import base64
@@ -16,7 +17,11 @@ def _ensure_person_crop(ctx: Any, person: dict[str, Any]) -> str | None:
     if cover_crop:
         p = Path(str(cover_crop))
         if not p.is_absolute():
-            p = (ctx.workspace.parent / p).resolve() if (ctx.workspace.parent / p).is_file() else (ctx.workspace / p).resolve()
+            p = (
+                (ctx.workspace.parent / p).resolve()
+                if (ctx.workspace.parent / p).is_file()
+                else (ctx.workspace / p).resolve()
+            )
         if p.is_file():
             return str(p)
 
@@ -42,7 +47,7 @@ def _ensure_person_crop(ctx: Any, person: dict[str, Any]) -> str | None:
                     "FROM faces f JOIN images img ON img.id = f.image_id "
                     "WHERE f.person_id = ? "
                     "ORDER BY f.confidence * f.w * f.h DESC LIMIT 1",
-                    (pid,)
+                    (pid,),
                 )
                 if row:
                     if row["crop_path"] and Path(str(row["crop_path"])).is_file():
@@ -53,7 +58,14 @@ def _ensure_person_crop(ctx: Any, person: dict[str, Any]) -> str | None:
         except Exception:
             pass
 
-    if not img_path or not Path(str(img_path)).is_file() or not w or not h or int(w) <= 0 or int(h) <= 0:
+    if (
+        not img_path
+        or not Path(str(img_path)).is_file()
+        or not w
+        or not h
+        or int(w) <= 0
+        or int(h) <= 0
+    ):
         return None
 
     face_dict = {"id": cid, "x": x, "y": y, "w": w, "h": h}
@@ -169,14 +181,16 @@ def register_people_handlers(registry: dict[str, Any], ctx: Any) -> None:
             b64 = base64.b64encode(buf.getvalue()).decode("ascii")
             return {"data_url": f"data:image/jpeg;base64,{b64}"}
 
-    registry.update({
-        "persons.list": persons_list,
-        "persons.get": persons_get,
-        "persons.rename": persons_rename,
-        "persons.merge": persons_merge,
-        "persons.confirm": persons_confirm,
-        "faces.list": faces_for_person,
-        "faces.name": faces_name,
-        "faces.assign": faces_assign,
-        "faces.crop": faces_crop,
-    })
+    registry.update(
+        {
+            "persons.list": persons_list,
+            "persons.get": persons_get,
+            "persons.rename": persons_rename,
+            "persons.merge": persons_merge,
+            "persons.confirm": persons_confirm,
+            "faces.list": faces_for_person,
+            "faces.name": faces_name,
+            "faces.assign": faces_assign,
+            "faces.crop": faces_crop,
+        }
+    )

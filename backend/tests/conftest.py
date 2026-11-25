@@ -1,4 +1,5 @@
 """Shared fixtures: synthetic images, temporary settings, in-memory database."""
+
 from __future__ import annotations
 
 import sys
@@ -9,11 +10,11 @@ import pytest
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:          # fallback if pytest.ini is ignored
+if str(ROOT) not in sys.path:  # fallback if pytest.ini is ignored
     sys.path.insert(0, str(ROOT))
 
-from config import Settings            # noqa: E402
-from database import DatabaseManager   # noqa: E402
+from config import Settings  # noqa: E402
+from database import DatabaseManager  # noqa: E402
 
 
 @pytest.fixture
@@ -23,6 +24,7 @@ def make_image():
     Different seeds give visually different images (random colour blocks);
     the same seed gives identical pixels. Format follows the file suffix.
     """
+
     def _make(path: Path, seed: int = 0, size: tuple[int, int] = (300, 200)) -> Path:
         rng = np.random.default_rng(seed)
         block = rng.integers(0, 256, (4, 6, 3), dtype=np.uint8)
@@ -30,6 +32,7 @@ def make_image():
         path.parent.mkdir(parents=True, exist_ok=True)
         image.save(path)
         return path
+
     return _make
 
 

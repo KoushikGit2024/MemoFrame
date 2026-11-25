@@ -1,4 +1,5 @@
 """Link Live Photo videos to their still (same folder, same name, short clip)."""
+
 from __future__ import annotations
 
 import os

@@ -1,4 +1,5 @@
 """Input validation helpers, including argparse ``type=`` callables."""
+
 from __future__ import annotations
 
 import argparse
@@ -34,6 +35,7 @@ def validate_positive_int(value: int, name: str) -> int:
 
 
 # ---- argparse adapters ---------------------------------------------------
+
 
 def _wrap(func, *args):
     try:

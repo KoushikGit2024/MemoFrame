@@ -1,4 +1,5 @@
 """MemoFrame: Local, offline-first photo organizer and facial/scene analysis engine."""
+
 import sys
 from pathlib import Path
 

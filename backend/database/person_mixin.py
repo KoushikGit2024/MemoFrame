@@ -1,4 +1,5 @@
 """Database mixin for persons and face clustering persistence."""
+
 from __future__ import annotations
 
 import re
@@ -111,7 +112,9 @@ class PersonDbMixin:
     def rename_person(self, person_id: int, new_name: str) -> bool:
         """Rename a person cluster."""
         with self._tx() as conn:
-            res = conn.execute("UPDATE persons SET name = ? WHERE id = ?", (new_name.strip(), person_id))
+            res = conn.execute(
+                "UPDATE persons SET name = ? WHERE id = ?", (new_name.strip(), person_id)
+            )
             self._bump_persons(conn)
             return res.rowcount > 0
 
@@ -120,9 +123,11 @@ class PersonDbMixin:
         with self._tx() as conn:
             if conn.execute("SELECT 1 FROM faces WHERE id = ?", (face_id,)).fetchone() is None:
                 raise ValueError(f"No face with id {face_id}.")
-            if person_id is not None and conn.execute(
-                "SELECT 1 FROM persons WHERE id = ?", (person_id,)
-            ).fetchone() is None:
+            if (
+                person_id is not None
+                and conn.execute("SELECT 1 FROM persons WHERE id = ?", (person_id,)).fetchone()
+                is None
+            ):
                 raise ValueError(f"No person with id {person_id}.")
             conn.execute(
                 "UPDATE faces SET person_id = ?, locked = 1 WHERE id = ?",
@@ -178,17 +183,22 @@ class PersonDbMixin:
         with self._tx() as conn:
             if conn.execute("SELECT 1 FROM persons WHERE id = ?", (person_id,)).fetchone() is None:
                 raise ValueError(f"No person with id {person_id}.")
-            n = conn.execute("UPDATE faces SET locked = 1 WHERE person_id = ?", (person_id,)).rowcount
+            n = conn.execute(
+                "UPDATE faces SET locked = 1 WHERE person_id = ?", (person_id,)
+            ).rowcount
             self._bump_persons(conn)
             return n
 
     def set_face_locked(self, face_id: int, locked: bool = True) -> bool:
         """Explicitly set the locked flag on a face."""
         with self._tx() as conn:
-            changed = conn.execute(
-                "UPDATE faces SET locked = ? WHERE id = ?",
-                (1 if locked else 0, face_id),
-            ).rowcount > 0
+            changed = (
+                conn.execute(
+                    "UPDATE faces SET locked = ? WHERE id = ?",
+                    (1 if locked else 0, face_id),
+                ).rowcount
+                > 0
+            )
             if changed:
                 self._bump_persons(conn)
             return changed
@@ -196,10 +206,13 @@ class PersonDbMixin:
     def unlock_face(self, face_id: int) -> bool:
         """Hand a face back to automatic clustering."""
         with self._tx() as conn:
-            changed = conn.execute(
-                "UPDATE faces SET locked = 0 WHERE id = ? AND locked = 1",
-                (face_id,),
-            ).rowcount > 0
+            changed = (
+                conn.execute(
+                    "UPDATE faces SET locked = 0 WHERE id = ? AND locked = 1",
+                    (face_id,),
+                ).rowcount
+                > 0
+            )
             if changed:
                 self._bump_persons(conn)
             return changed

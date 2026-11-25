@@ -15,6 +15,7 @@ stdout: one JSON object per line.
 stdin: send a line ``cancel``, ``pause`` or ``resume``.
 Logs go to stderr and to the workspace log file, never to stdout.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -68,20 +69,25 @@ def main(argv: list[str] | None = None) -> int:
     diag.add_argument("--workspace", type=Path, required=True)
     args = ap.parse_args(argv)
 
-    for stream in (sys.stdin, sys.stdout, sys.stderr):      # pipes default to a legacy code page
+    for stream in (sys.stdin, sys.stdout, sys.stderr):  # pipes default to a legacy code page
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError, OSError):
             pass
 
     if args.cmd == "version":
-        _emit({"type": "version", "api_version": API_VERSION, "methods": describe(Engine)["methods"]})
+        _emit(
+            {"type": "version", "api_version": API_VERSION, "methods": describe(Engine)["methods"]}
+        )
         return 0
 
     setup_logging(args.workspace / "photo_organizer.log", quiet=True)
     try:
-        with Engine(args.workspace, profile=getattr(args, "profile", None),
-                    on_event=lambda ev: _emit({"type": "progress", **ev.to_dict()})) as eng:
+        with Engine(
+            args.workspace,
+            profile=getattr(args, "profile", None),
+            on_event=lambda ev: _emit({"type": "progress", **ev.to_dict()}),
+        ) as eng:
             if args.cmd == "doctor":
                 _emit({"type": "doctor", **eng.doctor(args.input)})
                 return 0

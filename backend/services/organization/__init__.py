@@ -1,4 +1,5 @@
 """Organization, deduplication, and spatiotemporal grouping service."""
+
 from .bursts import detect_bursts
 from .duplicates import MAX_THRESHOLD, UnionFind, choose_keeper, find_duplicates
 from .grouper import group_images, name_groups, refine_events

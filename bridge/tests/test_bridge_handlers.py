@@ -1,4 +1,5 @@
 """Deterministic unit tests verifying all 52 Engine contract interactions through BridgeServer."""
+
 from __future__ import annotations
 
 import json
@@ -48,8 +49,22 @@ class FakeEngine:
             {"id": 2, "name": "Person 02", "image_count": 2},
         ]
         self.photos = [
-            {"id": 10, "path": str(workspace / "a.jpg"), "width": 1200, "height": 800, "quality": 88.5, "exif_ts": "2025-05-01T10:00:00"},
-            {"id": 11, "path": str(workspace / "b.jpg"), "width": 1200, "height": 800, "quality": 72.0, "exif_ts": "2025-05-01T10:01:00"},
+            {
+                "id": 10,
+                "path": str(workspace / "a.jpg"),
+                "width": 1200,
+                "height": 800,
+                "quality": 88.5,
+                "exif_ts": "2025-05-01T10:00:00",
+            },
+            {
+                "id": 11,
+                "path": str(workspace / "b.jpg"),
+                "width": 1200,
+                "height": 800,
+                "quality": 72.0,
+                "exif_ts": "2025-05-01T10:01:00",
+            },
         ]
         self.closed = False
 
@@ -59,10 +74,18 @@ class FakeEngine:
     def count(self, kind: str = "photo", **filters) -> int:
         return len(self.photos)
 
-    def find(self, kind: str = "photo", status: str | None = None, sort: str = "date", limit: int = 40, offset: int = 0, **filters):
+    def find(
+        self,
+        kind: str = "photo",
+        status: str | None = None,
+        sort: str = "date",
+        limit: int = 40,
+        offset: int = 0,
+        **filters,
+    ):
         if status == "failed":
             return [{"id": 99, "path": "/bad.jpg", "error": "corrupt"}]
-        return self.photos[offset:offset + limit]
+        return self.photos[offset : offset + limit]
 
     def get_image(self, image_id: int):
         return next((p for p in self.photos if p["id"] == image_id), None)
@@ -71,7 +94,20 @@ class FakeEngine:
         return str(self.workspace / f"thumb_{image_id}.jpg")
 
     def get_faces_many(self, ids):
-        return {10: [{"id": 101, "x": 10, "y": 10, "w": 50, "h": 50, "locked": 1, "person_id": 1, "person_name": "Alice"}]}
+        return {
+            10: [
+                {
+                    "id": 101,
+                    "x": 10,
+                    "y": 10,
+                    "w": 50,
+                    "h": 50,
+                    "locked": 1,
+                    "person_id": 1,
+                    "person_name": "Alice",
+                }
+            ]
+        }
 
     def get_persons(self):
         return list(self.persons)
@@ -103,7 +139,12 @@ class FakeEngine:
         return None
 
     def get_duplicate_clusters(self):
-        return {"c1": [{**self.photos[0], "suggested_keep": True, "kind": "near"}, {**self.photos[1], "kind": "near"}]}
+        return {
+            "c1": [
+                {**self.photos[0], "suggested_keep": True, "kind": "near"},
+                {**self.photos[1], "kind": "near"},
+            ]
+        }
 
     def get_bursts(self):
         return [{"id": 5, "image_count": 2, "best_image_id": 10}]
@@ -112,7 +153,15 @@ class FakeEngine:
         return list(self.photos)
 
     def get_groups(self):
-        return [{"id": 7, "name": "Trip", "start_ts": "2025-05-01T10:00:00", "end_ts": "2025-05-01T12:00:00", "image_count": 2}]
+        return [
+            {
+                "id": 7,
+                "name": "Trip",
+                "start_ts": "2025-05-01T10:00:00",
+                "end_ts": "2025-05-01T12:00:00",
+                "image_count": 2,
+            }
+        ]
 
     def get_group_images(self, gid: int, limit: int = 8):
         return list(self.photos[:limit])
@@ -164,7 +213,13 @@ class FakeEngine:
         self.get_image(image_id).pop("effective_ts", None)
 
     def stats(self):
-        return {"total_images": 2, "total_faces": 1, "duplicate_clusters": 1, "groups": 1, "videos": 0}
+        return {
+            "total_images": 2,
+            "total_faces": 1,
+            "duplicate_clusters": 1,
+            "groups": 1,
+            "videos": 0,
+        }
 
     def doctor(self):
         return {"checks": [{"name": "db", "status": "ok", "detail": "healthy"}]}
@@ -214,7 +269,9 @@ def test_library_and_people_rpc_endpoints(tmp_path: Path) -> None:
     assert init["connected"] is True
     assert init["config_warnings"] == ["unknown_key"]
 
-    q = srv.dispatch("photos.query", {"filters": {}, "sort": "date_desc", "page": 0, "page_size": 40})
+    q = srv.dispatch(
+        "photos.query", {"filters": {}, "sort": "date_desc", "page": 0, "page_size": 40}
+    )
     assert q["total"] == 2
     assert len(q["items"][0]["faces"]) == 1
 

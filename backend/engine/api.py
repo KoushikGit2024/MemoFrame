@@ -4,6 +4,7 @@ Everything returns plain dicts, lists and numbers. Failures raise
 :class:`EngineError` with a stable code. The engine only reads photos; all
 writes go to the workspace.
 """
+
 from __future__ import annotations
 
 import functools
@@ -52,6 +53,7 @@ def _translated(fn: F) -> F:
         except Exception as exc:  # noqa: BLE001
             _log.error("Engine call %s failed", fn.__name__, exc_info=True)
             raise translate(exc) from exc
+
     return wrapper  # type: ignore[return-value]
 
 
@@ -111,6 +113,7 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
         if self._db is None:
             self.settings.ensure_dirs()
             from utils.logger import setup_logging
+
             if not logging.getLogger("photo_organizer").handlers:
                 setup_logging(self.settings.log_path)
             self._lock.acquire()
@@ -150,9 +153,11 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
     def _source(root: Path | str) -> Path:
         path = Path(root).expanduser()
         if not path.is_dir():
-            raise EngineError(ErrorCode.DRIVE_OFFLINE,
-                              f"Folder not found or drive not connected: {path}",
-                              "Reconnect the drive and try again.")
+            raise EngineError(
+                ErrorCode.DRIVE_OFFLINE,
+                f"Folder not found or drive not connected: {path}",
+                "Reconnect the drive and try again.",
+            )
         return path.resolve()
 
     # ---- control --------------------------------------------------------
@@ -177,8 +182,12 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
     def process(self, *, retry_failed: bool = False) -> dict[str, Any]:
         self.control.reset()
         summary = pipeline.process_pending(
-            self.settings, self.db, retry_failed=retry_failed,
-            show_progress=False, control=self.control)
+            self.settings,
+            self.db,
+            retry_failed=retry_failed,
+            show_progress=False,
+            control=self.control,
+        )
         return asdict(summary)
 
     @_translated
@@ -187,12 +196,19 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
         source = self._source(root)
         self.control.reset()
         summary = pipeline.run_pipeline(
-            self.settings, self.db, source, retry_failed=retry_failed,
-            show_progress=False, control=self.control)
+            self.settings,
+            self.db,
+            source,
+            retry_failed=retry_failed,
+            show_progress=False,
+            control=self.control,
+        )
         return {**asdict(summary), "stats": self.db.report_stats()}
 
     @_translated
-    def rescan(self, root: Path | str | None = None, *, retry_failed: bool = False) -> dict[str, Any]:
+    def rescan(
+        self, root: Path | str | None = None, *, retry_failed: bool = False
+    ) -> dict[str, Any]:
         """On-demand, offline rescan.
 
         Discovers new/modified photos, processes only pending items, updates duplicates
@@ -204,15 +220,21 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
             return self.run_all(root, retry_failed=retry_failed)
         sources = [Path(s) for s in self.db.list_sources()]
         if not sources:
-            raise EngineError(ErrorCode.INVALID_INPUT,
-                              "No folders to rescan. Pass a folder, or run a scan first.")
+            raise EngineError(
+                ErrorCode.INVALID_INPUT, "No folders to rescan. Pass a folder, or run a scan first."
+            )
         total_processed = total_failed = 0
         interrupted = False
         for s in sources:
             if s.is_dir():
                 res = pipeline.run_pipeline(
-                    self.settings, self.db, s, retry_failed=retry_failed,
-                    show_progress=False, control=self.control)
+                    self.settings,
+                    self.db,
+                    s,
+                    retry_failed=retry_failed,
+                    show_progress=False,
+                    control=self.control,
+                )
                 total_processed += res.processed
                 total_failed += res.failed
                 if res.interrupted:
@@ -258,6 +280,7 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
     @_translated
     def get_duplicate_clusters(self) -> dict[int, list[dict[str, Any]]]:
         from services.organization.duplicates import choose_keeper
+
         out = {}
         for cid, members in self.db.get_duplicate_clusters().items():
             dict_members = [_row(m) for m in members]
@@ -279,8 +302,10 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
     @_translated
     def set_mark(self, image_id: int, kind: str, note: str | None = None) -> None:
         if kind not in MARK_KINDS:
-            raise EngineError(ErrorCode.INVALID_INPUT,
-                              f"Unknown mark {kind!r}. Use one of: {', '.join(MARK_KINDS)}.")
+            raise EngineError(
+                ErrorCode.INVALID_INPUT,
+                f"Unknown mark {kind!r}. Use one of: {', '.join(MARK_KINDS)}.",
+            )
         if self.db.get_image(image_id) is None:
             raise EngineError(ErrorCode.INVALID_INPUT, f"No image with id {image_id}.")
         self.db.set_mark(image_id, kind, note)
@@ -290,7 +315,9 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
         return self.db.clear_mark(image_id, kind)
 
     @_translated
-    def get_marks(self, image_id: int | None = None, kind: str | None = None) -> list[dict[str, Any]]:
+    def get_marks(
+        self, image_id: int | None = None, kind: str | None = None
+    ) -> list[dict[str, Any]]:
         return [_row(r) for r in self.db.get_marks(image_id, kind)]
 
     # ---- Phase B: file states, cache, health ------------------------------
@@ -312,12 +339,14 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
     @_translated
     def rebuild(self) -> dict[str, int]:
         """Force-rebuild duplicates, places, bursts and groups (e.g. after changing settings)."""
-        return {"duplicate_clusters": pipeline.update_duplicates(self.settings, self.db, force=True),
-                "places_named": pipeline.update_places(self.settings, self.db, force=True),
-                "bursts": pipeline.update_bursts(self.settings, self.db, force=True),
-                "groups": pipeline.update_groups(self.settings, self.db, force=True),
-                "persons": pipeline.update_persons(self.settings, self.db, force=True),
-                "search_index": pipeline.update_search_index(self.settings, self.db, force=True)}
+        return {
+            "duplicate_clusters": pipeline.update_duplicates(self.settings, self.db, force=True),
+            "places_named": pipeline.update_places(self.settings, self.db, force=True),
+            "bursts": pipeline.update_bursts(self.settings, self.db, force=True),
+            "groups": pipeline.update_groups(self.settings, self.db, force=True),
+            "persons": pipeline.update_persons(self.settings, self.db, force=True),
+            "search_index": pipeline.update_search_index(self.settings, self.db, force=True),
+        }
 
     @_translated
     def thumbnail(self, image_id: int) -> str:
@@ -350,9 +379,11 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
         Runs once per (detector backend, SFace file); faces that still get no embedding
         (too small, no landmarks) are not retried until one of those changes or force=True."""
         if not self.settings.sface_path.is_file():
-            raise EngineError(ErrorCode.MODEL_MISSING,
-                              f"Face recognition model not found at {self.settings.sface_path}. "
-                              "Run doctor or process a photo to download it.")
+            raise EngineError(
+                ErrorCode.MODEL_MISSING,
+                f"Face recognition model not found at {self.settings.sface_path}. "
+                "Run doctor or process a photo to download it.",
+            )
         sig = self._recog_sig()
         if not force and self.db.get_meta("recog_backfill") == sig:
             return {"requeued": 0, "processed": 0}
@@ -362,7 +393,8 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
         interrupted = False
         if requeued:
             summary = pipeline.process_pending(
-                self.settings, self.db, show_progress=False, control=self.control)
+                self.settings, self.db, show_progress=False, control=self.control
+            )
             processed, interrupted = summary.processed, summary.interrupted
             pipeline.update_persons(self.settings, self.db)
             pipeline.update_search_index(self.settings, self.db)
@@ -374,6 +406,7 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
     def analyze_existing(self) -> dict[str, int]:
         """Fill quality, dHash, content type and date flags for photos processed earlier."""
         from services.pipeline.enrich import enrich_existing
+
         self.control.reset()
         n = enrich_existing(self.settings, self.db, self.control)
         return {"analyzed": n, **self.rebuild()}
@@ -394,6 +427,7 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
     def set_date_override(self, image_id: int, iso_datetime: str, note: str | None = None) -> None:
         """Correct a photo's date in the DATABASE only. Format: YYYY-MM-DDTHH:MM:SS."""
         from datetime import datetime
+
         try:
             datetime.strptime(iso_datetime, "%Y-%m-%dT%H:%M:%S")
         except ValueError:
@@ -417,6 +451,7 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
     def tag_existing(self) -> dict[str, int]:
         """Tag photos processed earlier (needs tagging_enabled and the model files)."""
         from services.intelligence.tagging import tag_existing
+
         self.control.reset()
         n = tag_existing(self.settings, self.db, self.control)
         pipeline.update_search_index(self.settings, self.db)
@@ -424,9 +459,15 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
 
     # ---- Phase G ----------------------------------------------------------
     @_translated
-    def watch(self, folders: list[Path | str] | None = None, *, interval_s: float | None = None,
-              settle_s: float | None = None, profile: str | None = "gentle",
-              max_cycles: int | None = None) -> dict[str, int]:
+    def watch(
+        self,
+        folders: list[Path | str] | None = None,
+        *,
+        interval_s: float | None = None,
+        settle_s: float | None = None,
+        profile: str | None = "gentle",
+        max_cycles: int | None = None,
+    ) -> dict[str, int]:
         """Watch folders and process new or changed photos until ``cancel()`` is called.
 
         ``folders=None`` watches every folder scanned before. Runs on the calling thread, so
@@ -434,28 +475,33 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
         message ``on battery``). Returns ``{"cycles", "processed", "failed"}``.
         """
         from services.pipeline.watcher import FolderWatcher
-        roots = ([Path(f) for f in folders] if folders
-                 else [Path(s) for s in self.db.list_sources()])
+
+        roots = [Path(f) for f in folders] if folders else [Path(s) for s in self.db.list_sources()]
         if not roots:
-            raise EngineError(ErrorCode.INVALID_INPUT,
-                              "No folders to watch. Pass folders, or run a scan first.")
+            raise EngineError(
+                ErrorCode.INVALID_INPUT, "No folders to watch. Pass folders, or run a scan first."
+            )
         self.control.reset()
         settings = apply_profile(self.settings, profile) if profile else self.settings
-        return FolderWatcher(settings, self.db, roots, self.control,
-                             interval_s=interval_s, settle_s=settle_s).run(max_cycles)
+        return FolderWatcher(
+            settings, self.db, roots, self.control, interval_s=interval_s, settle_s=settle_s
+        ).run(max_cycles)
 
     @_translated
     def export_diagnostics(self, include_log: bool = True) -> str:
         """Write a diagnostics zip inside the workspace and return its path."""
         from engine.diagnostics import build_bundle
+
         return str(build_bundle(self.settings, self.doctor(), self.db.report_stats(), include_log))
 
     # ---- environment ----------------------------------------------------
     @_translated
     def doctor(self, source_dirs: list[Path | str] | None = None) -> dict[str, Any]:
         checks = run_checks(self.settings, source_dirs or [])
-        return {"ok": not any(c.status == "fail" for c in checks),
-                "checks": [c.to_dict() for c in checks]}
+        return {
+            "ok": not any(c.status == "fail" for c in checks),
+            "checks": [c.to_dict() for c in checks],
+        }
 
     @_translated
     def get_faces_many(self, image_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
@@ -466,16 +512,22 @@ class Engine(PersonEngineMixin, SearchEngineMixin):
         }
 
     @_translated
-    def reset_workspace(self, *, keep_generated: bool = False, clear_sources: bool = False,
-                        clear_saved_searches: bool = False) -> dict[str, int]:
+    def reset_workspace(
+        self,
+        *,
+        keep_generated: bool = False,
+        clear_sources: bool = False,
+        clear_saved_searches: bool = False,
+    ) -> dict[str, int]:
         """Clear the database and generated files. Original photos are never touched.
         Scanned folders and saved searches are kept unless you ask to clear them."""
         before = self.db.report_stats()["total_images"]
         self.db.reset(clear_sources=clear_sources, clear_saved_searches=clear_saved_searches)
         self.db.rebuild_fts()
         if not keep_generated:
-            maintenance.clear_cache(self.settings, self.db,
-                                    ("thumbnails", "face_crops", "annotated"))
+            maintenance.clear_cache(
+                self.settings, self.db, ("thumbnails", "face_crops", "annotated")
+            )
             grouped = self.settings.grouped_dir
             if grouped.is_dir() and is_within(grouped, self.settings.workspace):
                 shutil.rmtree(grouped, ignore_errors=True)

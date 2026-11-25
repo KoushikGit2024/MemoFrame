@@ -1,5 +1,6 @@
 """Do YuNet and InsightFace landmarks give matching SFace embeddings?
-    python tools/check_landmarks.py photo.jpg   (expect similarity > 0.8)"""
+python tools/check_landmarks.py photo.jpg   (expect similarity > 0.8)"""
+
 from __future__ import annotations
 
 import sys
@@ -9,12 +10,12 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import SFACE_SHA256, SFACE_URL, Settings            # noqa: E402
-from services.face.detector import create_detector               # noqa: E402
-from services.face.processor import _to_decoded                  # noqa: E402
-from services.face.recognizer import FaceRecognizerSF            # noqa: E402
-from services.vision.loader import load_image                    # noqa: E402
-from utils.model_downloader import ensure_model                  # noqa: E402
+from config import SFACE_SHA256, SFACE_URL, Settings  # noqa: E402
+from services.face.detector import create_detector  # noqa: E402
+from services.face.processor import _to_decoded  # noqa: E402
+from services.face.recognizer import FaceRecognizerSF  # noqa: E402
+from services.vision.loader import load_image  # noqa: E402
+from utils.model_downloader import ensure_model  # noqa: E402
 
 
 def main(photo: str) -> int:

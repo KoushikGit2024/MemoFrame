@@ -7,6 +7,7 @@ the threshold must be identical on at least one band, so no pair is missed.
 Clusters are merged transitively (union-find), so a cluster can chain
 A~B~C even if A and C differ by more than the threshold.
 """
+
 from __future__ import annotations
 
 from typing import Any, Iterable, Iterator, Mapping, Sequence
@@ -16,7 +17,7 @@ import numpy as np
 from services.organization.similarity import PHASH_BITS, parse_phash
 
 MAX_THRESHOLD = 16
-_MAX_BLOCK_CELLS = 4_000_000     # caps memory of one comparison block
+_MAX_BLOCK_CELLS = 4_000_000  # caps memory of one comparison block
 _POPCOUNT = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint8)
 
 
@@ -66,7 +67,7 @@ def _near_pairs(values: np.ndarray, threshold: int) -> Iterator[tuple[int, int]]
             h = values[bucket]
             block = max(1, _MAX_BLOCK_CELLS // m)
             for start in range(0, m, block):
-                xor = h[start:start + block, None] ^ h[None, :]
+                xor = h[start : start + block, None] ^ h[None, :]
                 rows, cols = np.nonzero(_popcount(xor) <= threshold)
                 rows = rows + start
                 keep = cols > rows
@@ -147,6 +148,7 @@ def choose_keeper(members: Sequence[Any]) -> int:
     """Suggest which member to keep: highest quality, then most pixels, then largest
     file, then lowest id. ``quality`` is optional (treated as 0 when absent). Accepts
     mappings or sqlite3.Row objects."""
+
     def get_val(m: Any, key: str) -> Any:
         try:
             return m[key]

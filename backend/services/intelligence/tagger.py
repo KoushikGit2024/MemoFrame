@@ -10,6 +10,7 @@ Files (in ``<workspace>/models/tags/``):
   tag_map.txt          optional: lines "class name => tag"; only mapped classes are kept and
                        classes mapped to the same tag add up
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -64,10 +65,20 @@ class SceneTagger:
     ``forward`` takes a float32 NCHW blob and returns the model's 1-D output.
     """
 
-    def __init__(self, forward: Callable[[np.ndarray], np.ndarray], labels: list[str],
-                 signature: str, *, top_k: int = 5, min_score: float = 0.15, size: int = 224,
-                 mean: tuple[float, ...] = IMAGENET_MEAN, std: tuple[float, ...] = IMAGENET_STD,
-                 output: str = "logits", tag_map: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        forward: Callable[[np.ndarray], np.ndarray],
+        labels: list[str],
+        signature: str,
+        *,
+        top_k: int = 5,
+        min_score: float = 0.15,
+        size: int = 224,
+        mean: tuple[float, ...] = IMAGENET_MEAN,
+        std: tuple[float, ...] = IMAGENET_STD,
+        output: str = "logits",
+        tag_map: dict[str, str] | None = None,
+    ) -> None:
         self._forward, self.labels, self.signature = forward, labels, signature
         self.top_k, self.min_score, self.size = top_k, min_score, size
         self._mean = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
@@ -85,19 +96,25 @@ class SceneTagger:
         short = round(self.size * 256 / 224)
         w, h = pil.size
         scale = short / min(w, h)
-        resized = pil.convert("RGB").resize((max(self.size, round(w * scale)),
-                                             max(self.size, round(h * scale))),
-                                            Image.Resampling.BILINEAR)
+        resized = pil.convert("RGB").resize(
+            (max(self.size, round(w * scale)), max(self.size, round(h * scale))),
+            Image.Resampling.BILINEAR,
+        )
         left, top = (resized.width - self.size) // 2, (resized.height - self.size) // 2
-        arr = np.asarray(resized.crop((left, top, left + self.size, top + self.size)),
-                         dtype=np.float32) / 255.0
+        arr = (
+            np.asarray(
+                resized.crop((left, top, left + self.size, top + self.size)), dtype=np.float32
+            )
+            / 255.0
+        )
         return np.ascontiguousarray(((arr - self._mean) / self._std).transpose(2, 0, 1)[None])
 
     def probabilities(self, pil: Image.Image) -> np.ndarray:
         out = np.asarray(self._forward(self._blob(pil)), dtype=np.float64).reshape(-1)
         if out.size != len(self.labels):
-            raise ValueError(f"Model outputs {out.size} values but the labels file has "
-                             f"{len(self.labels)} lines.")
+            raise ValueError(
+                f"Model outputs {out.size} values but the labels file has {len(self.labels)} lines."
+            )
         if self.output == "logits":
             out = np.exp(out - out.max())
             out /= out.sum()
@@ -122,7 +139,7 @@ def _load_net(model: Path):
     try:
         data = np.frombuffer(model.read_bytes(), dtype=np.uint8)
         try:
-            return cv2.dnn.readNetFromONNX(data)          # buffer form: works with non-ASCII paths
+            return cv2.dnn.readNetFromONNX(data)  # buffer form: works with non-ASCII paths
         except (cv2.error, TypeError):
             return cv2.dnn.readNetFromONNX(str(model))
     except (cv2.error, OSError) as exc:
@@ -142,7 +159,8 @@ def create_tagger(settings: Settings) -> SceneTagger | None:
     missing = [str(p) for p in (model, labels_path) if not p.is_file()]
     if missing:
         raise TaggerUnavailableError(
-            "Tagging is enabled but these files are missing:\n  " + "\n  ".join(missing))
+            "Tagging is enabled but these files are missing:\n  " + "\n  ".join(missing)
+        )
     labels = load_labels(labels_path)
     config: dict = {}
     if (folder / "scene_tags.json").is_file():
@@ -169,13 +187,19 @@ def create_tagger(settings: Settings) -> SceneTagger | None:
         return net.forward()
 
     tagger = SceneTagger(
-        forward, labels, digest.hexdigest()[:12],
-        top_k=settings.tags_top_k, min_score=settings.tags_min_score,
+        forward,
+        labels,
+        digest.hexdigest()[:12],
+        top_k=settings.tags_top_k,
+        min_score=settings.tags_min_score,
         size=int(config.get("input_size", 224)),
-        mean=tuple(config.get("mean", IMAGENET_MEAN)), std=tuple(config.get("std", IMAGENET_STD)),
-        output=config.get("output", "logits"), tag_map=tag_map)
+        mean=tuple(config.get("mean", IMAGENET_MEAN)),
+        std=tuple(config.get("std", IMAGENET_STD)),
+        output=config.get("output", "logits"),
+        tag_map=tag_map,
+    )
     try:
-        tagger.probabilities(Image.new("RGB", (64, 64)))      # fail early on a mismatched pair
+        tagger.probabilities(Image.new("RGB", (64, 64)))  # fail early on a mismatched pair
     except (cv2.error, ValueError) as exc:
         raise TaggerUnavailableError(f"Tag model check failed: {exc}") from exc
     return tagger

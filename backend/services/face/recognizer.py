@@ -3,6 +3,7 @@
 Companion to YuNet. Extracts 128-dimensional L2-normalized float32 feature
 vectors used for person clustering and face matching across photos.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,6 +25,7 @@ def _ascii_path(p: Path) -> str:
     if sys.platform == "win32":
         try:
             import ctypes
+
             buf = ctypes.create_unicode_buffer(512)
             if ctypes.windll.kernel32.GetShortPathNameW(s, buf, 512):
                 return buf.value
@@ -51,13 +53,17 @@ class FaceRecognizerSF:
         attempts = [(cv2.dnn.DNN_BACKEND_OPENCV, cv2.dnn.DNN_TARGET_CPU)]
         if use_gpu:
             attempts.insert(0, (cv2.dnn.DNN_BACKEND_CUDA, cv2.dnn.DNN_TARGET_CUDA))
-        
+
         data = np.frombuffer(self.model_path.read_bytes(), dtype=np.uint8)
         last_error = None
         for backend, target in attempts:
             creators = (
-                lambda: cv2.FaceRecognizerSF.create("onnx", data, np.empty(0, np.uint8), backend, target),
-                lambda: cv2.FaceRecognizerSF.create(_ascii_path(self.model_path), "", backend, target),
+                lambda: cv2.FaceRecognizerSF.create(
+                    "onnx", data, np.empty(0, np.uint8), backend, target
+                ),
+                lambda: cv2.FaceRecognizerSF.create(
+                    _ascii_path(self.model_path), "", backend, target
+                ),
                 lambda: cv2.FaceRecognizerSF.create(self._ascii_copy(), "", backend, target),
             )
             for create in creators:
@@ -95,6 +101,6 @@ class FaceRecognizerSF:
         """Aligned SFace embedding from a FaceBox with landmarks (full-res coordinates)."""
         lm = getattr(face, "landmarks", None)
         if not lm or len(lm) != 10:
-            return None                      # no landmarks, so no reliable embedding
+            return None  # no landmarks, so no reliable embedding
         row = np.array([face.x, face.y, face.w, face.h, *lm, face.confidence], dtype=np.float32)
         return self.extract_feature(bgr_img, row)

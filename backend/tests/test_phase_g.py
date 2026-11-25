@@ -1,4 +1,5 @@
 """Phase G: watch mode (debounce, settling, offline folders, cancel, battery, read-only)."""
+
 from __future__ import annotations
 
 import hashlib
@@ -54,19 +55,21 @@ def root(tmp_path, make_image):
 def test_new_files_processed_once_stable(settings, root, det):
     with DatabaseManager(settings.db_path) as db:
         w = make_watcher(settings, db, [root])
-        assert w.run(max_cycles=1)["processed"] == 0          # first sighting only
-        assert w.run(max_cycles=1)["processed"] == 2          # stable on the second poll
+        assert w.run(max_cycles=1)["processed"] == 0  # first sighting only
+        assert w.run(max_cycles=1)["processed"] == 2  # stable on the second poll
         assert db.report_stats()["processed"] == 2
         assert db.list_sources() == [str(root)]
 
 
-def test_photo_added_later_is_picked_up_and_old_ones_are_not_redone(settings, root, make_image, det):
+def test_photo_added_later_is_picked_up_and_old_ones_are_not_redone(
+    settings, root, make_image, det
+):
     with DatabaseManager(settings.db_path) as db:
         w = make_watcher(settings, db, [root])
         w.run(max_cycles=2)
         calls = det.calls
         w.run(max_cycles=2)
-        assert det.calls == calls                              # nothing changed, nothing redone
+        assert det.calls == calls  # nothing changed, nothing redone
         make_image(root / "c.jpg", 3)
         assert w.run(max_cycles=2)["processed"] == 1
         assert det.calls == calls + 1
@@ -79,8 +82,8 @@ def test_file_still_being_written_waits(settings, tmp_path, det):
     f.write_bytes(b"1")
     with DatabaseManager(settings.db_path) as db:
         w = make_watcher(settings, db, [root])
-        assert w.poll_once() == []                             # first sighting
-        f.write_bytes(b"12")                                   # still growing
+        assert w.poll_once() == []  # first sighting
+        f.write_bytes(b"12")  # still growing
         assert w.poll_once() == []
         assert [p.name for p, _, _ in w.poll_once()] == ["x.jpg"]
 
@@ -89,7 +92,7 @@ def test_recent_files_wait_for_settle_time(settings, root, det):
     with DatabaseManager(settings.db_path) as db:
         w = make_watcher(settings, db, [root], settle_s=3600)
         w.poll_once()
-        assert w.poll_once() == []                             # too new
+        assert w.poll_once() == []  # too new
         w._now = lambda: time.time() + 7200
         assert len(w.poll_once()) == 2
 
@@ -99,17 +102,25 @@ def test_offline_folder_is_skipped_then_recovers(settings, root, tmp_path, det):
         w = make_watcher(settings, db, [root])
         w.run(max_cycles=2)
         root.rename(tmp_path / "unplugged")
-        assert w.run(max_cycles=2)["processed"] == 0           # no error, nothing marked missing
+        assert w.run(max_cycles=2)["processed"] == 0  # no error, nothing marked missing
         assert db.state_counts() == {"ok": 2, "offline": 0, "missing": 0}
         (tmp_path / "unplugged").rename(root)
-        assert w.run(max_cycles=2)["processed"] == 0           # known files are unchanged
+        assert w.run(max_cycles=2)["processed"] == 0  # known files are unchanged
 
 
 def test_cancel_stops_the_loop(settings, root, det):
     control = RunControl()
     with DatabaseManager(settings.db_path) as db:
-        w = FolderWatcher(settings, db, [root], control, interval_s=1, settle_s=0,
-                          sleep=lambda s: control.cancel(), battery=lambda: False)
+        w = FolderWatcher(
+            settings,
+            db,
+            [root],
+            control,
+            interval_s=1,
+            settle_s=0,
+            sleep=lambda s: control.cancel(),
+            battery=lambda: False,
+        )
         assert w.run()["cycles"] == 1
 
 
@@ -133,7 +144,7 @@ def test_photos_are_never_modified(settings, root, tmp_path, det):
 def test_engine_watch(settings, root, tmp_path, det):
     with Engine(settings.workspace, settings=settings) as eng:
         with pytest.raises(EngineError) as err:
-            eng.watch()                                        # no folders known yet
+            eng.watch()  # no folders known yet
         assert err.value.code == ErrorCode.INVALID_INPUT
         result = eng.watch([root], interval_s=1, settle_s=0, max_cycles=2)
         assert result["processed"] == 2

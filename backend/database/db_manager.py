@@ -4,6 +4,7 @@ One connection is shared behind a lock, and every write goes through
 :meth:`DatabaseManager._tx` so a batch is committed atomically. The database
 stores metadata only; original photographs are never touched.
 """
+
 from __future__ import annotations
 
 import json
@@ -32,10 +33,25 @@ STATUS_FAILED = "failed"
 
 # Per-image columns written by save_results() (face_count is derived).
 RESULT_COLUMNS: tuple[str, ...] = (
-    "width", "height", "sha256", "phash", "exif_ts", "ts_source",
-    "gps_lat", "gps_lon", "features", "thumb_path",
-    "kind", "duration_s", "format",
-    "quality", "sharpness", "brightness", "dhash", "content_type", "date_flag",
+    "width",
+    "height",
+    "sha256",
+    "phash",
+    "exif_ts",
+    "ts_source",
+    "gps_lat",
+    "gps_lon",
+    "features",
+    "thumb_path",
+    "kind",
+    "duration_s",
+    "format",
+    "quality",
+    "sharpness",
+    "brightness",
+    "dhash",
+    "content_type",
+    "date_flag",
 )
 
 from database.analysis_mixin import AnalysisDbMixin
@@ -45,8 +61,10 @@ from database.organization_mixin import OrganizationDbMixin
 from database.person_mixin import PersonDbMixin
 from database.search_mixin import FIND_FILTERS, MARK_KINDS, SearchDbMixin, _EFF, _SORTS
 from database.tag_mixin import TagDbMixin
-_MONTHS = ("January February March April May June July August "
-           "September October November December").split()
+
+_MONTHS = (
+    "January February March April May June July August September October November December"
+).split()
 
 
 def fts_query(text: str) -> str:
@@ -56,7 +74,7 @@ def fts_query(text: str) -> str:
 
 def _date_words(ts: str | None) -> str:
     try:
-        year, month = int(ts[:4]), int(ts[5:7])        # type: ignore[index]
+        year, month = int(ts[:4]), int(ts[5:7])  # type: ignore[index]
         return f"{year} {_MONTHS[month - 1]} {_MONTHS[month - 1][:3]}"
     except (TypeError, ValueError, IndexError):
         return ""
@@ -79,7 +97,15 @@ class ScanStats:
         return self.new + self.changed + self.unchanged
 
 
-class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin, MaintenanceDbMixin, OrganizationDbMixin, MarksDbMixin):
+class DatabaseManager(
+    PersonDbMixin,
+    SearchDbMixin,
+    AnalysisDbMixin,
+    TagDbMixin,
+    MaintenanceDbMixin,
+    OrganizationDbMixin,
+    MarksDbMixin,
+):
     """Thin, explicit wrapper around the project's SQLite database.
 
     Usage::
@@ -107,8 +133,8 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
             conn = sqlite3.connect(
                 str(self.db_path),
                 timeout=30,
-                isolation_level=None,        # we manage transactions explicitly
-                check_same_thread=False,     # access is serialised by self._lock
+                isolation_level=None,  # we manage transactions explicitly
+                check_same_thread=False,  # access is serialised by self._lock
             )
         except sqlite3.Error as exc:
             raise DatabaseError(f"Cannot open database {self.db_path}: {exc}") from exc
@@ -121,7 +147,7 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
 
         prefix = str(self.db_path) if isinstance(self.db_path, Path) else None
         try:
-            migrate(conn, prefix)          # backs up first when upgrading an existing DB
+            migrate(conn, prefix)  # backs up first when upgrading an existing DB
         except MigrationError as exc:
             conn.close()
             raise DatabaseError(str(exc)) from exc
@@ -218,8 +244,12 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
                             self._bump(conn)
                         unchanged += 1
         stats = ScanStats(new, changed, unchanged)
-        log.info("Registered files: %d new, %d changed, %d unchanged",
-                 stats.new, stats.changed, stats.unchanged)
+        log.info(
+            "Registered files: %d new, %d changed, %d unchanged",
+            stats.new,
+            stats.changed,
+            stats.unchanged,
+        )
         return stats
 
     @staticmethod
@@ -257,7 +287,9 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
     def count_pending(self, include_failed: bool = False) -> int:
         """Number of images still waiting for processing."""
         if include_failed:
-            return self._scalar("SELECT COUNT(*) FROM images WHERE status IN ('pending','failed') AND state = 'ok'")
+            return self._scalar(
+                "SELECT COUNT(*) FROM images WHERE status IN ('pending','failed') AND state = 'ok'"
+            )
         return self._scalar("SELECT COUNT(*) FROM images WHERE status = 'pending' AND state = 'ok'")
 
     def retry_failed(self) -> int:
@@ -297,7 +329,8 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
                 conn.execute(update_sql, params)
                 kept = conn.execute(
                     "SELECT x, y, w, h, person_id FROM faces WHERE image_id = ? AND locked = 1",
-                    (image_id,)).fetchall()
+                    (image_id,),
+                ).fetchall()
                 conn.execute("DELETE FROM faces WHERE image_id = ?", (image_id,))
                 conn.executemany(
                     "INSERT INTO faces (image_id, label, x, y, w, h, confidence, crop_path, embedding, person_id) "
@@ -306,7 +339,10 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
                         (
                             image_id,
                             f.get("label") or f"Face {i:03d}",
-                            int(f["x"]), int(f["y"]), int(f["w"]), int(f["h"]),
+                            int(f["x"]),
+                            int(f["y"]),
+                            int(f["w"]),
+                            int(f["h"]),
                             float(f["confidence"]),
                             f.get("crop_path"),
                             f.get("embedding"),
@@ -361,20 +397,30 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
                 "SELECT COUNT(*) FROM duplicates WHERE kind = 'exact'"
             ),
             "groups": self._scalar("SELECT COUNT(*) FROM groups"),
-            "videos": self._scalar("SELECT COUNT(*) FROM images WHERE status = 'done' AND kind = 'video'"),
+            "videos": self._scalar(
+                "SELECT COUNT(*) FROM images WHERE status = 'done' AND kind = 'video'"
+            ),
             "live_pairs": self._scalar("SELECT COUNT(*) FROM images WHERE pair_id IS NOT NULL"),
             "bursts": self._scalar("SELECT COUNT(*) FROM bursts"),
             "tagged": self._scalar("SELECT COUNT(*) FROM images WHERE tagged_with IS NOT NULL"),
-            "screenshots": self._scalar("SELECT COUNT(*) FROM images WHERE content_type = 'screenshot'"),
-            "documents": self._scalar("SELECT COUNT(*) FROM images WHERE content_type = 'document'"),
-            "date_issues": self._scalar("SELECT COUNT(*) FROM images WHERE date_flag IN ('future','implausible','none')"),
+            "screenshots": self._scalar(
+                "SELECT COUNT(*) FROM images WHERE content_type = 'screenshot'"
+            ),
+            "documents": self._scalar(
+                "SELECT COUNT(*) FROM images WHERE content_type = 'document'"
+            ),
+            "date_issues": self._scalar(
+                "SELECT COUNT(*) FROM images WHERE date_flag IN ('future','implausible','none')"
+            ),
             "offline_images": self._scalar("SELECT COUNT(*) FROM images WHERE state = 'offline'"),
             "missing_images": self._scalar("SELECT COUNT(*) FROM images WHERE state = 'missing'"),
         }
 
     def failed_images(self) -> list[sqlite3.Row]:
         """``path, error`` for every failed image."""
-        return self._query("SELECT id, path, error FROM images WHERE status = 'failed' ORDER BY path")
+        return self._query(
+            "SELECT id, path, error FROM images WHERE status = 'failed' ORDER BY path"
+        )
 
     # ------------------------------------------------------------------
     # Meta / revision (lets rebuilds be skipped when nothing changed)
@@ -383,14 +429,16 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
     def _bump(conn: sqlite3.Connection) -> None:
         conn.execute(
             "INSERT INTO meta (key, value) VALUES ('revision', '1') "
-            "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + 1")
+            "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + 1"
+        )
 
     @staticmethod
     def _bump_persons(conn: sqlite3.Connection) -> None:
         """People changes must not invalidate duplicate/burst/group caches (they use 'revision')."""
         conn.execute(
             "INSERT INTO meta (key, value) VALUES ('persons_rev', '1') "
-            "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + 1")
+            "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + 1"
+        )
 
     @staticmethod
     def _iou(a: Sequence[int], b: Sequence[int]) -> float:
@@ -403,22 +451,26 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
     @staticmethod
     def _restore_locked(conn: sqlite3.Connection, image_id: int, kept: list[sqlite3.Row]) -> None:
         """Re-apply user decisions to the freshly detected faces of one photo (IoU >= 0.5)."""
-        new = conn.execute("SELECT id, x, y, w, h FROM faces WHERE image_id = ? ORDER BY id",
-                           (image_id,)).fetchall()
+        new = conn.execute(
+            "SELECT id, x, y, w, h FROM faces WHERE image_id = ? ORDER BY id", (image_id,)
+        ).fetchall()
         taken: set[int] = set()
         for old in kept:
             best, best_iou = None, 0.5
             for n in new:
                 if n["id"] in taken:
                     continue
-                v = DatabaseManager._iou((old["x"], old["y"], old["w"], old["h"]),
-                                         (n["x"], n["y"], n["w"], n["h"]))
+                v = DatabaseManager._iou(
+                    (old["x"], old["y"], old["w"], old["h"]), (n["x"], n["y"], n["w"], n["h"])
+                )
                 if v >= best_iou:
                     best, best_iou = n["id"], v
             if best is not None:
                 taken.add(best)
-                conn.execute("UPDATE faces SET person_id = ?, locked = 1 WHERE id = ?",
-                             (old["person_id"], best))
+                conn.execute(
+                    "UPDATE faces SET person_id = ?, locked = 1 WHERE id = ?",
+                    (old["person_id"], best),
+                )
 
     def revision(self) -> int:
         """Counter that changes whenever processed results change."""
@@ -433,7 +485,9 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
         with self._tx() as conn:
             conn.execute(
                 "INSERT INTO meta (key, value) VALUES (?, ?) "
-                "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, value),
+            )
 
     # ------------------------------------------------------------------
     # Sources and file states (ok / offline / missing)
@@ -443,7 +497,9 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
         with self._tx() as conn:
             conn.execute(
                 "INSERT INTO sources (path) VALUES (?) "
-                "ON CONFLICT(path) DO UPDATE SET last_seen = datetime('now')", (path,))
+                "ON CONFLICT(path) DO UPDATE SET last_seen = datetime('now')",
+                (path,),
+            )
 
     def list_sources(self) -> list[str]:
         return [r["path"] for r in self._query("SELECT path FROM sources ORDER BY path")]
@@ -453,7 +509,9 @@ class DatabaseManager(PersonDbMixin, SearchDbMixin, AnalysisDbMixin, TagDbMixin,
         return self._query("SELECT id, path, state FROM images ORDER BY id")
 
     def image_ids_in_state(self, state: str) -> list[int]:
-        return [int(r["id"]) for r in self._query("SELECT id FROM images WHERE state = ?", (state,))]
+        return [
+            int(r["id"]) for r in self._query("SELECT id FROM images WHERE state = ?", (state,))
+        ]
 
     def state_counts(self) -> dict[str, int]:
         counts = {"ok": 0, "offline": 0, "missing": 0}

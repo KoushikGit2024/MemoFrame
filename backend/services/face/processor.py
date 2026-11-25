@@ -3,6 +3,7 @@
 Labels ("Face 001") are positions within ONE image (left to right). They carry
 no identity and say nothing about faces in other photographs.
 """
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -42,7 +43,7 @@ def expand_box(face: FaceBox, img_w: int, img_h: int, margin: float) -> tuple[in
 
 def _font(size: int) -> ImageFont.ImageFont:
     try:
-        return ImageFont.load_default(size=size)     # Pillow >= 10.1
+        return ImageFont.load_default(size=size)  # Pillow >= 10.1
     except TypeError:
         return ImageFont.load_default()
 
@@ -71,8 +72,14 @@ def _to_decoded(face: FaceBox, scale: float) -> FaceBox:
     if scale == 1.0:
         return face
     lm = tuple(v / scale for v in face.landmarks) if face.landmarks else None
-    return replace(face, x=round(face.x / scale), y=round(face.y / scale),
-                   w=round(face.w / scale), h=round(face.h / scale), landmarks=lm)
+    return replace(
+        face,
+        x=round(face.x / scale),
+        y=round(face.y / scale),
+        w=round(face.w / scale),
+        h=round(face.h / scale),
+        landmarks=lm,
+    )
 
 
 def process_faces(
@@ -99,8 +106,11 @@ def process_faces(
 
     max_side = None if settings.save_face_crops else 2400
     try:
-        full = (load_image_bytes(data, source.name, max_side) if data is not None
-                else load_image(source, max_side=max_side))
+        full = (
+            load_image_bytes(data, source.name, max_side)
+            if data is not None
+            else load_image(source, max_side=max_side)
+        )
     except ImageLoadError as exc:
         log.warning("Face outputs skipped (cannot reopen image): %s", exc)
         return labelled
@@ -119,11 +129,13 @@ def process_faces(
                 embedding = recognizer.embed_face(full_bgr, _to_decoded(face, full.scale))
 
             if settings.save_face_crops:
-                crop = full.pil.crop(expand_box(face, full.width, full.height,
-                                                settings.face_crop_margin))
+                crop = full.pil.crop(
+                    expand_box(face, full.width, full.height, settings.face_crop_margin)
+                )
                 crop = resize_to_fit(crop, settings.face_thumb_size)
                 dest = shard_dir(settings.face_crops_dir, image_id) / output_name(
-                    image_id, source, tag=f"f{i:03d}")
+                    image_id, source, tag=f"f{i:03d}"
+                )
                 atomic_write_bytes(dest, encode_jpeg(crop, settings.jpeg_quality))
                 crop_path = str(dest)
 

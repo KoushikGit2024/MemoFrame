@@ -3,6 +3,7 @@
 Works on the ``Image.Exif`` object already captured by the loader, so the file
 is not opened a second time.
 """
+
 from __future__ import annotations
 
 import math
@@ -77,7 +78,7 @@ def extract_gps(exif: Image.Exif) -> tuple[float | None, float | None]:
         return None, None
     if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
         return None, None
-    if lat == 0.0 and lon == 0.0:      # "null island": a common no-fix placeholder
+    if lat == 0.0 and lon == 0.0:  # "null island": a common no-fix placeholder
         return None, None
     return lat, lon
 

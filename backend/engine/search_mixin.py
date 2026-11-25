@@ -1,4 +1,5 @@
 """Search, timeline, saved searches, tags, and similarity mixin for Engine."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -9,8 +10,9 @@ from engine.errors import EngineError, ErrorCode
 class SearchEngineMixin:
     """Search, discovery, and query methods for Engine."""
 
-    def find(self, *, sort: str = "date", limit: int = 100, offset: int = 0,
-             **filters: Any) -> list[dict[str, Any]]:
+    def find(
+        self, *, sort: str = "date", limit: int = 100, offset: int = 0, **filters: Any
+    ) -> list[dict[str, Any]]:
         from engine.api import _row, _translated
         from services.pipeline import orchestrator as pipeline
 
@@ -18,7 +20,10 @@ class SearchEngineMixin:
         def _impl():
             if filters.get("text"):
                 pipeline.update_search_index(self.settings, self.db)
-            return [_row(r) for r in self.db.find_images(sort=sort, limit=limit, offset=offset, **filters)]
+            return [
+                _row(r)
+                for r in self.db.find_images(sort=sort, limit=limit, offset=offset, **filters)
+            ]
 
         return _impl()
 
@@ -70,7 +75,9 @@ class SearchEngineMixin:
 
         return _impl()
 
-    def run_saved_search(self, name: str, *, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    def run_saved_search(
+        self, name: str, *, limit: int = 100, offset: int = 0
+    ) -> list[dict[str, Any]]:
         from engine.api import _translated
 
         @_translated
@@ -108,7 +115,9 @@ class SearchEngineMixin:
 
         @_translated
         def _impl():
-            return [{"label": r["label"], "count": int(r["n"])} for r in self.db.list_tag_counts(limit)]
+            return [
+                {"label": r["label"], "count": int(r["n"])} for r in self.db.list_tag_counts(limit)
+            ]
 
         return _impl()
 

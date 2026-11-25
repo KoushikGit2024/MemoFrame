@@ -1,4 +1,5 @@
 """'Find similar' from stored whole-image embeddings (brute force, chunked)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -14,7 +15,9 @@ def find_similar(db: DatabaseManager, image_id: int, limit: int = 20) -> list[tu
     """
     q = db.get_embedding(image_id)
     if q is None:
-        raise ValueError("This photo has no stored embedding. Turn on store_embeddings and run tagging.")
+        raise ValueError(
+            "This photo has no stored embedding. Turn on store_embeddings and run tagging."
+        )
     query = np.frombuffer(q["vec"], dtype=np.float16).astype(np.float32)
     query /= np.linalg.norm(query) or 1.0
     best: list[tuple[float, int]] = []
@@ -28,8 +31,11 @@ def find_similar(db: DatabaseManager, image_id: int, limit: int = 20) -> list[tu
         norms = np.linalg.norm(mat, axis=1)
         norms[norms == 0] = 1.0
         scores = (mat / norms[:, None]) @ query
-        best.extend((float(s), int(r["image_id"])) for s, r in zip(scores, rows)
-                    if int(r["image_id"]) != image_id)
+        best.extend(
+            (float(s), int(r["image_id"]))
+            for s, r in zip(scores, rows)
+            if int(r["image_id"]) != image_id
+        )
         best.sort(reverse=True)
         del best[limit:]
     return [(i, s) for s, i in best]

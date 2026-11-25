@@ -1,4 +1,5 @@
 """Database mixin for duplicate clusters, image groupings, and facial lookups."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -48,7 +49,9 @@ class OrganizationDbMixin:
             "i.gps_lat, i.gps_lon, i.phash, i.features, i.place "
             "FROM images i LEFT JOIN date_overrides o ON o.image_id = i.id "
             "WHERE i.status = 'done' AND i.state != 'missing' AND i.pair_id IS NULL"
-            + junk + " ORDER BY i.id")
+            + junk
+            + " ORDER BY i.id"
+        )
 
     def replace_groups(self, groups: Sequence[Mapping[str, Any]]) -> int:
         """Replace all groups."""
@@ -75,7 +78,8 @@ class OrganizationDbMixin:
     def get_group_images(self, group_id: int) -> list[sqlite3.Row]:
         """Images in a group (photos only), in timestamp order."""
         return self._query(
-            "SELECT * FROM images WHERE group_id = ? AND kind != 'video' ORDER BY exif_ts, id", (group_id,)
+            "SELECT * FROM images WHERE group_id = ? AND kind != 'video' ORDER BY exif_ts, id",
+            (group_id,),
         )
 
     def get_image(self, image_id: int) -> sqlite3.Row | None:
@@ -88,21 +92,26 @@ class OrganizationDbMixin:
         return self._query(
             "SELECT f.*, p.name AS person_name FROM faces f "
             "LEFT JOIN persons p ON p.id = f.person_id "
-            "WHERE f.image_id = ? ORDER BY f.id", (image_id,))
+            "WHERE f.image_id = ? ORDER BY f.id",
+            (image_id,),
+        )
 
-    def faces_for_images(self, image_ids: Iterable[int],
-                         chunk_size: int = 500) -> dict[int, list[sqlite3.Row]]:
+    def faces_for_images(
+        self, image_ids: Iterable[int], chunk_size: int = 500
+    ) -> dict[int, list[sqlite3.Row]]:
         """Faces of many images in a few queries (no embeddings)."""
         ids = [int(i) for i in image_ids]
         out: dict[int, list[sqlite3.Row]] = {i: [] for i in ids}
         for start in range(0, len(ids), chunk_size):
-            part = ids[start:start + chunk_size]
+            part = ids[start : start + chunk_size]
             marks = ",".join("?" for _ in part)
             rows = self._query(
                 "SELECT f.id, f.image_id, f.person_id, f.label, f.x, f.y, f.w, f.h, "
                 "f.confidence, f.crop_path, f.locked, p.name AS person_name "
                 "FROM faces f LEFT JOIN persons p ON p.id = f.person_id "
-                f"WHERE f.image_id IN ({marks}) ORDER BY f.image_id, f.id", part)
+                f"WHERE f.image_id IN ({marks}) ORDER BY f.image_id, f.id",
+                part,
+            )
             for r in rows:
                 out[int(r["image_id"])].append(r)
         return out
@@ -171,13 +180,12 @@ class OrganizationDbMixin:
             clauses.append("group_id = ?")
             params.append(group_id)
         if path_contains:
-            escaped = (
-                path_contains.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            )
+            escaped = path_contains.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             clauses.append("path LIKE ? ESCAPE '\\'")
             params.append(f"%{escaped}%")
         sql = (
-            "SELECT * FROM images WHERE " + " AND ".join(clauses)
+            "SELECT * FROM images WHERE "
+            + " AND ".join(clauses)
             + " ORDER BY exif_ts, id LIMIT ? OFFSET ?"
         )
         return self._query(sql, (*params, limit, offset))

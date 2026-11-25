@@ -2,6 +2,7 @@
 
 Only the model file is downloaded. No image data ever leaves the machine.
 """
+
 from __future__ import annotations
 
 import os
@@ -80,7 +81,8 @@ def ensure_model(
             f"Downloaded {dest.name} failed verification.\n"
             f"  expected sha256: {expected_sha256 or '(none)'}\n  got:             {actual}\n"
             "If you trust the source, put the 'got' value into config.py "
-            "(or set MEMOFRAME_SKIP_MODEL_HASH=1 once).")
+            "(or set MEMOFRAME_SKIP_MODEL_HASH=1 once)."
+        )
 
     log.info("Model saved to %s (%s)", dest, human_size(dest.stat().st_size))
     return dest
@@ -94,9 +96,11 @@ def install_bundled_model(dest: Path) -> bool:
     """
     if dest.is_file():
         return False
-    folders = [os.environ.get("PHOTO_ORGANIZER_BUNDLED_MODELS"),
-               str(Path(getattr(sys, "_MEIPASS", "")) / "models") if hasattr(sys, "_MEIPASS") else None,
-               str(Path(sys.executable).parent / "models")]
+    folders = [
+        os.environ.get("PHOTO_ORGANIZER_BUNDLED_MODELS"),
+        str(Path(getattr(sys, "_MEIPASS", "")) / "models") if hasattr(sys, "_MEIPASS") else None,
+        str(Path(sys.executable).parent / "models"),
+    ]
     for folder in filter(None, folders):
         candidate = Path(folder) / dest.name
         if candidate.is_file() and candidate.stat().st_size >= _MIN_PLAUSIBLE_BYTES:

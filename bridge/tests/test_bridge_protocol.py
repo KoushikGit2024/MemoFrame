@@ -1,4 +1,5 @@
 """Deterministic unit tests for bridge protocol, atomic prefs, and monotonic progress."""
+
 from __future__ import annotations
 
 import json

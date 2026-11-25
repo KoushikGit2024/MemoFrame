@@ -2,6 +2,7 @@
 
 These describe whole-image appearance only. Nothing here looks at faces.
 """
+
 from __future__ import annotations
 
 import cv2
@@ -9,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 PHASH_BITS = 64
-FEATURE_DIM = 8 * 4 * 4          # HSV bins: H8 x S4 x V4
+FEATURE_DIM = 8 * 4 * 4  # HSV bins: H8 x S4 x V4
 
 
 def compute_phash(pil: Image.Image) -> str:
@@ -21,8 +22,8 @@ def compute_phash(pil: Image.Image) -> str:
     """
     grey = np.asarray(pil.convert("L").resize((32, 32), Image.Resampling.LANCZOS), dtype=np.float32)
     block = cv2.dct(grey)[:8, :8]
-    median = float(np.median(block.flatten()[1:]))     # ignore the DC term
-    bits = (block > median + 1e-3).flatten()           # epsilon keeps flat images stable
+    median = float(np.median(block.flatten()[1:]))  # ignore the DC term
+    bits = (block > median + 1e-3).flatten()  # epsilon keeps flat images stable
     value = 0
     for bit in bits:
         value = (value << 1) | int(bit)

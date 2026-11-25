@@ -1,4 +1,5 @@
 """Engine API: progress, cancel/resume, marks, config, profiles, migrations, doctor."""
+
 from __future__ import annotations
 
 import hashlib
@@ -48,11 +49,11 @@ def test_run_all_reports_progress_and_never_touches_photos(settings, photos):
         assert (result["processed"], result["failed"], result["remaining"]) == (5, 0, 0)
         assert result["stats"]["total_faces"] == 5
         assert len(eng.search(min_faces=1)) == 5
-        assert "features" not in eng.search()[0]               # blobs are not exposed
+        assert "features" not in eng.search()[0]  # blobs are not exposed
     stages = {e.stage for e in events}
     assert {"scan", "process", "duplicates", "groups", "done"} <= stages
     assert max(e.done for e in events if e.stage == "process") == 5
-    assert _snapshot(photos) == before                          # same files, same bytes
+    assert _snapshot(photos) == before  # same files, same bytes
 
 
 def test_cancel_then_resume(settings, photos):
@@ -70,7 +71,7 @@ def test_cancel_then_resume(settings, photos):
         holder.clear()
         second = eng.process()
         assert (second["processed"], second["remaining"], second["interrupted"]) == (3, 0, False)
-        assert eng.stats()["total_faces"] == 5                  # no duplicate rows after resume
+        assert eng.stats()["total_faces"] == 5  # no duplicate rows after resume
 
 
 def test_marks_roundtrip_and_validation(settings, photos):
@@ -102,15 +103,18 @@ def test_engine_must_be_open(settings):
 
 
 # ---- config and profiles -------------------------------------------------------
-@pytest.mark.parametrize("line", [
-    "confidence_threshold = 2",
-    "workers = 0",
-    "cpu_limit = 0",
-    'workers = "two"',
-    "nonsense_key = 1",
-    'detector_backend = "magic"',
-    'profile = "turbo"',
-])
+@pytest.mark.parametrize(
+    "line",
+    [
+        "confidence_threshold = 2",
+        "workers = 0",
+        "cpu_limit = 0",
+        'workers = "two"',
+        "nonsense_key = 1",
+        'detector_backend = "magic"',
+        'profile = "turbo"',
+    ],
+)
 def test_invalid_config_rejected(tmp_path, line):
     ws = tmp_path / "ws"
     ws.mkdir()
@@ -133,7 +137,7 @@ def test_profile_then_explicit_values(tmp_path):
     ws.mkdir()
     (ws / "config.toml").write_text('profile = "gentle"\nbatch_size = 8\n', encoding="utf-8")
     s = load_settings(ws)
-    assert (s.workers, s.cpu_limit, s.batch_size) == (1, 0.5, 8)   # file value beats profile
+    assert (s.workers, s.cpu_limit, s.batch_size) == (1, 0.5, 8)  # file value beats profile
     assert s.save_annotated is False and s.save_face_crops is False
     assert load_settings(ws, profile="fast").cpu_limit == 1.0
 
@@ -159,7 +163,7 @@ def test_v1_database_is_upgraded_with_backup(tmp_path):
     _make_v1_db(path)
     with DatabaseManager(path) as db:
         assert db._scalar("PRAGMA user_version") >= 2
-        assert db.report_stats()["total_images"] == 1           # data survived
+        assert db.report_stats()["total_images"] == 1  # data survived
         db.set_mark(1, "keep")
         assert db.get_marks(1)[0]["kind"] == "keep"
     assert (tmp_path / "ws" / "photos.db.bak-v1").is_file()

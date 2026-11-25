@@ -1,4 +1,5 @@
 """Load and validate ``config.toml`` from the workspace."""
+
 from __future__ import annotations
 
 import logging
@@ -99,8 +100,11 @@ watch_pause_on_battery = true
 
 
 def _bad(message: str) -> EngineError:
-    return EngineError(ErrorCode.CONFIG_INVALID, f"{CONFIG_NAME}: {message}",
-                       f"Fix or delete that line in {CONFIG_NAME}.")
+    return EngineError(
+        ErrorCode.CONFIG_INVALID,
+        f"{CONFIG_NAME}: {message}",
+        f"Fix or delete that line in {CONFIG_NAME}.",
+    )
 
 
 def _check(key: str, value: Any) -> Any:
@@ -121,7 +125,9 @@ def _check(key: str, value: Any) -> Any:
         raise _bad("'detector_backend' must be 'yunet' or 'insightface'")
     if key == "storage_type" and value not in ("hdd", "ssd"):
         raise _bad("'storage_type' must be 'hdd' or 'ssd'")
-    if key in ("tag_model_file", "tag_labels_file") and (not value or "/" in value or "\\" in value):
+    if key in ("tag_model_file", "tag_labels_file") and (
+        not value or "/" in value or "\\" in value
+    ):
         raise _bad(f"'{key}' must be a file name only (no folders)")
     return float(value) if kind is float else value
 
@@ -134,8 +140,13 @@ def write_default_config(workspace: Path) -> Path:
     return path
 
 
-def load_settings(workspace: Path, profile: str | None = None, *,
-                  strict: bool = True, warnings: list[str] | None = None) -> Settings:
+def load_settings(
+    workspace: Path,
+    profile: str | None = None,
+    *,
+    strict: bool = True,
+    warnings: list[str] | None = None,
+) -> Settings:
     """Build :class:`Settings`: defaults, then profile, then explicit config values.
 
     strict=True  : any problem raises EngineError(CONFIG_INVALID).

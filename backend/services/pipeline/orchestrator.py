@@ -4,6 +4,7 @@ The parent process is the only database writer. Workers return plain dicts.
 Re-running continues where the last run stopped, because only ``pending``
 images are fetched and each batch is committed atomically.
 """
+
 from __future__ import annotations
 
 import gc
@@ -45,8 +46,8 @@ from utils.model_downloader import ensure_model
 
 log = get_logger("processing.pipeline")
 
-_Task = tuple[int, str, int]                 # (image_id, path, mtime_ns)
-_Outcome = tuple[bool, int, Any]             # (ok, image_id, result dict | error text)
+_Task = tuple[int, str, int]  # (image_id, path, mtime_ns)
+_Outcome = tuple[bool, int, Any]  # (ok, image_id, result dict | error text)
 
 # Per-process state, set by _init_worker.
 _settings: Settings | None = None
@@ -78,6 +79,7 @@ def _init_worker(settings: Settings, ignore_sigint: bool) -> None:
     if ignore_sigint:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         from utils.logger import setup_worker_logging
+
         setup_worker_logging(settings.workspace)
     cv2.setNumThreads(settings.cv_threads)
     if settings.low_priority and ignore_sigint:
@@ -114,10 +116,16 @@ def _process_video(image_id: int, path: Path, mtime_ns: int, settings: Settings)
         thumb_path = None
         if info.poster is not None:
             try:
-                thumb_path = str(save_thumbnail(
-                    info.poster, image_id, path, settings.thumbnails_dir,
-                    settings.thumbnail_size, settings.jpeg_quality,
-                ))
+                thumb_path = str(
+                    save_thumbnail(
+                        info.poster,
+                        image_id,
+                        path,
+                        settings.thumbnails_dir,
+                        settings.thumbnail_size,
+                        settings.jpeg_quality,
+                    )
+                )
             except OSError as exc:
                 log.warning("Poster thumbnail not written for %s: %s", path.name, exc)
 
@@ -150,29 +158,44 @@ def _process_one_inner(task: _Task) -> _Outcome:
         if path.suffix.lower() in VIDEO_EXTENSIONS:
             return _process_video(image_id, path, mtime_ns, settings)
         try:
-            data = path.read_bytes()                 # the only disk read for this image
+            data = path.read_bytes()  # the only disk read for this image
         except OSError as exc:
             return False, image_id, f"FILE_UNREADABLE: {path.name}: {exc}"
         sha256 = hashlib.sha256(data).hexdigest()
         loaded = load_image_bytes(data, path.name, settings.max_detect_side)
         meta = extract_metadata(loaded.exif, loaded.width, loaded.height, mtime_ns)
         record = ImageRecord(
-            image_id=image_id, path=path, meta=meta, sha256=sha256,
-            phash=compute_phash(loaded.pil), features=compute_features(loaded.pil),
+            image_id=image_id,
+            path=path,
+            meta=meta,
+            sha256=sha256,
+            phash=compute_phash(loaded.pil),
+            features=compute_features(loaded.pil),
             fmt=loaded.format or None,
         )
         faces = detector.detect(loaded)
-        if settings.tiled_detection and max(loaded.width, loaded.height) > settings.max_detect_side * 1.5:
+        if (
+            settings.tiled_detection
+            and max(loaded.width, loaded.height) > settings.max_detect_side * 1.5
+        ):
             big = load_image_bytes(data, path.name, settings.tile_source_side)
             faces = merge_faces(faces + detector.detect_tiled(big, settings.tile_size))
             del big
-        record.faces = process_faces(image_id, path, faces, settings,
-                                     recognizer=_recognizer, data=data)
+        record.faces = process_faces(
+            image_id, path, faces, settings, recognizer=_recognizer, data=data
+        )
         del data
         try:
-            record.thumb_path = str(save_thumbnail(
-                loaded.pil, image_id, path, settings.thumbnails_dir,
-                settings.thumbnail_size, settings.jpeg_quality))
+            record.thumb_path = str(
+                save_thumbnail(
+                    loaded.pil,
+                    image_id,
+                    path,
+                    settings.thumbnails_dir,
+                    settings.thumbnail_size,
+                    settings.jpeg_quality,
+                )
+            )
         except OSError as exc:
             log.warning("Thumbnail not written for %s: %s", path.name, exc)
         result = record.to_result()
@@ -207,7 +230,9 @@ def _process_one(task: _Task) -> _Outcome:
 # ----------------------------------------------------------------------
 # Stages
 # ----------------------------------------------------------------------
-def _watch(files: Iterator[tuple[Path, int, int]], control: RunControl) -> Iterator[tuple[Path, int, int]]:
+def _watch(
+    files: Iterator[tuple[Path, int, int]], control: RunControl
+) -> Iterator[tuple[Path, int, int]]:
     """Pass files through, emit scan progress, and stop early on cancel."""
     n = 0
     for item in files:
@@ -241,10 +266,16 @@ def scan_directory(
 def _ensure_sface(settings: Settings) -> None:
     marker = settings.models_dir / ".sface_download_failed"
     try:
-        if (not settings.sface_path.is_file() and marker.is_file()
-                and time.time() - marker.stat().st_mtime < 3600):
-            log.warning("SFace download failed recently; people grouping disabled for now "
-                        "(delete %s to retry now)", marker)
+        if (
+            not settings.sface_path.is_file()
+            and marker.is_file()
+            and time.time() - marker.stat().st_mtime < 3600
+        ):
+            log.warning(
+                "SFace download failed recently; people grouping disabled for now "
+                "(delete %s to retry now)",
+                marker,
+            )
             return
     except OSError:
         pass
@@ -296,18 +327,23 @@ def process_pending(
 
     workers = settings.workers
     if settings.storage_type == "hdd" and workers > 2:
-        log.info("HDD mode: using 2 workers instead of %d (parallel reads slow a hard drive)", workers)
+        log.info(
+            "HDD mode: using 2 workers instead of %d (parallel reads slow a hard drive)", workers
+        )
         workers = 2
 
     if control is not None:
-        control.emit(ProgressEvent("process", 0, total, message=f"Starting analysis of {total} photos..."))
+        control.emit(
+            ProgressEvent("process", 0, total, message=f"Starting analysis of {total} photos...")
+        )
 
     executor: ProcessPoolExecutor | None = None
     if workers > 1:
-        create_detector(settings).close()        # fail fast, before spawning workers
+        create_detector(settings).close()  # fail fast, before spawning workers
         # On Windows, OpenCV C++ threads/ONNX runtime handles deadlock if max_tasks_per_child recycles workers
         recycle = None if sys.platform == "win32" else (settings.worker_recycle_tasks or None)
         import multiprocessing
+
         mp_context = None if sys.platform == "win32" else multiprocessing.get_context("spawn")
         executor = ProcessPoolExecutor(
             max_workers=workers,
@@ -336,7 +372,9 @@ def process_pending(
             ok: list[dict[str, Any]] = []
             bad: list[tuple[int, str]] = []
             try:
-                outcomes = executor.map(_process_one, tasks) if executor else map(_process_one, tasks)
+                outcomes = (
+                    executor.map(_process_one, tasks) if executor else map(_process_one, tasks)
+                )
                 for success, image_id, payload in outcomes:
                     if success:
                         ok.append(payload)
@@ -345,9 +383,15 @@ def process_pending(
                         log.warning("Failed: %s", payload)
                     bar.update(1)
                     if control is not None:
-                        control.emit(ProgressEvent(
-                            "process", done + failed + len(ok) + len(bad), total,
-                            failed + len(bad), Path(names[image_id]).name))
+                        control.emit(
+                            ProgressEvent(
+                                "process",
+                                done + failed + len(ok) + len(bad),
+                                total,
+                                failed + len(bad),
+                                Path(names[image_id]).name,
+                            )
+                        )
                         if not control.checkpoint():
                             interrupted = True
                             break
@@ -355,7 +399,7 @@ def process_pending(
                 interrupted = True
             except BrokenProcessPool as exc:
                 crash = exc
-            db.save_results(ok)              # partial batches are kept on cancel/interrupt/crash
+            db.save_results(ok)  # partial batches are kept on cancel/interrupt/crash
             db.save_failures(bad)
             done += len(ok)
             failed += len(bad)
@@ -369,11 +413,18 @@ def process_pending(
             _close_worker()
 
     if done:
-        db.restore_marks()          # marks follow photos that moved, or came back after a reset
+        db.restore_marks()  # marks follow photos that moved, or came back after a reset
 
     if control is not None:
-        control.emit(ProgressEvent("process", done + failed, total, failed,
-                                   message="interrupted" if interrupted else "complete"))
+        control.emit(
+            ProgressEvent(
+                "process",
+                done + failed,
+                total,
+                failed,
+                message="interrupted" if interrupted else "complete",
+            )
+        )
     if crash is not None:
         raise PipelineError(
             "A worker process crashed (possibly out of memory). Progress so far is saved; "
@@ -406,9 +457,10 @@ def run_pipeline(
 ) -> ProcessSummary:
     """Scan, process, then rebuild duplicates and groups (skipped if interrupted)."""
     scan_directory(settings, db, root, control)
-    refresh_states(db)                      # lets moved files be recognised
+    refresh_states(db)  # lets moved files be recognised
     summary = process_pending(
-        settings, db, retry_failed=retry_failed, show_progress=show_progress, control=control)
+        settings, db, retry_failed=retry_failed, show_progress=show_progress, control=control
+    )
     if not summary.interrupted and not (control and control.cancelled):
         for stage_name, update_fn in (
             ("duplicates", lambda: update_duplicates(settings, db)),
@@ -438,6 +490,7 @@ def run_pipeline(
         if control:
             control.emit(ProgressEvent("done", message="finished"))
     return summary
+
 
 # ----------------------------------------------------------------------
 # Pruning (records of photos that no longer exist on disk)

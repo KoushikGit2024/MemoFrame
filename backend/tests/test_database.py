@@ -1,4 +1,5 @@
 """Database operations: registration, results, failures, search, duplicates, groups."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,9 +38,20 @@ def test_unchanged_file_keeps_results(db):
 
 def test_save_results_labels_and_counts(db):
     db.register_files([("a.jpg", 10, 1), ("b.jpg", 10, 2)])
-    db.save_results([{"image_id": 1, "width": 100, "height": 50, "sha256": "s", "phash": "0" * 16,
-                      "exif_ts": "2024-06-01T10:00:00", "ts_source": "exif_original",
-                      "faces": [_face(), _face(x=30, c=0.8)]}])
+    db.save_results(
+        [
+            {
+                "image_id": 1,
+                "width": 100,
+                "height": 50,
+                "sha256": "s",
+                "phash": "0" * 16,
+                "exif_ts": "2024-06-01T10:00:00",
+                "ts_source": "exif_original",
+                "faces": [_face(), _face(x=30, c=0.8)],
+            }
+        ]
+    )
     img = db.get_image(1)
     assert (img["status"], img["face_count"], img["width"]) == (STATUS_DONE, 2, 100)
     assert [f["label"] for f in db.get_faces(1)] == ["Face 001", "Face 002"]
@@ -49,8 +61,9 @@ def test_save_results_labels_and_counts(db):
 def test_save_results_is_atomic(db):
     db.register_files([("a.jpg", 1, 1), ("b.jpg", 1, 2)])
     with pytest.raises(KeyError):
-        db.save_results([{"image_id": 1, "faces": [_face()]},
-                         {"image_id": 2, "faces": [{"y": 1}]}])      # missing keys
+        db.save_results(
+            [{"image_id": 1, "faces": [_face()]}, {"image_id": 2, "faces": [{"y": 1}]}]
+        )  # missing keys
     assert db.count_pending() == 2
     assert db.report_stats()["total_faces"] == 0
 
@@ -73,17 +86,19 @@ def test_fetch_pending_respects_limit(db):
 
 def test_search_filters(db):
     db.register_files([("/p/a_b.jpg", 1, 1), ("/p/aXb.jpg", 1, 2), ("/p/c.jpg", 1, 3)])
-    db.save_results([
-        {"image_id": 1, "exif_ts": "2024-06-01T10:00:00", "faces": [_face(), _face(x=9)]},
-        {"image_id": 2, "exif_ts": "2024-06-02T10:00:00", "faces": []},
-        {"image_id": 3, "exif_ts": "2024-07-01T10:00:00", "faces": [_face()]},
-    ])
+    db.save_results(
+        [
+            {"image_id": 1, "exif_ts": "2024-06-01T10:00:00", "faces": [_face(), _face(x=9)]},
+            {"image_id": 2, "exif_ts": "2024-06-02T10:00:00", "faces": []},
+            {"image_id": 3, "exif_ts": "2024-07-01T10:00:00", "faces": [_face()]},
+        ]
+    )
     ids = lambda **kw: [r["id"] for r in db.search_images(**kw)]
     assert ids(min_faces=2) == [1]
     assert ids(max_faces=0) == [2]
     assert ids(taken_from="2024-06-02", taken_until="2024-06-30") == [2]
-    assert ids(taken_until="2024-06-01") == [1]            # date-only 'until' includes that day
-    assert ids(path_contains="_") == [1]                   # underscore is literal, not a wildcard
+    assert ids(taken_until="2024-06-01") == [1]  # date-only 'until' includes that day
+    assert ids(path_contains="_") == [1]  # underscore is literal, not a wildcard
     assert ids(limit=2) == [1, 2]
 
 
@@ -101,8 +116,12 @@ def test_duplicates_roundtrip_and_stats(db):
 def test_groups_replace_and_assign(db):
     db.register_files([(f"{i}.jpg", 1, i) for i in range(1, 4)])
     db.save_results([{"image_id": i, "exif_ts": f"2024-06-0{i}T10:00:00"} for i in range(1, 4)])
-    db.replace_groups([{"kind": "event", "name": "E1", "image_ids": [1, 2]},
-                       {"kind": "visual", "name": "V1", "image_ids": [3]}])
+    db.replace_groups(
+        [
+            {"kind": "event", "name": "E1", "image_ids": [1, 2]},
+            {"kind": "visual", "name": "V1", "image_ids": [3]},
+        ]
+    )
     groups = db.get_groups()
     assert [g["image_count"] for g in groups] == [2, 1]
     assert db.get_image(3)["group_id"] == groups[1]["id"]
@@ -114,9 +133,13 @@ def test_groups_replace_and_assign(db):
 
 def test_report_stats_counts_faces(db):
     db.register_files([("a.jpg", 1, 1), ("b.jpg", 1, 2), ("c.jpg", 1, 3), ("d.jpg", 1, 4)])
-    db.save_results([{"image_id": 1, "faces": []},
-                     {"image_id": 2, "faces": [_face()]},
-                     {"image_id": 3, "faces": [_face(), _face(x=9), _face(x=20)]}])
+    db.save_results(
+        [
+            {"image_id": 1, "faces": []},
+            {"image_id": 2, "faces": [_face()]},
+            {"image_id": 3, "faces": [_face(), _face(x=9), _face(x=20)]},
+        ]
+    )
     db.save_failures([(4, "bad")])
     s = db.report_stats()
     assert (s["total_images"], s["processed"], s["failed"], s["pending"]) == (4, 3, 1, 0)

@@ -1,4 +1,5 @@
 """RPC handlers for duplicate clusters, burst sequences, and chronological timeline groups."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -22,12 +23,14 @@ def register_collection_handlers(registry: dict[str, Any], ctx: Any) -> None:
                     (int(p["id"]) for p in enriched if p.get("suggested_keep")),
                     int(enriched[0]["id"]),
                 )
-                result.append({
-                    "cluster_id": str(cid),
-                    "kind": str(enriched[0].get("kind", "near")),
-                    "best_image_id": best_id,
-                    "photos": enriched,
-                })
+                result.append(
+                    {
+                        "cluster_id": str(cid),
+                        "kind": str(enriched[0].get("kind", "near")),
+                        "best_image_id": best_id,
+                        "photos": enriched,
+                    }
+                )
         return result
 
     def duplicates_resolve(params: dict[str, Any]) -> dict[str, Any]:
@@ -61,7 +64,7 @@ def register_collection_handlers(registry: dict[str, Any], ctx: Any) -> None:
         with ctx.lock:
             hidden = {int(m["image_id"]) for m in (eng.get_marks(None, "hidden") or [])}
             frames: list[dict[str, Any]] = []
-            for item in (eng.get_burst_images(burst_id) or []):
+            for item in eng.get_burst_images(burst_id) or []:
                 if item.get("state") == "missing" or int(item["id"]) in hidden:
                     continue
                 frame = dict(item)
@@ -97,9 +100,11 @@ def register_collection_handlers(registry: dict[str, Any], ctx: Any) -> None:
         eng = ctx.require_engine()
         with ctx.lock:
             groups = list(eng.get_groups() or [])
-            dated = sorted((g for g in groups if g.get("start_ts")), key=lambda g: g["start_ts"], reverse=True)
+            dated = sorted(
+                (g for g in groups if g.get("start_ts")), key=lambda g: g["start_ts"], reverse=True
+            )
             ordered = dated + [g for g in groups if not g.get("start_ts")]
-            page_groups = ordered[offset:offset + limit]
+            page_groups = ordered[offset : offset + limit]
             enriched_groups: list[dict[str, Any]] = []
             for g in page_groups:
                 g_copy = dict(g)
@@ -108,12 +113,14 @@ def register_collection_handlers(registry: dict[str, Any], ctx: Any) -> None:
                 enriched_groups.append(g_copy)
         return {"groups": enriched_groups, "total": len(ordered), "offset": offset, "limit": limit}
 
-    registry.update({
-        "duplicates.list": duplicates_list,
-        "duplicates.resolve": duplicates_resolve,
-        "bursts.list": bursts_list,
-        "bursts.frames": bursts_frames,
-        "bursts.keep_one": bursts_keep_one,
-        "bursts.keep_all": bursts_keep_all,
-        "timeline.groups": timeline_groups,
-    })
+    registry.update(
+        {
+            "duplicates.list": duplicates_list,
+            "duplicates.resolve": duplicates_resolve,
+            "bursts.list": bursts_list,
+            "bursts.frames": bursts_frames,
+            "bursts.keep_one": bursts_keep_one,
+            "bursts.keep_all": bursts_keep_all,
+            "timeline.groups": timeline_groups,
+        }
+    )

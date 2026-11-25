@@ -1,4 +1,5 @@
 """CLI parsing, error handling, reset, prune and report files (fake detector, no network)."""
+
 from __future__ import annotations
 
 import json
@@ -16,7 +17,7 @@ from utils.logger import setup_logging
 @pytest.fixture(autouse=True)
 def _close_log_handlers():
     yield
-    setup_logging(None)          # closes the log file so Windows can clean up temp dirs
+    setup_logging(None)  # closes the log file so Windows can clean up temp dirs
 
 
 class FakeDetector:
@@ -51,15 +52,18 @@ def test_defaults_and_overrides_parse():
     assert (ns.command, ns.workers, ns.confidence, ns.input) == ("process", 2, 0.5, None)
 
 
-@pytest.mark.parametrize("argv", [
-    ["scan"],                                     # --input is required
-    ["scan", "--input", "definitely/not/here"],   # directory must exist
-    ["process", "--confidence", "1.5"],
-    ["process", "--workers", "0"],
-    ["duplicates", "--near-threshold", "17"],
-    ["search", "--from", "June 2024"],
-    ["nonsense"],
-])
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["scan"],  # --input is required
+        ["scan", "--input", "definitely/not/here"],  # directory must exist
+        ["process", "--confidence", "1.5"],
+        ["process", "--workers", "0"],
+        ["duplicates", "--near-threshold", "17"],
+        ["search", "--from", "June 2024"],
+        ["nonsense"],
+    ],
+)
 def test_invalid_arguments_exit_with_usage_error(argv, capsys):
     with pytest.raises(SystemExit) as exc:
         build_parser().parse_args(argv)
@@ -87,7 +91,7 @@ def test_scan_process_report_search(tmp_path, photos, fake_detector, capsys):
     stats = json.loads(reports[-1].read_text(encoding="utf-8"))["stats"]
     assert (stats["processed"], stats["total_faces"]) == (2, 2)
     dup_csv = sorted((ws / "reports").glob("duplicates_*.csv"))[-1]
-    assert dup_csv.read_bytes().startswith(b"\xef\xbb\xbf")          # UTF-8 BOM for Excel
+    assert dup_csv.read_bytes().startswith(b"\xef\xbb\xbf")  # UTF-8 BOM for Excel
 
     assert run("search", "--workspace", ws, "--min-faces", 1) == 0
     assert "2 result(s)" in capsys.readouterr().out

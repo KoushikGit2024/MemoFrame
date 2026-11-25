@@ -1,4 +1,5 @@
 """Phase C test suite: HEIC, video indexing, Live Photo pairing, migration v4."""
+
 from __future__ import annotations
 
 import struct
@@ -33,7 +34,9 @@ def _create_minimal_mp4(path: Path, duration_s: float = 3.0) -> None:
     modified_mac = created_mac
 
     # header + times: 4 + 16 = 20 bytes
-    mvhd_head = struct.pack(">BBBB IIII", 0, 0, 0, 0, created_mac, modified_mac, timescale, duration_ticks)
+    mvhd_head = struct.pack(
+        ">BBBB IIII", 0, 0, 0, 0, created_mac, modified_mac, timescale, duration_ticks
+    )
     # rate (4), volume (2), reserved (10), matrix (36), pre_defined (24), next_track_id (4)
     rate = 0x00010000
     volume = 0x0100
@@ -42,7 +45,14 @@ def _create_minimal_mp4(path: Path, duration_s: float = 3.0) -> None:
     pre_defined = b"\x00" * 24
     next_track_id = 2
 
-    mvhd_payload = mvhd_head + struct.pack(">IH", rate, volume) + reserved + matrix + pre_defined + struct.pack(">I", next_track_id)
+    mvhd_payload = (
+        mvhd_head
+        + struct.pack(">IH", rate, volume)
+        + reserved
+        + matrix
+        + pre_defined
+        + struct.pack(">I", next_track_id)
+    )
     mvhd_box = struct.pack(">I", 8 + len(mvhd_payload)) + b"mvhd" + mvhd_payload
     moov_box = struct.pack(">I", 8 + len(mvhd_box)) + b"moov" + mvhd_box
 
@@ -63,6 +73,7 @@ def test_mvhd_parser(tmp_path: Path):
 def test_heic_decode_if_supported():
     """Verify pillow-heif is functioning or graceful fallback."""
     import pillow_heif
+
     assert pillow_heif.__version__ is not None
     extensions = Image.registered_extensions()
     assert ".heic" in extensions
@@ -75,29 +86,33 @@ def test_live_photo_pairing(tmp_path: Path):
         photo_path = str(tmp_path / "IMG_1001.JPG")
         video_path = str(tmp_path / "IMG_1001.MOV")
 
-        db.register_files([
-            (photo_path, 1000, 100),
-            (video_path, 5000, 100),
-        ])
+        db.register_files(
+            [
+                (photo_path, 1000, 100),
+                (video_path, 5000, 100),
+            ]
+        )
 
         # Save results marking photo and video
-        db.save_results([
-            {
-                "image_id": 1,
-                "kind": "photo",
-                "width": 1920,
-                "height": 1080,
-                "sha256": "abc1",
-                "phash": 12345,
-            },
-            {
-                "image_id": 2,
-                "kind": "video",
-                "duration_s": 2.5,
-                "width": 1920,
-                "height": 1080,
-            },
-        ])
+        db.save_results(
+            [
+                {
+                    "image_id": 1,
+                    "kind": "photo",
+                    "width": 1920,
+                    "height": 1080,
+                    "sha256": "abc1",
+                    "phash": 12345,
+                },
+                {
+                    "image_id": 2,
+                    "kind": "video",
+                    "duration_s": 2.5,
+                    "width": 1920,
+                    "height": 1080,
+                },
+            ]
+        )
 
         # Link live pairs
         linked = link_live_pairs(db, max_seconds=6.0)
@@ -130,16 +145,27 @@ def test_live_photo_pairing_too_long(tmp_path: Path):
         photo_path = str(tmp_path / "IMG_2001.JPG")
         video_path = str(tmp_path / "IMG_2001.MOV")
 
-        db.register_files([
-            (photo_path, 1000, 100),
-            (video_path, 50000, 100),
-        ])
+        db.register_files(
+            [
+                (photo_path, 1000, 100),
+                (video_path, 50000, 100),
+            ]
+        )
 
         # 10s video is longer than 6.0s max_seconds
-        db.save_results([
-            {"image_id": 1, "kind": "photo", "width": 100, "height": 100, "sha256": "a", "phash": 1},
-            {"image_id": 2, "kind": "video", "duration_s": 10.0, "width": 100, "height": 100},
-        ])
+        db.save_results(
+            [
+                {
+                    "image_id": 1,
+                    "kind": "photo",
+                    "width": 100,
+                    "height": 100,
+                    "sha256": "a",
+                    "phash": 1,
+                },
+                {"image_id": 2, "kind": "video", "duration_s": 10.0, "width": 100, "height": 100},
+            ]
+        )
 
         linked = link_live_pairs(db, max_seconds=6.0)
         assert linked == 0
@@ -152,12 +178,16 @@ def test_video_pipeline_indexing(tmp_path: Path, monkeypatch):
 
     # Mock ensure_model and detector creation to avoid network dependency in tests
     from models import FaceBox
+
     class FakeDetector:
         def detect(self, loaded):
             return []
+
         def close(self):
             pass
+
     from services.pipeline import orchestrator as pipeline
+
     monkeypatch.setattr(pipeline, "ensure_model", lambda p: p)
     monkeypatch.setattr(pipeline, "create_detector", lambda s: FakeDetector())
 

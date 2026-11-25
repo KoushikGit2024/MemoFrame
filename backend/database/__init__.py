@@ -1,4 +1,5 @@
 """SQLite persistence layer."""
+
 from database.db_manager import (
     STATUS_DONE,
     STATUS_FAILED,

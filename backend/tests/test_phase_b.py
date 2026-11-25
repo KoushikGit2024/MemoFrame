@@ -1,4 +1,5 @@
 """Phase B: single-read loader, states, rebuild skipping, cache, repair, backup, migration."""
+
 from __future__ import annotations
 
 import os
@@ -11,8 +12,12 @@ from database import DatabaseManager
 from database.migrations import MIGRATIONS
 from services.pipeline import orchestrator as pipeline
 from services.pipeline.maintenance import (
-    clear_cache, enforce_cache_cap, forget_missing, get_thumbnail,
-    refresh_states, run_maintenance,
+    clear_cache,
+    enforce_cache_cap,
+    forget_missing,
+    get_thumbnail,
+    refresh_states,
+    run_maintenance,
 )
 from services.pipeline.orchestrator import update_duplicates
 from services.vision.thumbnails import shard_dir
@@ -48,13 +53,13 @@ def test_offline_vs_missing_and_recovery(db, tmp_path, make_image):
     b.unlink()
     assert refresh_states(db) == {"ok": 1, "offline": 0, "missing": 1}
 
-    root.rename(tmp_path / "unplugged")                 # simulate a disconnected drive
+    root.rename(tmp_path / "unplugged")  # simulate a disconnected drive
     assert refresh_states(db) == {"ok": 0, "offline": 2, "missing": 0}
     assert db.fetch_pending(10) == [] and db.count_pending() == 0
 
-    (tmp_path / "unplugged").rename(root)               # reconnect
+    (tmp_path / "unplugged").rename(root)  # reconnect
     assert refresh_states(db) == {"ok": 1, "offline": 0, "missing": 1}
-    assert len(db.search_images()) == 1                 # missing hidden by default
+    assert len(db.search_images()) == 1  # missing hidden by default
     assert len(db.search_images(include_missing=True)) == 2
 
 
@@ -62,7 +67,7 @@ def test_offline_pending_images_are_not_processed(db):
     db.register_files([("a.jpg", 1, 1)])
     db.set_states([(1, "offline")])
     assert db.fetch_pending(10) == []
-    db.register_files([("a.jpg", 1, 1)])                # seen again by a scan
+    db.register_files([("a.jpg", 1, 1)])  # seen again by a scan
     assert [r["id"] for r in db.fetch_pending(10)] == [1]
 
 
@@ -83,16 +88,22 @@ def test_forget_missing_only_removes_missing(db, settings, tmp_path, make_image)
 def test_unchanged_data_skips_rebuild(db, settings, monkeypatch):
     calls = []
     real = pipeline.find_duplicates
-    monkeypatch.setattr(pipeline, "find_duplicates", lambda *a, **k: calls.append(1) or real(*a, **k))
+    monkeypatch.setattr(
+        pipeline, "find_duplicates", lambda *a, **k: calls.append(1) or real(*a, **k)
+    )
     db.register_files([("a.jpg", 1, 1), ("b.jpg", 1, 2)])
-    db.save_results([{"image_id": 1, "sha256": "x", "phash": "0" * 16},
-                     {"image_id": 2, "sha256": "x", "phash": "0" * 16}])
+    db.save_results(
+        [
+            {"image_id": 1, "sha256": "x", "phash": "0" * 16},
+            {"image_id": 2, "sha256": "x", "phash": "0" * 16},
+        ]
+    )
     assert update_duplicates(settings, db) == 1
-    assert update_duplicates(settings, db) == 1 and len(calls) == 1      # skipped
+    assert update_duplicates(settings, db) == 1 and len(calls) == 1  # skipped
     assert update_duplicates(settings, db, force=True) == 1 and len(calls) == 2
-    db.register_files([("a.jpg", 9, 1)])                                  # file changed
+    db.register_files([("a.jpg", 9, 1)])  # file changed
     db.save_results([{"image_id": 1, "sha256": "y", "phash": "f" * 16}])
-    assert update_duplicates(settings, db) == 0 and len(calls) == 3       # recomputed
+    assert update_duplicates(settings, db) == 0 and len(calls) == 3  # recomputed
 
 
 # ---- cache ------------------------------------------------------------------------
@@ -110,7 +121,7 @@ def _fake_thumbs(settings, db, n=3):
 
 def test_cache_cap_removes_oldest_first(db, settings):
     _fake_thumbs(settings, db)
-    assert enforce_cache_cap(settings, db, 1) == 2                        # 1.8 MB -> under 1 MiB
+    assert enforce_cache_cap(settings, db, 1) == 2  # 1.8 MB -> under 1 MiB
     assert db.get_image(1)["thumb_path"] is None and db.get_image(2)["thumb_path"] is None
     assert db.get_image(3)["thumb_path"] is not None
 
@@ -142,8 +153,12 @@ def test_thumbnail_regenerated_from_original(db, settings, tmp_path, make_image)
 # ---- health -----------------------------------------------------------------------
 def test_repair_fixes_counts_and_requeues(db):
     db.register_files([("a.jpg", 1, 1), ("b.jpg", 1, 2)])
-    db.save_results([{"image_id": 1, "width": 5, "height": 5, "sha256": "s", "faces": [_face()]},
-                     {"image_id": 2, "faces": []}])                       # 2: no hash/size = incomplete
+    db.save_results(
+        [
+            {"image_id": 1, "width": 5, "height": 5, "sha256": "s", "faces": [_face()]},
+            {"image_id": 2, "faces": []},
+        ]
+    )  # 2: no hash/size = incomplete
     db._db.execute("UPDATE images SET face_count = 9 WHERE id = 1")
     result = db.repair()
     assert result["face_counts_fixed"] == 1 and result["requeued"] == 1

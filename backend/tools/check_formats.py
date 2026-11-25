@@ -3,6 +3,7 @@
 Usage:
     python tools/check_formats.py <folder_with_photos>
 """
+
 from __future__ import annotations
 
 import argparse

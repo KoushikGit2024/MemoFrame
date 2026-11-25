@@ -3,6 +3,7 @@
 To change the schema later: append ``(N, lambda: "SQL ...")`` to MIGRATIONS.
 Use ``IF NOT EXISTS`` so a migration can safely be re-run after a crash.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -29,35 +30,52 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 """
 
+
 def _v3(conn: sqlite3.Connection) -> str:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(images)")}
-    alter = "" if "state" in cols else "ALTER TABLE images ADD COLUMN state TEXT NOT NULL DEFAULT 'ok';"
-    return alter + """
+    alter = (
+        "" if "state" in cols else "ALTER TABLE images ADD COLUMN state TEXT NOT NULL DEFAULT 'ok';"
+    )
+    return (
+        alter
+        + """
 CREATE TABLE IF NOT EXISTS sources (
     path       TEXT PRIMARY KEY,
     last_seen  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_images_state ON images(state);
 """
+    )
 
 
 def _v4(conn: sqlite3.Connection) -> str:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(images)")}
-    stmts = [f"ALTER TABLE images ADD COLUMN {name} {ddl};"
-             for name, ddl in (("kind", "TEXT NOT NULL DEFAULT 'photo'"),
-                               ("duration_s", "REAL"),
-                               ("format", "TEXT"),
-                               ("pair_id", "INTEGER"))
-             if name not in cols]
+    stmts = [
+        f"ALTER TABLE images ADD COLUMN {name} {ddl};"
+        for name, ddl in (
+            ("kind", "TEXT NOT NULL DEFAULT 'photo'"),
+            ("duration_s", "REAL"),
+            ("format", "TEXT"),
+            ("pair_id", "INTEGER"),
+        )
+        if name not in cols
+    ]
     stmts.append("CREATE INDEX IF NOT EXISTS idx_images_kind ON images(kind);")
     return "\n".join(stmts)
 
 
 def _v5(conn: sqlite3.Connection) -> str:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(images)")}
-    wanted = (("quality", "REAL"), ("sharpness", "REAL"), ("brightness", "REAL"),
-              ("dhash", "TEXT"), ("content_type", "TEXT NOT NULL DEFAULT 'photo'"),
-              ("place", "TEXT"), ("burst_id", "INTEGER"), ("date_flag", "TEXT"))
+    wanted = (
+        ("quality", "REAL"),
+        ("sharpness", "REAL"),
+        ("brightness", "REAL"),
+        ("dhash", "TEXT"),
+        ("content_type", "TEXT NOT NULL DEFAULT 'photo'"),
+        ("place", "TEXT"),
+        ("burst_id", "INTEGER"),
+        ("date_flag", "TEXT"),
+    )
     stmts = [f"ALTER TABLE images ADD COLUMN {n} {d};" for n, d in wanted if n not in cols]
     stmts.append("""
 CREATE TABLE IF NOT EXISTS bursts (
@@ -91,7 +109,9 @@ INSERT OR IGNORE INTO marks_archive (sha256, kind, note, path)
 def _v7(conn: sqlite3.Connection) -> str:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(images)")}
     alter = "" if "tagged_with" in cols else "ALTER TABLE images ADD COLUMN tagged_with TEXT;"
-    return alter + """
+    return (
+        alter
+        + """
 CREATE TABLE IF NOT EXISTS tags (
     image_id INTEGER NOT NULL REFERENCES images(id) ON DELETE CASCADE,
     label    TEXT NOT NULL,
@@ -104,13 +124,16 @@ CREATE TABLE IF NOT EXISTS embeddings (
     vec      BLOB NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_tags_label ON tags(label);
 """
+    )
 
 
 def _v8(conn: sqlite3.Connection) -> str:
     face_cols = {r[1] for r in conn.execute("PRAGMA table_info(faces)")}
     stmts = []
     if "person_id" not in face_cols:
-        stmts.append("ALTER TABLE faces ADD COLUMN person_id INTEGER REFERENCES persons(id) ON DELETE SET NULL;")
+        stmts.append(
+            "ALTER TABLE faces ADD COLUMN person_id INTEGER REFERENCES persons(id) ON DELETE SET NULL;"
+        )
     if "embedding" not in face_cols:
         stmts.append("ALTER TABLE faces ADD COLUMN embedding BLOB;")
 
@@ -129,9 +152,14 @@ CREATE INDEX IF NOT EXISTS idx_faces_person ON faces(person_id);
 
 def _v9(conn: sqlite3.Connection) -> str:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(faces)")}
-    alter = "" if "locked" in cols else \
-        "ALTER TABLE faces ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;"
-    return alter + "\nCREATE INDEX IF NOT EXISTS idx_faces_locked ON faces(locked) WHERE locked = 1;"
+    alter = (
+        ""
+        if "locked" in cols
+        else "ALTER TABLE faces ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;"
+    )
+    return (
+        alter + "\nCREATE INDEX IF NOT EXISTS idx_faces_locked ON faces(locked) WHERE locked = 1;"
+    )
 
 
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], str]]] = [
@@ -161,7 +189,8 @@ def migrate(conn: sqlite3.Connection, backup_prefix: str | None = None) -> int:
     if current > LATEST_VERSION:
         raise MigrationError(
             f"Database schema v{current} is newer than this program (v{LATEST_VERSION}). "
-            "Update the application.")
+            "Update the application."
+        )
     if current == LATEST_VERSION:
         return current
 

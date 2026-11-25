@@ -3,6 +3,7 @@
 Photos are only ever READ. Everything deleted here lives in the workspace.
 Errors are plain Python exceptions (the Engine translates them).
 """
+
 from __future__ import annotations
 
 import os
@@ -23,7 +24,7 @@ log = get_logger("processing.maintenance")
 
 MB = 1024 * 1024
 BACKUPS_TO_KEEP = 3
-_SUSPICIOUS_MIN = 10          # a source whose files are ALL missing is treated as offline
+_SUSPICIOUS_MIN = 10  # a source whose files are ALL missing is treated as offline
 CACHE_KINDS = ("thumbnails", "face_crops", "annotated")
 
 
@@ -68,8 +69,9 @@ def refresh_states(db: DatabaseManager) -> dict[str, int]:
         for image_id, old_state, path in items:
             if root is not None:
                 up = source_up[root] and not (
-                    len(items) == totals[root] and totals[root] >= _SUSPICIOUS_MIN)
-            else:                                   # scanned before sources were recorded
+                    len(items) == totals[root] and totals[root] >= _SUSPICIOUS_MIN
+                )
+            else:  # scanned before sources were recorded
                 up = bool(path.anchor) and Path(path.anchor).is_dir()
             new_state = "missing" if up else "offline"
             if new_state != old_state:
@@ -124,15 +126,19 @@ def cache_info(settings: Settings) -> dict[str, dict[str, int]]:
     }
 
 
-def clear_cache(settings: Settings, db: DatabaseManager,
-                kinds: Iterable[str] = ("thumbnails",)) -> dict[str, int]:
+def clear_cache(
+    settings: Settings, db: DatabaseManager, kinds: Iterable[str] = ("thumbnails",)
+) -> dict[str, int]:
     """Delete generated files of the given kinds (workspace only). Returns freed MB per kind.
 
     Thumbnails can be recreated on demand with :func:`get_thumbnail`.
     """
     freed: dict[str, int] = {}
-    dirs = {"thumbnails": settings.thumbnails_dir, "face_crops": settings.face_crops_dir,
-            "annotated": settings.annotated_dir}
+    dirs = {
+        "thumbnails": settings.thumbnails_dir,
+        "face_crops": settings.face_crops_dir,
+        "annotated": settings.annotated_dir,
+    }
     for kind in kinds:
         if kind not in dirs:
             raise ValueError(f"Unknown cache kind {kind!r}. Use: {', '.join(CACHE_KINDS)}.")
@@ -152,8 +158,9 @@ def enforce_cache_cap(settings: Settings, db: DatabaseManager, max_mb: int) -> i
     """Delete the oldest thumbnails until the folder is under ``max_mb``. Returns files removed."""
     if max_mb <= 0 or not settings.thumbnails_dir.is_dir():
         return 0
-    files = [(p.stat().st_mtime, p.stat().st_size, p)
-             for p in settings.thumbnails_dir.rglob("*.jpg")]
+    files = [
+        (p.stat().st_mtime, p.stat().st_size, p) for p in settings.thumbnails_dir.rglob("*.jpg")
+    ]
     total = sum(size for _, size, _ in files)
     limit = max_mb * MB
     if total <= limit:
@@ -196,8 +203,14 @@ def get_thumbnail(settings: Settings, db: DatabaseManager, image_id: int) -> Pat
         try:
             info = probe_video(source)
             if info.poster is not None:
-                dest = save_thumbnail(info.poster, image_id, source, settings.thumbnails_dir,
-                                      settings.thumbnail_size, settings.jpeg_quality)
+                dest = save_thumbnail(
+                    info.poster,
+                    image_id,
+                    source,
+                    settings.thumbnails_dir,
+                    settings.thumbnail_size,
+                    settings.jpeg_quality,
+                )
                 db.set_thumb_path(image_id, str(dest))
                 return dest
         except Exception as exc:
@@ -208,8 +221,14 @@ def get_thumbnail(settings: Settings, db: DatabaseManager, image_id: int) -> Pat
         loaded = load_image(source, settings.thumbnail_size * 2)
     except ImageLoadError as exc:
         raise ValueError(str(exc)) from exc
-    dest = save_thumbnail(loaded.pil, image_id, source, settings.thumbnails_dir,
-                          settings.thumbnail_size, settings.jpeg_quality)
+    dest = save_thumbnail(
+        loaded.pil,
+        image_id,
+        source,
+        settings.thumbnails_dir,
+        settings.thumbnail_size,
+        settings.jpeg_quality,
+    )
     db.set_thumb_path(image_id, str(dest))
     return dest
 
@@ -217,7 +236,9 @@ def get_thumbnail(settings: Settings, db: DatabaseManager, image_id: int) -> Pat
 # ----------------------------------------------------------------------
 # Database health
 # ----------------------------------------------------------------------
-def run_maintenance(settings: Settings, db: DatabaseManager, vacuum: bool = False) -> dict[str, Any]:
+def run_maintenance(
+    settings: Settings, db: DatabaseManager, vacuum: bool = False
+) -> dict[str, Any]:
     """Back up the database, check integrity, refresh statistics, trim the WAL.
 
     Keeps the newest ``BACKUPS_TO_KEEP`` backups in ``<workspace>/backups``.

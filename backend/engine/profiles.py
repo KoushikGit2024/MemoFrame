@@ -1,4 +1,5 @@
 """Resource profiles. Each sets how hard the engine works."""
+
 from __future__ import annotations
 
 from config import Settings
@@ -17,6 +18,8 @@ DEFAULT_PROFILE = "balanced"
 def apply_profile(settings: Settings, name: str) -> Settings:
     """Return ``settings`` with the named profile applied."""
     if name not in PROFILES:
-        raise EngineError(ErrorCode.CONFIG_INVALID,
-                          f"Unknown profile {name!r}. Choose one of: {', '.join(PROFILES)}.")
+        raise EngineError(
+            ErrorCode.CONFIG_INVALID,
+            f"Unknown profile {name!r}. Choose one of: {', '.join(PROFILES)}.",
+        )
     return settings.with_overrides(**PROFILES[name])

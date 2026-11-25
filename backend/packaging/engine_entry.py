@@ -1,4 +1,5 @@
 """Entry point for the packaged engine (python -m engine does not exist in a frozen build)."""
+
 import multiprocessing
 import sys
 from pathlib import Path
@@ -11,6 +12,5 @@ if str(ROOT) not in sys.path:
 from engine.__main__ import main
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()      # required: workers are re-launches of this exe
+    multiprocessing.freeze_support()  # required: workers are re-launches of this exe
     sys.exit(main())
-

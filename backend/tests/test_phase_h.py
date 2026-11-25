@@ -1,4 +1,5 @@
 """Phase H: workspace lock, API contract, diagnostics, bundled model, runner encoding."""
+
 from __future__ import annotations
 
 import json
@@ -15,18 +16,66 @@ from utils.model_downloader import install_bundled_model
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCUMENTED = [
-    "scan", "process", "run_all", "analyze_existing", "rebuild", "cancel", "pause", "resume",
-    "find", "count", "timeline", "search", "get_image", "get_faces", "get_groups",
-    "get_group_images", "get_duplicate_clusters", "get_bursts", "get_burst_images",
-    "failed_images", "live_video", "low_confidence_faces", "stats", "save_search",
-    "list_saved_searches", "run_saved_search", "delete_saved_search", "set_mark", "clear_mark",
-    "get_marks", "suspicious_dates", "set_date_override", "clear_date_override", "moves",
-    "check_files", "forget_missing", "thumbnail", "cache_info", "clear_cache", "maintenance",
-    "repair", "doctor", "export_diagnostics",
-    "watch", "tag_existing", "get_tags", "list_tags", "similar", "rescan",
+    "scan",
+    "process",
+    "run_all",
+    "analyze_existing",
+    "rebuild",
+    "cancel",
+    "pause",
+    "resume",
+    "find",
+    "count",
+    "timeline",
+    "search",
+    "get_image",
+    "get_faces",
+    "get_groups",
+    "get_group_images",
+    "get_duplicate_clusters",
+    "get_bursts",
+    "get_burst_images",
+    "failed_images",
+    "live_video",
+    "low_confidence_faces",
+    "stats",
+    "save_search",
+    "list_saved_searches",
+    "run_saved_search",
+    "delete_saved_search",
+    "set_mark",
+    "clear_mark",
+    "get_marks",
+    "suspicious_dates",
+    "set_date_override",
+    "clear_date_override",
+    "moves",
+    "check_files",
+    "forget_missing",
+    "thumbnail",
+    "cache_info",
+    "clear_cache",
+    "maintenance",
+    "repair",
+    "doctor",
+    "export_diagnostics",
+    "watch",
+    "tag_existing",
+    "get_tags",
+    "list_tags",
+    "similar",
+    "rescan",
     "recognize_existing",
-    "get_persons", "get_person", "rename_person", "get_person_faces", "get_unassigned_faces",
-    "assign_face", "create_person", "merge_persons", "confirm_person", "unlock_face",
+    "get_persons",
+    "get_person",
+    "rename_person",
+    "get_person_faces",
+    "get_unassigned_faces",
+    "assign_face",
+    "create_person",
+    "merge_persons",
+    "confirm_person",
+    "unlock_face",
 ]
 
 
@@ -35,7 +84,7 @@ def test_second_engine_on_same_workspace_is_refused(settings):
         with pytest.raises(EngineError) as err:
             Engine(settings.workspace, settings=settings).open()
         assert err.value.code == ErrorCode.WORKSPACE_LOCKED
-    with Engine(settings.workspace, settings=settings):       # released on close
+    with Engine(settings.workspace, settings=settings):  # released on close
         pass
 
 
@@ -73,10 +122,12 @@ def test_bundled_model_installed_once(settings, tmp_path, monkeypatch):
 
 def _run(*args):
     import os
+
     env = dict(os.environ)
     env["PYTHONPATH"] = f"{str(ROOT)}{os.pathsep}{env.get('PYTHONPATH', '')}"
-    return subprocess.run([sys.executable, "-m", "engine", *args], cwd=ROOT,
-                          env=env, capture_output=True, timeout=120)
+    return subprocess.run(
+        [sys.executable, "-m", "engine", *args], cwd=ROOT, env=env, capture_output=True, timeout=120
+    )
 
 
 def test_runner_version_and_utf8_output(tmp_path):
@@ -84,6 +135,6 @@ def test_runner_version_and_utf8_output(tmp_path):
     assert out["type"] == "version" and out["api_version"] == API_VERSION
     ws = tmp_path / "ছবি_фото"
     proc = _run("doctor", "--workspace", str(ws))
-    last = json.loads(proc.stdout.decode("utf-8").splitlines()[-1])    # must decode as UTF-8
+    last = json.loads(proc.stdout.decode("utf-8").splitlines()[-1])  # must decode as UTF-8
     assert proc.returncode == 0 and last["type"] == "doctor"
     assert any("ছবি_фото" in c["detail"] for c in last["checks"])

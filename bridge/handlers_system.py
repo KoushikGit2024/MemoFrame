@@ -1,4 +1,5 @@
 """RPC handlers for workspace stats, doctor, maintenance, config, prefs, and folder scanning."""
+
 from __future__ import annotations
 
 import os
@@ -9,7 +10,14 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from backend.config import SFACE_FILENAME, SFACE_SHA256, SFACE_URL, YUNET_FILENAME, YUNET_SHA256, YUNET_URL
+from backend.config import (
+    SFACE_FILENAME,
+    SFACE_SHA256,
+    SFACE_URL,
+    YUNET_FILENAME,
+    YUNET_SHA256,
+    YUNET_URL,
+)
 from backend.utils.file_utils import atomic_write_bytes, ensure_dir, sha256_file
 from bridge.progress import StageProgress, StepProgress, describe
 from bridge.protocol import BridgeError
@@ -24,12 +32,16 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
             "connected": ctx.engine is not None,
             "workspace": str(ctx.workspace),
             "backend_error": ctx.backend_error,
-            "config_warnings": list(getattr(ctx.engine, "config_warnings", []) or []) if ctx.engine else [],
+            "config_warnings": list(getattr(ctx.engine, "config_warnings", []) or [])
+            if ctx.engine
+            else [],
             "prefs": ctx.prefs.all(),
             "config": {
                 "tagging_enabled": bool(getattr(settings, "tagging_enabled", False)),
                 "store_embeddings": bool(getattr(settings, "store_embeddings", False)),
-                "log_path": str(getattr(settings, "log_path", ctx.workspace / "photo_organizer.log")),
+                "log_path": str(
+                    getattr(settings, "log_path", ctx.workspace / "photo_organizer.log")
+                ),
             },
         }
 
@@ -117,7 +129,8 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
 
         with ctx.lock:
             return dict(
-                eng.reset_workspace(clear_sources=clear_sources, clear_saved_searches=clear_saved) or {}
+                eng.reset_workspace(clear_sources=clear_sources, clear_saved_searches=clear_saved)
+                or {}
             )
 
     def scan_start(params: dict[str, Any]) -> dict[str, Any]:
@@ -134,13 +147,17 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
             raise BridgeError(
                 "MODELS_NOT_READY",
                 "AI face detection and recognition models are not downloaded or verified.",
-                "Please wait for model download to complete or trigger models.download first."
+                "Please wait for model download to complete or trigger models.download first.",
             )
 
         step_progress = StepProgress()
 
         def on_event(ev: Any) -> None:
-            ev_dict = ev.to_dict() if hasattr(ev, "to_dict") else (dict(ev) if isinstance(ev, dict) else {})
+            ev_dict = (
+                ev.to_dict()
+                if hasattr(ev, "to_dict")
+                else (dict(ev) if isinstance(ev, dict) else {})
+            )
             if not ev_dict:
                 ev_dict = {
                     "stage": getattr(ev, "stage", ""),
@@ -150,14 +167,17 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
                     "message": getattr(ev, "message", "") or "",
                 }
             pct = step_progress.update(ev_dict)
-            ctx.emit_event("scan.progress", {
-                "percent": pct,
-                "label": describe(ev_dict),
-                "stage": ev_dict.get("stage", ""),
-                "done": ev_dict.get("done", 0),
-                "total": ev_dict.get("total", 0),
-                "raw": ev_dict,
-            })
+            ctx.emit_event(
+                "scan.progress",
+                {
+                    "percent": pct,
+                    "label": describe(ev_dict),
+                    "stage": ev_dict.get("stage", ""),
+                    "done": ev_dict.get("done", 0),
+                    "total": ev_dict.get("total", 0),
+                    "raw": ev_dict,
+                },
+            )
 
         def worker() -> None:
             prev_cb = getattr(eng, "on_event", None)
@@ -255,38 +275,65 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
                 _download_active = True
                 try:
                     targets = [
-                        ("yunet", "Face Detection (YuNet)", YUNET_FILENAME, YUNET_URL, YUNET_SHA256, 232_589),
-                        ("sface", "Face Recognition (SFace)", SFACE_FILENAME, SFACE_URL, SFACE_SHA256, 38_696_353),
+                        (
+                            "yunet",
+                            "Face Detection (YuNet)",
+                            YUNET_FILENAME,
+                            YUNET_URL,
+                            YUNET_SHA256,
+                            232_589,
+                        ),
+                        (
+                            "sface",
+                            "Face Recognition (SFace)",
+                            SFACE_FILENAME,
+                            SFACE_URL,
+                            SFACE_SHA256,
+                            38_696_353,
+                        ),
                     ]
                     for key, display_name, filename, url, sha, est_total in targets:
                         dest = models_dir / filename
                         if _verify_model(dest, sha):
-                            ctx.emit_event("models.progress", {
-                                "model": key,
-                                "name": display_name,
-                                "downloaded": dest.stat().st_size,
-                                "total": dest.stat().st_size,
-                                "percent": 100,
-                                "stage": "ready",
-                            })
+                            ctx.emit_event(
+                                "models.progress",
+                                {
+                                    "model": key,
+                                    "name": display_name,
+                                    "downloaded": dest.stat().st_size,
+                                    "total": dest.stat().st_size,
+                                    "percent": 100,
+                                    "stage": "ready",
+                                },
+                            )
                             continue
 
-                        ctx.emit_event("models.progress", {
-                            "model": key,
-                            "name": display_name,
-                            "downloaded": 0,
-                            "total": est_total,
-                            "percent": 0,
-                            "stage": "downloading",
-                        })
+                        ctx.emit_event(
+                            "models.progress",
+                            {
+                                "model": key,
+                                "name": display_name,
+                                "downloaded": 0,
+                                "total": est_total,
+                                "percent": 0,
+                                "stage": "downloading",
+                            },
+                        )
 
                         req = urllib.request.Request(url, headers={"User-Agent": "memoframe/1.0"})
                         tmp_dest = dest.with_suffix(".tmp")
                         downloaded_bytes = 0
 
-                        with urllib.request.urlopen(req, timeout=60) as resp, open(tmp_dest, "wb") as f_out:
+                        with (
+                            urllib.request.urlopen(req, timeout=60) as resp,
+                            open(tmp_dest, "wb") as f_out,
+                        ):
                             content_len = resp.headers.get("Content-Length")
-                            total_bytes = int(content_len) if content_len and content_len.isdigit() else est_total
+                            total_bytes = (
+                                int(content_len)
+                                if content_len and content_len.isdigit()
+                                else est_total
+                            )
 
                             chunk_size = 128 * 1024  # 128 KB
                             while True:
@@ -295,15 +342,22 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
                                     break
                                 f_out.write(chunk)
                                 downloaded_bytes += len(chunk)
-                                pct = min(99, int((downloaded_bytes / total_bytes) * 100)) if total_bytes > 0 else 50
-                                ctx.emit_event("models.progress", {
-                                    "model": key,
-                                    "name": display_name,
-                                    "downloaded": downloaded_bytes,
-                                    "total": total_bytes,
-                                    "percent": pct,
-                                    "stage": "downloading",
-                                })
+                                pct = (
+                                    min(99, int((downloaded_bytes / total_bytes) * 100))
+                                    if total_bytes > 0
+                                    else 50
+                                )
+                                ctx.emit_event(
+                                    "models.progress",
+                                    {
+                                        "model": key,
+                                        "name": display_name,
+                                        "downloaded": downloaded_bytes,
+                                        "total": total_bytes,
+                                        "percent": pct,
+                                        "stage": "downloading",
+                                    },
+                                )
 
                         # Atomic move
                         if dest.exists():
@@ -314,16 +368,21 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
                         tmp_dest.replace(dest)
 
                         if not _verify_model(dest, sha):
-                            raise BridgeError("VERIFICATION_FAILED", f"Model verification failed for {filename}")
+                            raise BridgeError(
+                                "VERIFICATION_FAILED", f"Model verification failed for {filename}"
+                            )
 
-                        ctx.emit_event("models.progress", {
-                            "model": key,
-                            "name": display_name,
-                            "downloaded": downloaded_bytes,
-                            "total": downloaded_bytes,
-                            "percent": 100,
-                            "stage": "done",
-                        })
+                        ctx.emit_event(
+                            "models.progress",
+                            {
+                                "model": key,
+                                "name": display_name,
+                                "downloaded": downloaded_bytes,
+                                "total": downloaded_bytes,
+                                "percent": 100,
+                                "stage": "done",
+                            },
+                        )
 
                     ctx.emit_event("models.ready", {"ready": True})
                 except Exception as exc:
@@ -346,6 +405,7 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
 
         import subprocess
         import sys
+
         try:
             if sys.platform.startswith("win"):
                 os.startfile(str(p))  # type: ignore[attr-defined]
@@ -357,26 +417,28 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
-    registry.update({
-        "system.init": system_init,
-        "prefs.set": prefs_set,
-        "system.stats": system_stats,
-        "system.doctor": system_doctor,
-        "system.clear_cache": system_clear_cache,
-        "system.export_diagnostics": system_export_diagnostics,
-        "system.update_config": system_update_config,
-        "system.tag_existing": system_tag_existing,
-        "system.check_files": system_check_files,
-        "system.forget_missing": system_forget_missing,
-        "system.moves": system_moves,
-        "system.rebuild": system_rebuild,
-        "system.repair": system_repair,
-        "system.reset_workspace": system_reset_workspace,
-        "system.open_file": system_open_file,
-        "scan.start": scan_start,
-        "scan.pause": scan_pause,
-        "scan.resume": scan_resume,
-        "scan.cancel": scan_cancel,
-        "models.status": models_status,
-        "models.download": models_download,
-    })
+    registry.update(
+        {
+            "system.init": system_init,
+            "prefs.set": prefs_set,
+            "system.stats": system_stats,
+            "system.doctor": system_doctor,
+            "system.clear_cache": system_clear_cache,
+            "system.export_diagnostics": system_export_diagnostics,
+            "system.update_config": system_update_config,
+            "system.tag_existing": system_tag_existing,
+            "system.check_files": system_check_files,
+            "system.forget_missing": system_forget_missing,
+            "system.moves": system_moves,
+            "system.rebuild": system_rebuild,
+            "system.repair": system_repair,
+            "system.reset_workspace": system_reset_workspace,
+            "system.open_file": system_open_file,
+            "scan.start": scan_start,
+            "scan.pause": scan_pause,
+            "scan.resume": scan_resume,
+            "scan.cancel": scan_cancel,
+            "models.status": models_status,
+            "models.download": models_download,
+        }
+    )

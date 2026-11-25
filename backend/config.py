@@ -4,6 +4,7 @@ All tunable values live in the :class:`Settings` dataclass. The CLI builds a
 ``Settings`` instance and passes it around, so modules never read globals or
 environment variables directly.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -28,6 +29,7 @@ def default_extensions() -> frozenset[str]:
     if importlib.util.find_spec("rawpy"):
         exts |= RAW_EXTENSIONS
     return frozenset(exts)
+
 
 # YuNet face detector (detection only, no embeddings).
 # If YUNET_SHA256 is empty, the downloader skips hash verification.
@@ -69,45 +71,45 @@ class Settings:
     batch_size: int = 64
     workers: int = field(default_factory=_default_workers)
     hash_chunk_bytes: int = 1024 * 1024
-    cv_threads: int = 1                      # OpenCV threads per worker
-    cpu_limit: float = 1.0                   # 0.1-1.0 duty cycle per worker (1.0 = no throttle)
-    low_priority: bool = True                # run below normal OS priority
-    worker_recycle_tasks: int = 50           # restart a worker after N images (frees memory)
-    min_free_mem_mb: int = 1024              # memory guard floor (used from Phase A)
-    storage_type: str = "hdd"                # "hdd" caps workers at 2 (seek-bound); "ssd" does not
-    thumb_cache_max_mb: int = 0              # 0 = unlimited
+    cv_threads: int = 1  # OpenCV threads per worker
+    cpu_limit: float = 1.0  # 0.1-1.0 duty cycle per worker (1.0 = no throttle)
+    low_priority: bool = True  # run below normal OS priority
+    worker_recycle_tasks: int = 50  # restart a worker after N images (frees memory)
+    min_free_mem_mb: int = 1024  # memory guard floor (used from Phase A)
+    storage_type: str = "hdd"  # "hdd" caps workers at 2 (seek-bound); "ssd" does not
+    thumb_cache_max_mb: int = 0  # 0 = unlimited
 
     # --- Face detection --------------------------------------------------
-    detector_backend: str = "yunet"          # "yunet" | "insightface"
-    face_recognition: bool = True            # extract 128-d embeddings with SFace
+    detector_backend: str = "yunet"  # "yunet" | "insightface"
+    face_recognition: bool = True  # extract 128-d embeddings with SFace
     confidence_threshold: float = 0.7
     nms_threshold: float = 0.3
-    max_detect_side: int = 1280              # downscale long side before detection
-    min_face_px: int = 20                    # ignore boxes smaller than this (full-res px)
+    max_detect_side: int = 1280  # downscale long side before detection
+    min_face_px: int = 20  # ignore boxes smaller than this (full-res px)
     use_gpu: bool = False
 
     # --- Outputs ---------------------------------------------------------
     thumbnail_size: int = 256
     face_thumb_size: int = 160
-    face_crop_margin: float = 0.25           # fraction of box size added around crops
+    face_crop_margin: float = 0.25  # fraction of box size added around crops
     jpeg_quality: int = 90
     save_annotated: bool = True
     save_face_crops: bool = True
 
     # --- Duplicates ------------------------------------------------------
-    phash_near_threshold: int = 6            # max Hamming distance of 64-bit pHash
+    phash_near_threshold: int = 6  # max Hamming distance of 64-bit pHash
 
     # --- Grouping --------------------------------------------------------
     event_gap_hours: float = 3.0
     gps_split_km: float = 5.0
-    visual_cluster_distance: float = 0.35    # agglomerative distance (undated images)
+    visual_cluster_distance: float = 0.35  # agglomerative distance (undated images)
     min_group_size: int = 1
 
     # --- Phase D ---------------------------------------------------------
-    tiled_detection: bool = False            # extra small-face pass on large photos (slow)
+    tiled_detection: bool = False  # extra small-face pass on large photos (slow)
     tile_size: int = 960
-    tile_source_side: int = 3200             # long side the tiles are cut from
-    dhash_confirm_threshold: int = 12        # dHash veto for near duplicates; 64 disables
+    tile_source_side: int = 3200  # long side the tiles are cut from
+    dhash_confirm_threshold: int = 12  # dHash veto for near duplicates; 64 disables
     burst_gap_seconds: float = 2.0
     burst_hash_threshold: int = 14
     min_burst_size: int = 3
@@ -115,19 +117,19 @@ class Settings:
     refine_merge_gap_hours: float = 6.0
     refine_max_event_hours: float = 36.0
     place_max_km: float = 50.0
-    group_screenshots: bool = False          # include screenshots/documents in events
+    group_screenshots: bool = False  # include screenshots/documents in events
 
     # --- Phase F (scene tags; off by default) ----------------------------
     tagging_enabled: bool = False
     tags_top_k: int = 5
     tags_min_score: float = 0.15
-    store_embeddings: bool = False           # needed for "find similar"
+    store_embeddings: bool = False  # needed for "find similar"
     tag_model_file: str = "scene_model.onnx"
     tag_labels_file: str = "scene_labels.txt"
 
     # --- Phase G (watch mode) ---------------------------------------------
-    watch_interval_s: float = 30.0           # seconds between polls
-    watch_settle_s: float = 10.0             # a file must be at least this old and unchanged
+    watch_interval_s: float = 30.0  # seconds between polls
+    watch_settle_s: float = 10.0  # a file must be at least this old and unchanged
     watch_pause_on_battery: bool = True
 
     # --- Derived paths ---------------------------------------------------

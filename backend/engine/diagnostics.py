@@ -1,4 +1,5 @@
 """Diagnostics bundle: versions, checks, stats, settings and the log tail (no photos)."""
+
 from __future__ import annotations
 
 import json
@@ -32,14 +33,23 @@ def build_bundle(settings: Settings, doctor: dict, stats: dict, include_log: boo
     folder = settings.workspace / "diagnostics"
     folder.mkdir(parents=True, exist_ok=True)
     dest = folder / f"diagnostics-{datetime.now():%Y%m%d_%H%M%S}.zip"
-    info = {"api_version": API_VERSION, "python": sys.version, "platform": platform.platform(),
-            "frozen": bool(getattr(sys, "frozen", False)), "created": datetime.now().isoformat()}
+    info = {
+        "api_version": API_VERSION,
+        "python": sys.version,
+        "platform": platform.platform(),
+        "frozen": bool(getattr(sys, "frozen", False)),
+        "created": datetime.now().isoformat(),
+    }
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("info.json", json.dumps(info, indent=2))
         z.writestr("doctor.json", json.dumps(doctor, indent=2, ensure_ascii=False))
         z.writestr("stats.json", json.dumps(stats, indent=2))
-        z.writestr("settings.json", json.dumps(
-            {k: _jsonable(v) for k, v in asdict(settings).items()}, indent=2, ensure_ascii=False))
+        z.writestr(
+            "settings.json",
+            json.dumps(
+                {k: _jsonable(v) for k, v in asdict(settings).items()}, indent=2, ensure_ascii=False
+            ),
+        )
         config = settings.workspace / "config.toml"
         if config.is_file():
             z.write(config, "config.toml")

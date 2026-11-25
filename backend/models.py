@@ -4,6 +4,7 @@ These are picklable dataclasses, so worker processes can return them to the
 parent process. Faces carry geometry, confidence, and 128-d embeddings for
 offline person clustering.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -14,7 +15,7 @@ from typing import Any
 TS_EXIF_ORIGINAL = "exif_original"
 TS_EXIF_DATETIME = "exif_datetime"
 TS_FILE_MTIME = "file_mtime"
-TS_CONTAINER = "container_date"      # date read from a video file's header
+TS_CONTAINER = "container_date"  # date read from a video file's header
 TS_NONE = "none"
 
 
@@ -27,11 +28,11 @@ class FaceBox:
     w: int
     h: int
     confidence: float
-    label: str | None = None        # "Face 001"; assigned later, local to one image
+    label: str | None = None  # "Face 001"; assigned later, local to one image
     crop_path: str | None = None
     embedding: bytes | None = None  # 128-d float32 L2-normalized vector (512 bytes)
     person_id: int | None = None
-    landmarks: tuple[float, ...] | None = None   # 5 (x, y) points, full-res px; never stored
+    landmarks: tuple[float, ...] | None = None  # 5 (x, y) points, full-res px; never stored
 
     @property
     def area(self) -> int:
@@ -40,9 +41,13 @@ class FaceBox:
     def to_dict(self) -> dict[str, Any]:
         """Mapping accepted by ``DatabaseManager.save_results``."""
         return {
-            "x": self.x, "y": self.y, "w": self.w, "h": self.h,
+            "x": self.x,
+            "y": self.y,
+            "w": self.w,
+            "h": self.h,
             "confidence": self.confidence,
-            "label": self.label, "crop_path": self.crop_path,
+            "label": self.label,
+            "crop_path": self.crop_path,
             "embedding": self.embedding,
             "person_id": self.person_id,
         }
@@ -54,7 +59,7 @@ class ImageMeta:
 
     width: int
     height: int
-    exif_ts: str | None = None       # 'YYYY-MM-DDTHH:MM:SS' (naive local time)
+    exif_ts: str | None = None  # 'YYYY-MM-DDTHH:MM:SS' (naive local time)
     ts_source: str = TS_NONE
     gps_lat: float | None = None
     gps_lon: float | None = None
@@ -68,11 +73,11 @@ class ImageRecord:
     path: Path
     meta: ImageMeta
     sha256: str | None = None
-    phash: str | None = None                  # 16 hex chars
-    features: bytes | None = None             # colour-histogram bytes
+    phash: str | None = None  # 16 hex chars
+    features: bytes | None = None  # colour-histogram bytes
     thumb_path: str | None = None
     faces: list[FaceBox] = field(default_factory=list)
-    fmt: str | None = None                    # decoder format name, e.g. "JPEG", "HEIF"
+    fmt: str | None = None  # decoder format name, e.g. "JPEG", "HEIF"
 
     def to_result(self) -> dict[str, Any]:
         """Mapping accepted by ``DatabaseManager.save_results``."""

@@ -1,4 +1,5 @@
 """Database mixin for advanced search, timeline, and saved searches."""
+
 from __future__ import annotations
 
 import json
@@ -6,18 +7,40 @@ import re
 import sqlite3
 from typing import Any, Mapping
 
+
 def fts_query(text: str) -> str:
     """Safe FTS5 query: every word becomes a quoted prefix term, all must match."""
     return " ".join(f'"{t}"*' for t in re.findall(r"[^\W_]+", text))
 
-FIND_FILTERS = frozenset({
-    "text", "min_faces", "max_faces", "taken_from", "taken_until", "group_id",
-    "path_contains", "place_contains", "content_type", "kind", "format", "min_quality",
-    "burst_id", "in_burst", "duplicate", "mark", "no_mark",
-    "include_missing", "include_live_video", "include_hidden", "tag", "person_id",
-})
+
+FIND_FILTERS = frozenset(
+    {
+        "text",
+        "min_faces",
+        "max_faces",
+        "taken_from",
+        "taken_until",
+        "group_id",
+        "path_contains",
+        "place_contains",
+        "content_type",
+        "kind",
+        "format",
+        "min_quality",
+        "burst_id",
+        "in_burst",
+        "duplicate",
+        "mark",
+        "no_mark",
+        "include_missing",
+        "include_live_video",
+        "include_hidden",
+        "tag",
+        "person_id",
+    }
+)
 MARK_KINDS = ("keep", "reviewed", "favourite", "hidden")
-_EFF = "COALESCE(o.exif_ts, i.exif_ts)"          # date overrides apply
+_EFF = "COALESCE(o.exif_ts, i.exif_ts)"  # date overrides apply
 _SORTS = {
     "date": f"{_EFF} IS NULL, {_EFF}, i.id",
     "date_desc": f"{_EFF} IS NULL, {_EFF} DESC, i.id DESC",
@@ -88,14 +111,19 @@ class SearchDbMixin:
         if f.get("format") is not None:
             add("i.format = ? COLLATE NOCASE", f["format"])
         if f.get("tag"):
-            add("EXISTS (SELECT 1 FROM tags t WHERE t.image_id = i.id AND t.label = ? COLLATE NOCASE)",
-                f["tag"])
+            add(
+                "EXISTS (SELECT 1 FROM tags t WHERE t.image_id = i.id AND t.label = ? COLLATE NOCASE)",
+                f["tag"],
+            )
         if f.get("min_quality") is not None:
             add("i.quality >= ?", f["min_quality"])
         if f.get("burst_id") is not None:
             add("i.burst_id = ?", f["burst_id"])
         if f.get("person_id") is not None:
-            add("EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id AND fc.person_id = ?)", f["person_id"])
+            add(
+                "EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id AND fc.person_id = ?)",
+                f["person_id"],
+            )
         if f.get("in_burst") is not None:
             add("i.burst_id IS NOT NULL" if f["in_burst"] else "i.burst_id IS NULL")
         dup = f.get("duplicate")
@@ -108,19 +136,24 @@ class SearchDbMixin:
         if f.get("mark"):
             add("EXISTS (SELECT 1 FROM marks m WHERE m.image_id = i.id AND m.kind = ?)", f["mark"])
         if f.get("no_mark"):
-            add("NOT EXISTS (SELECT 1 FROM marks m WHERE m.image_id = i.id AND m.kind = ?)",
-                f["no_mark"])
+            add(
+                "NOT EXISTS (SELECT 1 FROM marks m WHERE m.image_id = i.id AND m.kind = ?)",
+                f["no_mark"],
+            )
         return " WHERE " + " AND ".join(c), p
 
-    def find_images(self, *, sort: str = "date", limit: int = 100, offset: int = 0,
-                    **filters: Any) -> list[sqlite3.Row]:
+    def find_images(
+        self, *, sort: str = "date", limit: int = 100, offset: int = 0, **filters: Any
+    ) -> list[sqlite3.Row]:
         """Search with any combination of FIND_FILTERS."""
         if sort not in _SORTS:
             raise ValueError(f"sort must be one of: {', '.join(_SORTS)}")
         where, params = self._find_where(filters)
         return self._query(
             f"SELECT i.*, {_EFF} AS effective_ts{self._FROM}{where} "
-            f"ORDER BY {_SORTS[sort]} LIMIT ? OFFSET ?", (*params, int(limit), int(offset)))
+            f"ORDER BY {_SORTS[sort]} LIMIT ? OFFSET ?",
+            (*params, int(limit), int(offset)),
+        )
 
     def count_images(self, **filters: Any) -> int:
         where, params = self._find_where(filters)
@@ -135,7 +168,8 @@ class SearchDbMixin:
             f"SELECT substr({_EFF}, 1, {widths[granularity]}) AS period, COUNT(*) AS n"
             f"{self._FROM} WHERE i.status = 'done' AND i.state != 'missing' AND i.pair_id IS NULL "
             "AND NOT EXISTS (SELECT 1 FROM marks h WHERE h.image_id = i.id AND h.kind = 'hidden') "
-            "GROUP BY period ORDER BY period IS NULL, period")
+            "GROUP BY period ORDER BY period IS NULL, period"
+        )
         return [{"period": r["period"], "count": int(r["n"])} for r in rows]
 
     def save_search(self, name: str, filters: Mapping[str, Any]) -> None:
@@ -152,11 +186,14 @@ class SearchDbMixin:
             conn.execute(
                 "INSERT INTO saved_searches (name, filters) VALUES (?, ?) "
                 "ON CONFLICT(name) DO UPDATE SET filters = excluded.filters",
-                (name, json.dumps(dict(filters), sort_keys=True)))
+                (name, json.dumps(dict(filters), sort_keys=True)),
+            )
 
     def list_saved_searches(self) -> list[dict[str, Any]]:
-        return [{"name": r["name"], "filters": json.loads(r["filters"])}
-                for r in self._query("SELECT name, filters FROM saved_searches ORDER BY name")]
+        return [
+            {"name": r["name"], "filters": json.loads(r["filters"])}
+            for r in self._query("SELECT name, filters FROM saved_searches ORDER BY name")
+        ]
 
     def get_saved_search(self, name: str) -> dict[str, Any] | None:
         rows = self._query("SELECT filters FROM saved_searches WHERE name = ?", (name,))

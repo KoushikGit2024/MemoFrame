@@ -5,6 +5,7 @@ plus HEIC/HEIF (pillow-heif) and RAW (rawpy) when those libraries are installed.
 Errors start with a stable code: FILE_MISSING, FILE_UNREADABLE, CORRUPT_IMAGE,
 UNSUPPORTED_FORMAT.
 """
+
 from __future__ import annotations
 
 import io
@@ -20,19 +21,20 @@ from PIL import Image, ImageOps
 from config import RAW_EXTENSIONS
 
 _ORIENTATION_TAG = 0x0112
-_SWAPS_AXES = frozenset({5, 6, 7, 8})   # EXIF orientations that rotate by 90 degrees
+_SWAPS_AXES = frozenset({5, 6, 7, 8})  # EXIF orientations that rotate by 90 degrees
 
 
 def _register_heif() -> bool:
     try:
         import pillow_heif
+
         pillow_heif.register_heif_opener()
         return True
     except Exception:  # noqa: BLE001 - optional dependency
         return False
 
 
-HEIC_AVAILABLE = _register_heif()       # runs in every worker process on import
+HEIC_AVAILABLE = _register_heif()  # runs in every worker process on import
 
 
 class ImageLoadError(Exception):
@@ -86,8 +88,9 @@ def _decode(source: Path | BinaryIO, name: str, max_side: int | None) -> LoadedI
         if max_side and max(work.size) > max_side:
             work.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
 
-        return LoadedImage(pil=work, width=full_w, height=full_h,
-                           scale=full_w / work.width, exif=exif, format=fmt)
+        return LoadedImage(
+            pil=work, width=full_w, height=full_h, scale=full_w / work.width, exif=exif, format=fmt
+        )
     except ImageLoadError:
         raise
     except FileNotFoundError as exc:
@@ -101,14 +104,16 @@ def _from_pil(pil: Image.Image, max_side: int | None, fmt: str) -> LoadedImage:
     width, height = pil.size
     if max_side and max(width, height) > max_side:
         pil.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
-    return LoadedImage(pil=pil, width=width, height=height, scale=width / pil.width,
-                       exif=Image.Exif(), format=fmt)
+    return LoadedImage(
+        pil=pil, width=width, height=height, scale=width / pil.width, exif=Image.Exif(), format=fmt
+    )
 
 
 def _decode_raw(data: bytes, name: str, max_side: int | None) -> LoadedImage:
     """RAW: use the camera's embedded preview (fast); fall back to a half-size develop."""
     try:
         import importlib
+
         rawpy = importlib.import_module("rawpy")
     except ImportError as exc:
         raise ImageLoadError(f"UNSUPPORTED_FORMAT: {name}: install rawpy for RAW files") from exc
@@ -126,7 +131,8 @@ def _decode_raw(data: bytes, name: str, max_side: int | None) -> LoadedImage:
                 pil = Image.fromarray(thumb.data)
             else:
                 pil = Image.fromarray(
-                    raw.postprocess(half_size=True, use_camera_wb=True, output_bps=8))
+                    raw.postprocess(half_size=True, use_camera_wb=True, output_bps=8)
+                )
         return _from_pil(pil, max_side, "RAW")
     except ImageLoadError:
         raise

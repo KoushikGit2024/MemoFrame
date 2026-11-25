@@ -1,4 +1,5 @@
 """Pipeline post-processing and update steps: duplicates, places, bursts, groups, persons, and search index."""
+
 from __future__ import annotations
 
 import logging
@@ -30,12 +31,15 @@ log = logging.getLogger("photo_organizer.orchestrator")
 def update_duplicates(settings: Settings, db: DatabaseManager, force: bool = False) -> int:
     """Recompute duplicate clusters (pHash candidates confirmed by dHash)."""
     from services.pipeline import orchestrator as pipeline
+
     sig = f"{db.revision()}|{settings.phash_near_threshold}|{settings.dhash_confirm_threshold}"
     cached = db.get_meta("dup_state")
     if cached and not force and cached.split("#")[0] == sig:
         return int(cached.split("#")[1])
     records = [(r["id"], r["sha256"], r["phash"], r["dhash"]) for r in db.fetch_hash_records()]
-    rows = pipeline.find_duplicates(records, settings.phash_near_threshold, settings.dhash_confirm_threshold)
+    rows = pipeline.find_duplicates(
+        records, settings.phash_near_threshold, settings.dhash_confirm_threshold
+    )
     db.replace_duplicates(rows)
     count = len({cluster_id for _, cluster_id, _ in rows})
     db.set_meta("dup_state", f"{sig}#{count}")
@@ -68,14 +72,19 @@ def update_places(settings: Settings, db: DatabaseManager, force: bool = False) 
 
 def update_bursts(settings: Settings, db: DatabaseManager, force: bool = False) -> int:
     """Detect bursts and suggest the best frame. Skipped if nothing changed."""
-    sig = (f"{db.revision()}|{settings.burst_gap_seconds}|{settings.burst_hash_threshold}|"
-           f"{settings.min_burst_size}")
+    sig = (
+        f"{db.revision()}|{settings.burst_gap_seconds}|{settings.burst_hash_threshold}|"
+        f"{settings.min_burst_size}"
+    )
     cached = db.get_meta("burst_state")
     if cached and not force and cached.split("#")[0] == sig:
         return int(cached.split("#")[1])
-    bursts = detect_bursts(db.fetch_burst_rows(), gap_seconds=settings.burst_gap_seconds,
-                           hash_threshold=settings.burst_hash_threshold,
-                           min_size=settings.min_burst_size)
+    bursts = detect_bursts(
+        db.fetch_burst_rows(),
+        gap_seconds=settings.burst_gap_seconds,
+        hash_threshold=settings.burst_hash_threshold,
+        min_size=settings.min_burst_size,
+    )
     count = db.replace_bursts(bursts)
     db.set_meta("burst_state", f"{sig}#{count}")
     return count
@@ -84,22 +93,35 @@ def update_bursts(settings: Settings, db: DatabaseManager, force: bool = False) 
 def update_groups(settings: Settings, db: DatabaseManager, force: bool = False) -> int:
     """Recompute groups: events (refined, place-named) and visual clusters."""
     link_live_pairs(db)
-    sig = (f"{db.revision()}|{settings.event_gap_hours}|{settings.gps_split_km}|"
-           f"{settings.visual_cluster_distance}|{settings.min_group_size}|"
-           f"{settings.refine_min_event_size}|{settings.refine_merge_gap_hours}|"
-           f"{settings.refine_max_event_hours}|{settings.group_screenshots}")
+    sig = (
+        f"{db.revision()}|{settings.event_gap_hours}|{settings.gps_split_km}|"
+        f"{settings.visual_cluster_distance}|{settings.min_group_size}|"
+        f"{settings.refine_min_event_size}|{settings.refine_merge_gap_hours}|"
+        f"{settings.refine_max_event_hours}|{settings.group_screenshots}"
+    )
     cached = db.get_meta("group_state")
     if cached and not force and cached.split("#")[0] == sig:
         return int(cached.split("#")[1])
     rows = db.fetch_grouping_rows(include_junk=settings.group_screenshots)
     groups = group_images(
-        rows, event_gap_hours=settings.event_gap_hours, gps_split_km=settings.gps_split_km,
-        visual_distance=settings.visual_cluster_distance, min_group_size=1)
-    times = {int(r["id"]): datetime.strptime(r["exif_ts"], "%Y-%m-%dT%H:%M:%S")
-             for r in rows if r["exif_ts"]}
-    groups = refine_events(groups, times, min_size=settings.refine_min_event_size,
-                           merge_gap_hours=settings.refine_merge_gap_hours,
-                           max_hours=settings.refine_max_event_hours)
+        rows,
+        event_gap_hours=settings.event_gap_hours,
+        gps_split_km=settings.gps_split_km,
+        visual_distance=settings.visual_cluster_distance,
+        min_group_size=1,
+    )
+    times = {
+        int(r["id"]): datetime.strptime(r["exif_ts"], "%Y-%m-%dT%H:%M:%S")
+        for r in rows
+        if r["exif_ts"]
+    }
+    groups = refine_events(
+        groups,
+        times,
+        min_size=settings.refine_min_event_size,
+        merge_gap_hours=settings.refine_merge_gap_hours,
+        max_hours=settings.refine_max_event_hours,
+    )
     name_groups(groups, {int(r["id"]): r["place"] for r in rows})
     groups = [g for g in groups if len(g["image_ids"]) >= settings.min_group_size]
     count = db.replace_groups(groups)
@@ -120,8 +142,10 @@ def update_persons(settings: Settings, db: DatabaseManager, force: bool = False)
     """Rebuild people. Confirmed (locked) faces are fixed points; everything else is re-derived."""
     rows = db.fetch_faces_with_embeddings()
     locked = [r for r in rows if r["locked"]]
-    sig = (f"{len(rows)}|{sum(int(r['id']) for r in rows)}|{len(locked)}|"
-           f"{sum(int(r['id']) for r in locked)}|{DEFAULT_COSINE_DISTANCE_EPS}")
+    sig = (
+        f"{len(rows)}|{sum(int(r['id']) for r in rows)}|{len(locked)}|"
+        f"{sum(int(r['id']) for r in locked)}|{DEFAULT_COSINE_DISTANCE_EPS}"
+    )
     if not force and db.get_meta("person_state") == sig:
         return len(db.list_persons())
 

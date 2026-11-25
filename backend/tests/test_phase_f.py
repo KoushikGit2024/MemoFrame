@@ -1,4 +1,5 @@
 """Phase F tests: scene tagging, similarity, schema guards, CLI tag."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -128,12 +129,18 @@ def test_backfill_then_nothing_left_and_unreadable_skipped(tmp_path: Path, monke
     Image.new("RGB", (50, 50), color="blue").save(p2)
 
     with DatabaseManager(s.db_path) as db:
-        db.register_files([(p1, p1.stat().st_size, int(p1.stat().st_mtime_ns)),
-                           (p2, p2.stat().st_size, int(p2.stat().st_mtime_ns))])
-        db.save_results([
-            {"image_id": 1, "sha256": "fake1", "status": "done"},
-            {"image_id": 2, "sha256": "fake2", "status": "done"},
-        ])
+        db.register_files(
+            [
+                (p1, p1.stat().st_size, int(p1.stat().st_mtime_ns)),
+                (p2, p2.stat().st_size, int(p2.stat().st_mtime_ns)),
+            ]
+        )
+        db.save_results(
+            [
+                {"image_id": 1, "sha256": "fake1", "status": "done"},
+                {"image_id": 2, "sha256": "fake2", "status": "done"},
+            ]
+        )
 
         assert db.count_untagged("sig123") == 2
 
@@ -141,7 +148,9 @@ def test_backfill_then_nothing_left_and_unreadable_skipped(tmp_path: Path, monke
     # Softmax([1.0, 5.0]): exp(1)=2.718, exp(5)=148.41 -> cat ~ 0.018, dog ~ 0.982
     # With min_score=0.01, both survive!
     logits = np.array([[1.0, 5.0]], dtype=np.float32)
-    mock_tagger = SceneTagger(lambda b: logits, labels=["cat", "dog"], signature="sig123", min_score=0.01)
+    mock_tagger = SceneTagger(
+        lambda b: logits, labels=["cat", "dog"], signature="sig123", min_score=0.01
+    )
 
     monkeypatch.setattr("services.intelligence.tagging.create_tagger", lambda s: mock_tagger)
     real_open = Image.open
@@ -181,11 +190,18 @@ def test_changed_file_resets_tags_and_embeddings(tmp_path: Path):
     with DatabaseManager(s.db_path) as db:
         db.register_files([(p, 5, 1000)])
         db.save_results([{"image_id": 1, "sha256": "hash1", "status": "done"}])
-        db.save_tags([(1, {
-            "tags": [("dog", 0.9)],
-            "tag_model": "m1",
-            "embedding": np.array([1.0, 0.0], dtype=np.float16).tobytes(),
-        })])
+        db.save_tags(
+            [
+                (
+                    1,
+                    {
+                        "tags": [("dog", 0.9)],
+                        "tag_model": "m1",
+                        "embedding": np.array([1.0, 0.0], dtype=np.float16).tobytes(),
+                    },
+                )
+            ]
+        )
 
         assert len(db.get_tags(1)) == 1
         assert db.get_embedding(1) is not None
@@ -216,11 +232,18 @@ def test_similar_cosine_search(tmp_path: Path):
             path.write_bytes(b"x")
             db.register_files([(path, 1, 1)])
             db.save_results([{"image_id": i, "sha256": f"h{i}", "status": "done"}])
-            db.save_tags([(i, {
-                "tags": [],
-                "tag_model": "m1",
-                "embedding": v.astype(np.float16).tobytes(),
-            })])
+            db.save_tags(
+                [
+                    (
+                        i,
+                        {
+                            "tags": [],
+                            "tag_model": "m1",
+                            "embedding": v.astype(np.float16).tobytes(),
+                        },
+                    )
+                ]
+            )
 
         # Search similar to image 1
         results = find_similar(db, image_id=1, limit=5)
@@ -233,6 +256,7 @@ def test_similar_cosine_search(tmp_path: Path):
 
 def test_v6_to_v7_migration(tmp_path: Path):
     from database.migrations import migrate, LATEST_VERSION, MIGRATIONS
+
     db_file = tmp_path / "test_mig.db"
     conn = sqlite3.connect(str(db_file))
     try:
@@ -287,4 +311,3 @@ def test_tagger_with_tag_map_groups_scores():
     assert "dog" in tag_dict
     assert "cat" in tag_dict
     assert tag_dict["dog"] > tag_dict["cat"]
-

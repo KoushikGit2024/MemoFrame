@@ -1,4 +1,5 @@
 """Tests for stability and architecture audit fixes."""
+
 from pathlib import Path
 import pytest
 from engine.api import Engine
@@ -13,7 +14,7 @@ def test_api_version_is_1_2_0() -> None:
 def test_tolerant_config_mode(tmp_path: Path) -> None:
     cfg = tmp_path / "config.toml"
     cfg.write_text("bogus_unknown_key = 12345\n", encoding="utf-8")
-    
+
     # Strict mode should raise EngineError
     with pytest.raises(Exception):
         Engine(tmp_path, strict_config=True)
@@ -40,12 +41,25 @@ def test_faces_for_images_and_name_face(tmp_path: Path) -> None:
     with Engine(tmp_path) as eng:
         eng.db.register_files([(str(tmp_path / "photo.jpg"), 100, 1000)])
         img_id = 1
-        eng.db.save_results([{
-            "image_id": img_id,
-            "width": 800,
-            "height": 600,
-            "faces": [{"x": 10, "y": 10, "w": 50, "h": 50, "confidence": 0.95, "embedding": b"\x00" * 512}],
-        }])
+        eng.db.save_results(
+            [
+                {
+                    "image_id": img_id,
+                    "width": 800,
+                    "height": 600,
+                    "faces": [
+                        {
+                            "x": 10,
+                            "y": 10,
+                            "w": 50,
+                            "h": 50,
+                            "confidence": 0.95,
+                            "embedding": b"\x00" * 512,
+                        }
+                    ],
+                }
+            ]
+        )
 
         # Batch faces lookup
         faces_map = eng.get_faces_many([img_id])
@@ -67,12 +81,16 @@ def test_faces_for_images_and_name_face(tmp_path: Path) -> None:
 def test_reset_workspace(tmp_path: Path) -> None:
     with Engine(tmp_path) as eng:
         eng.db.register_files([(str(tmp_path / "pic.jpg"), 10, 1)])
-        eng.db.save_results([{
-            "image_id": 1,
-            "width": 100,
-            "height": 100,
-            "faces": [],
-        }])
+        eng.db.save_results(
+            [
+                {
+                    "image_id": 1,
+                    "width": 100,
+                    "height": 100,
+                    "faces": [],
+                }
+            ]
+        )
         assert eng.db.report_stats()["total_images"] == 1
 
         # Create a mock cache file
@@ -84,4 +102,3 @@ def test_reset_workspace(tmp_path: Path) -> None:
         assert res["cleared_images"] == 1
         assert eng.db.report_stats()["total_images"] == 0
         assert not cache_file.exists()
-

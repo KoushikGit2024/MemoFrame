@@ -1,4 +1,5 @@
 """Phase D: quality, dHash, content type, dates, bursts, refinement, places, tiling, migration."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -9,7 +10,12 @@ import numpy as np
 import pytest
 from PIL import Image, ImageFilter
 
-from services.intelligence.analysis import classify_content, compute_dhash, date_flag, quality_metrics
+from services.intelligence.analysis import (
+    classify_content,
+    compute_dhash,
+    date_flag,
+    quality_metrics,
+)
 from services.organization.duplicates import choose_keeper, find_duplicates
 from services.face.detector import FaceDetector, merge_faces
 from services.intelligence.geo import PlaceIndex, load_place_index
@@ -22,7 +28,12 @@ from services.pipeline import orchestrator as pipeline
 from services.organization.bursts import detect_bursts
 from services.pipeline.enrich import enrich_existing
 from services.organization.grouper import group_images, name_groups, refine_events
-from services.pipeline.orchestrator import process_pending, scan_directory, update_bursts, update_places
+from services.pipeline.orchestrator import (
+    process_pending,
+    scan_directory,
+    update_bursts,
+    update_places,
+)
 
 
 def checker(size=(800, 600), cell=20) -> Image.Image:
@@ -33,8 +44,10 @@ def checker(size=(800, 600), cell=20) -> Image.Image:
 # ---- quality / hashes --------------------------------------------------------------
 def test_sharp_beats_blurred_and_black():
     sharp = checker()
-    assert quality_metrics(sharp, 480000)["quality"] > quality_metrics(
-        sharp.filter(ImageFilter.GaussianBlur(10)), 480000)["quality"]
+    assert (
+        quality_metrics(sharp, 480000)["quality"]
+        > quality_metrics(sharp.filter(ImageFilter.GaussianBlur(10)), 480000)["quality"]
+    )
     assert quality_metrics(Image.new("RGB", (800, 600), "black"), 480000)["quality"] < 30
 
 
@@ -60,7 +73,7 @@ def test_content_types(tmp_path, make_image):
     photo = make_image(tmp_path / "noise.jpg", 3, (800, 600))
     assert classify_content(_loaded(tmp_path / "ui.png"), "ui.png") == "screenshot"
     assert classify_content(_loaded(tmp_path / "scan.png"), "scan.png") == "document"
-    assert classify_content(_loaded(tmp_path / "cam.jpg"), "cam.jpg") == "photo"      # camera EXIF wins
+    assert classify_content(_loaded(tmp_path / "cam.jpg"), "cam.jpg") == "photo"  # camera EXIF wins
     assert classify_content(_loaded(photo), "noise.jpg") == "photo"
     assert classify_content(_loaded(photo), "Screenshot_2024.jpg") == "screenshot"
 
@@ -81,12 +94,14 @@ def test_dhash_vetoes_flat_phash_match():
     assert find_duplicates(rows, 6, 12) == []
     assert find_duplicates(rows, 6, 64) != []
     assert find_duplicates(rows) != []
-    assert find_duplicates([(1, "a", same), (2, "b", same)], 6, 12) != []     # no dHash: no veto
+    assert find_duplicates([(1, "a", same), (2, "b", same)], 6, 12) != []  # no dHash: no veto
 
 
 def test_keeper_prefers_quality():
-    members = [{"id": 1, "width": 4000, "height": 3000, "size": 9, "quality": 40.0},
-               {"id": 2, "width": 2000, "height": 1500, "size": 5, "quality": 80.0}]
+    members = [
+        {"id": 1, "width": 4000, "height": 3000, "size": 9, "quality": 40.0},
+        {"id": 2, "width": 2000, "height": 1500, "size": 5, "quality": 80.0},
+    ]
     assert choose_keeper(members) == 2
 
 
@@ -96,18 +111,32 @@ def _b(i, ts, ph="0123456789abcdef", q=None):
 
 
 def test_burst_detection_and_best_frame():
-    rows = [_b(1, "2024-06-01T10:00:00", q=50), _b(2, "2024-06-01T10:00:01", q=90),
-            _b(3, "2024-06-01T10:00:01", q=70), _b(4, "2024-06-01T10:05:00"),
-            _b(5, "2024-06-01T10:05:01", ph="ffffffffffffffff"), _b(6, "2024-06-01T10:05:02")]
+    rows = [
+        _b(1, "2024-06-01T10:00:00", q=50),
+        _b(2, "2024-06-01T10:00:01", q=90),
+        _b(3, "2024-06-01T10:00:01", q=70),
+        _b(4, "2024-06-01T10:05:00"),
+        _b(5, "2024-06-01T10:05:01", ph="ffffffffffffffff"),
+        _b(6, "2024-06-01T10:05:02"),
+    ]
     bursts = detect_bursts(rows, gap_seconds=2, hash_threshold=14, min_size=3)
     assert bursts == [{"image_ids": [1, 2, 3], "best_id": 2}]
 
 
 def test_bursts_in_database_and_stage_skips_when_unchanged(db, settings):
     db.register_files([(f"{i}.jpg", 1, i) for i in range(1, 5)])
-    db.save_results([{"image_id": i, "phash": "0123456789abcdef", "quality": 10.0 * i,
-                      "exif_ts": f"2024-06-01T10:00:0{i}", "ts_source": "exif_original"}
-                     for i in range(1, 5)])
+    db.save_results(
+        [
+            {
+                "image_id": i,
+                "phash": "0123456789abcdef",
+                "quality": 10.0 * i,
+                "exif_ts": f"2024-06-01T10:00:0{i}",
+                "ts_source": "exif_original",
+            }
+            for i in range(1, 5)
+        ]
+    )
     assert update_bursts(settings, db) == 1
     burst = db.get_bursts()[0]
     assert (burst["best_image_id"], burst["image_count"]) == (4, 4)
@@ -118,21 +147,31 @@ def test_bursts_in_database_and_stage_skips_when_unchanged(db, settings):
 
 # ---- refinement and naming ----------------------------------------------------------
 def _row(i, ts, **kw):
-    return {"id": i, "exif_ts": ts, "ts_source": "exif_original", "gps_lat": kw.get("lat"),
-            "gps_lon": kw.get("lon"), "features": None}
+    return {
+        "id": i,
+        "exif_ts": ts,
+        "ts_source": "exif_original",
+        "gps_lat": kw.get("lat"),
+        "gps_lon": kw.get("lon"),
+        "features": None,
+    }
 
 
 def test_tiny_event_merges_into_neighbour_and_long_event_splits():
     rows = [_row(i, f"2024-06-01T10:{i:02d}:00") for i in range(5)]
-    rows += [_row(10, "2024-06-01T15:00:00")]                         # alone, 5h after the last
+    rows += [_row(10, "2024-06-01T15:00:00")]  # alone, 5h after the last
     groups = group_images(rows, event_gap_hours=3, gps_split_km=0)
     assert len(groups) == 2
     times = {r["id"]: datetime.strptime(r["exif_ts"], "%Y-%m-%dT%H:%M:%S") for r in rows}
     merged = refine_events(groups, times, min_size=3, merge_gap_hours=6, max_hours=36)
     assert [g["image_ids"] for g in merged] == [[0, 1, 2, 3, 4, 10]]
 
-    long_rows = [_row(1, "2024-06-01T00:00:00"), _row(2, "2024-06-01T02:00:00"),
-                 _row(3, "2024-06-02T20:00:00"), _row(4, "2024-06-02T22:00:00")]
+    long_rows = [
+        _row(1, "2024-06-01T00:00:00"),
+        _row(2, "2024-06-01T02:00:00"),
+        _row(3, "2024-06-02T20:00:00"),
+        _row(4, "2024-06-02T22:00:00"),
+    ]
     long_groups = group_images(long_rows, event_gap_hours=45, gps_split_km=0)
     assert len(long_groups) == 1
     times = {r["id"]: datetime.strptime(r["exif_ts"], "%Y-%m-%dT%H:%M:%S") for r in long_rows}
@@ -141,8 +180,15 @@ def test_tiny_event_merges_into_neighbour_and_long_event_splits():
 
 
 def test_name_groups_uses_majority_place():
-    groups = [{"kind": "event", "name": "Event 2024-06-01 10:00", "start_ts": "2024-06-01T10:00:00",
-               "end_ts": "2024-06-01T11:00:00", "image_ids": [1, 2, 3]}]
+    groups = [
+        {
+            "kind": "event",
+            "name": "Event 2024-06-01 10:00",
+            "start_ts": "2024-06-01T10:00:00",
+            "end_ts": "2024-06-01T11:00:00",
+            "image_ids": [1, 2, 3],
+        }
+    ]
     name_groups(groups, {1: "Imphal, IN", 2: "Imphal, IN", 3: ""})
     assert groups[0]["name"] == "Imphal, IN, 01 Jun 2024"
 
@@ -151,18 +197,30 @@ def test_name_groups_uses_majority_place():
 def test_builtin_and_file_place_index(tmp_path):
     pts = np.array([[24.82, 93.94], [0.0, -30.0]])
     assert PlaceIndex.builtin().lookup_many(pts, 50) == ["Imphal, IN", None]
-    line = "\t".join(["1", "Testville", "Testville", "", "10.0", "20.0", "P", "PPL", "XX"] + [""] * 6)
+    line = "\t".join(
+        ["1", "Testville", "Testville", "", "10.0", "20.0", "P", "PPL", "XX"] + [""] * 6
+    )
     (tmp_path / "cities15000.txt").write_text(line + "\n", encoding="utf-8")
-    assert load_place_index(tmp_path).lookup_many(np.array([[10.01, 20.01]]), 50) == ["Testville, XX"]
+    assert load_place_index(tmp_path).lookup_many(np.array([[10.01, 20.01]]), 50) == [
+        "Testville, XX"
+    ]
 
 
 def test_update_places_marks_unmatched_and_does_not_retry(db, settings):
     db.register_files([("a.jpg", 1, 1), ("b.jpg", 1, 2), ("c.jpg", 1, 3)])
-    db.save_results([{"image_id": 1, "gps_lat": 24.817, "gps_lon": 93.937},
-                     {"image_id": 2, "gps_lat": 0.5, "gps_lon": -30.0}, {"image_id": 3}])
+    db.save_results(
+        [
+            {"image_id": 1, "gps_lat": 24.817, "gps_lon": 93.937},
+            {"image_id": 2, "gps_lat": 0.5, "gps_lon": -30.0},
+            {"image_id": 3},
+        ]
+    )
     assert update_places(settings, db) == 1
     assert (db.get_image(1)["place"], db.get_image(2)["place"], db.get_image(3)["place"]) == (
-        "Imphal, IN", "", None)
+        "Imphal, IN",
+        "",
+        None,
+    )
     assert update_places(settings, db) == 0
 
 
@@ -177,21 +235,31 @@ class SquareFinder(FaceDetector):
         ys, xs = np.nonzero(bgr[:, :, 0] == 255)
         if len(xs) < 500:
             return []
-        return [(float(xs.min()), float(ys.min()), float(xs.max() - xs.min() + 1),
-                 float(ys.max() - ys.min() + 1), 0.9)]
+        return [
+            (
+                float(xs.min()),
+                float(ys.min()),
+                float(xs.max() - xs.min() + 1),
+                float(ys.max() - ys.min() + 1),
+                0.9,
+            )
+        ]
 
 
 def test_tiled_detection_maps_back_and_merges_duplicates():
     arr = np.zeros((1600, 2400, 3), dtype=np.uint8)
     arr[900:960, 1500:1560] = 255
-    big = LoadedImage(pil=Image.fromarray(arr), width=2400, height=1600, scale=1.0, exif=Image.Exif())
+    big = LoadedImage(
+        pil=Image.fromarray(arr), width=2400, height=1600, scale=1.0, exif=Image.Exif()
+    )
     faces = SquareFinder().detect_tiled(big, tile=960)
     assert [(f.x, f.y, f.w, f.h) for f in faces] == [(1500, 900, 60, 60)]
 
 
 def test_merge_faces_keeps_higher_confidence():
-    kept = merge_faces([FaceBox(10, 10, 50, 50, 0.8), FaceBox(12, 12, 50, 50, 0.95),
-                        FaceBox(300, 10, 50, 50, 0.9)])
+    kept = merge_faces(
+        [FaceBox(10, 10, 50, 50, 0.8), FaceBox(12, 12, 50, 50, 0.95), FaceBox(300, 10, 50, 50, 0.9)]
+    )
     assert [(f.x, f.confidence) for f in kept] == [(12, 0.95), (300, 0.9)]
 
 
@@ -224,14 +292,22 @@ def test_pipeline_stores_analysis_and_enrich_backfills(settings, tmp_path, make_
 
         db._db.execute("UPDATE images SET quality = NULL, dhash = NULL")
         (root / "p3.jpg").unlink()
-        assert enrich_existing(settings, db) == 2                       # missing file is skipped
+        assert enrich_existing(settings, db) == 2  # missing file is skipped
         assert db.count_unanalyzed() == 1
 
 
 def test_date_override_changes_grouping_input(db):
     db.register_files([("a.jpg", 1, 1)])
-    db.save_results([{"image_id": 1, "exif_ts": "2030-01-01T00:00:00", "ts_source": "exif_original",
-                      "date_flag": "future"}])
+    db.save_results(
+        [
+            {
+                "image_id": 1,
+                "exif_ts": "2030-01-01T00:00:00",
+                "ts_source": "exif_original",
+                "date_flag": "future",
+            }
+        ]
+    )
     assert db.suspicious_dates()[0]["date_flag"] == "future"
     db.set_date_override(1, "2024-06-01T10:00:00", "camera clock was wrong")
     assert db.fetch_grouping_rows()[0]["exif_ts"] == "2024-06-01T10:00:00"
@@ -241,9 +317,17 @@ def test_date_override_changes_grouping_input(db):
 
 def test_screenshots_are_left_out_of_groups_by_default(db):
     db.register_files([("a.jpg", 1, 1), ("b.png", 1, 2)])
-    db.save_results([{"image_id": 1, "exif_ts": "2024-06-01T10:00:00", "ts_source": "exif_original"},
-                     {"image_id": 2, "exif_ts": "2024-06-01T10:01:00", "ts_source": "exif_original",
-                      "content_type": "screenshot"}])
+    db.save_results(
+        [
+            {"image_id": 1, "exif_ts": "2024-06-01T10:00:00", "ts_source": "exif_original"},
+            {
+                "image_id": 2,
+                "exif_ts": "2024-06-01T10:01:00",
+                "ts_source": "exif_original",
+                "content_type": "screenshot",
+            },
+        ]
+    )
     assert [r["id"] for r in db.fetch_grouping_rows()] == [1]
     assert len(db.fetch_grouping_rows(include_junk=True)) == 2
     assert [r["id"] for r in db.search_images(content_type="screenshot")] == [2]
@@ -261,6 +345,11 @@ def test_v4_database_upgrades_to_v5(tmp_path):
     conn.close()
     with DatabaseManager(path) as db:
         row = db.get_image(1)
-        assert (row["content_type"], row["quality"], row["place"], row["burst_id"]) == ("photo", None, None, None)
+        assert (row["content_type"], row["quality"], row["place"], row["burst_id"]) == (
+            "photo",
+            None,
+            None,
+            None,
+        )
         assert db.get_bursts() == []
     assert (tmp_path / "photos.db.bak-v4").is_file()

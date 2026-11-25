@@ -4,6 +4,7 @@ Date and duration come from the MP4/MOV header (``moov/mvhd``), read with a few
 seeks, so large videos are never read whole. A poster frame is grabbed through
 OpenCV when the build can decode the codec (HEVC often cannot).
 """
+
 from __future__ import annotations
 
 import os
@@ -18,8 +19,10 @@ os.environ.setdefault("OPENCV_FFMPEG_LOGLEVEL", "-8")
 os.environ.setdefault("OPENCV_LOG_LEVEL", "SILENT")
 
 import cv2
+
 try:
     import cv2.utils.logging as _cv2_logging
+
     _cv2_logging.setLogLevel(_cv2_logging.LOG_LEVEL_SILENT)
 except (ImportError, AttributeError):
     pass
@@ -30,7 +33,7 @@ _EPOCH_1904 = datetime(1904, 1, 1, tzinfo=timezone.utc)
 
 @dataclass
 class VideoInfo:
-    created: datetime | None = None          # naive local time
+    created: datetime | None = None  # naive local time
     duration_s: float | None = None
     width: int = 0
     height: int = 0
@@ -47,12 +50,12 @@ def _boxes(fh: BinaryIO, start: int, end: int) -> Iterator[tuple[bytes, int, int
             return
         size, kind = struct.unpack(">I4s", head)
         header = 8
-        if size == 1:                                   # 64-bit size follows
+        if size == 1:  # 64-bit size follows
             ext = fh.read(8)
             if len(ext) < 8:
                 return
             size, header = struct.unpack(">Q", ext)[0], 16
-        elif size == 0:                                 # box runs to the end
+        elif size == 0:  # box runs to the end
             size = end - pos
         if size < header:
             return
@@ -103,7 +106,7 @@ def probe_video(path: Path, max_side: int = 1280) -> VideoInfo:
     info = VideoInfo(created=created, duration_s=duration)
     cap = None
     try:
-        cap = cv2.VideoCapture(str(path))     # may fail for non-ASCII Windows paths
+        cap = cv2.VideoCapture(str(path))  # may fail for non-ASCII Windows paths
         if cap.isOpened():
             info.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
             info.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
@@ -111,7 +114,7 @@ def probe_video(path: Path, max_side: int = 1280) -> VideoInfo:
             frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
             if info.duration_s is None and fps > 0 and frames > 0:
                 info.duration_s = frames / fps
-            if frames > 10 and fps > 0:           # skip a possible black first frame
+            if frames > 10 and fps > 0:  # skip a possible black first frame
                 cap.set(cv2.CAP_PROP_POS_FRAMES, int(min(frames * 0.1, fps)))
             ok, frame = cap.read()
             if ok and frame is not None:

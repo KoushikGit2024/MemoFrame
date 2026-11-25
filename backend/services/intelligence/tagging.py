@@ -1,4 +1,5 @@
 """Backfill tags for photos processed before tagging was enabled (read-only, no face detection)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,8 +14,9 @@ from utils.logger import get_logger
 log = get_logger("processing.tagging")
 
 
-def tag_existing(settings: Settings, db: DatabaseManager,
-                 control: RunControl | None = None, batch: int = 100) -> int:
+def tag_existing(
+    settings: Settings, db: DatabaseManager, control: RunControl | None = None, batch: int = 100
+) -> int:
     """Tag every processed photo not yet tagged with the current model. Returns the count.
 
     Unreadable or missing files are skipped (left untagged) so a later run can retry.

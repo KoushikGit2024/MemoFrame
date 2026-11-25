@@ -1,4 +1,5 @@
 """Face biometric and identity service."""
+
 from .clusterer import (
     DEFAULT_COSINE_DISTANCE_EPS,
     DEFAULT_MIN_SAMPLES,

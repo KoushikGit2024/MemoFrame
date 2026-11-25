@@ -1,4 +1,5 @@
 """Command-line interface: scan, process, group, report, duplicates, search, reset."""
+
 from __future__ import annotations
 
 import argparse
@@ -70,7 +71,8 @@ def _require_db(settings: Settings) -> None:
     if not settings.db_path.is_file():
         raise CliError(
             f"No database at {settings.db_path}. Run 'scan' or 'process' with --input first "
-            "(or pass the right --workspace).")
+            "(or pass the right --workspace)."
+        )
 
 
 # ----------------------------------------------------------------------
@@ -81,11 +83,15 @@ def cmd_scan(args: argparse.Namespace, settings: Settings) -> int:
     with DatabaseManager(settings.db_path) as db:
         stats = scan_directory(settings, db, args.input)
         pending = db.count_pending()
-    print(f"Found {stats.total} image(s): {stats.new} new, {stats.changed} changed, "
-          f"{stats.unchanged} unchanged.")
+    print(
+        f"Found {stats.total} image(s): {stats.new} new, {stats.changed} changed, "
+        f"{stats.unchanged} unchanged."
+    )
     if pending:
-        print(f"{pending} image(s) waiting. Run: python main.py process "
-              f"--workspace \"{settings.workspace}\"")
+        print(
+            f"{pending} image(s) waiting. Run: python main.py process "
+            f'--workspace "{settings.workspace}"'
+        )
     return 0
 
 
@@ -98,9 +104,12 @@ def cmd_process(args: argparse.Namespace, settings: Settings) -> int:
             stats = scan_directory(settings, db, args.input)
             print(f"Scan: {stats.new} new, {stats.changed} changed, {stats.unchanged} unchanged.")
         summary = process_pending(
-            settings, db, retry_failed=args.retry_failed, show_progress=not args.quiet)
-        print(f"Processed {summary.processed}, failed {summary.failed}, "
-              f"remaining {summary.remaining}.")
+            settings, db, retry_failed=args.retry_failed, show_progress=not args.quiet
+        )
+        print(
+            f"Processed {summary.processed}, failed {summary.failed}, "
+            f"remaining {summary.remaining}."
+        )
         if summary.interrupted:
             print("Interrupted. Progress is saved; run the same command again to continue.")
             return 130
@@ -192,21 +201,33 @@ def cmd_report(args: argparse.Namespace, settings: Settings) -> int:
 def cmd_search(args: argparse.Namespace, settings: Settings) -> int:
     _require_db(settings)
     wanted = dict(
-        text=args.text, min_faces=args.min_faces, max_faces=args.max_faces,
-        taken_from=args.taken_from, taken_until=args.taken_until, group_id=args.group_id,
-        path_contains=args.path_contains, place_contains=getattr(args, "place", None),
-        content_type=getattr(args, "content_type", None), kind=getattr(args, "kind", None),
-        min_quality=getattr(args, "min_quality", None), mark=args.mark, duplicate=args.duplicate,
-        tag=getattr(args, "tag", None))
+        text=args.text,
+        min_faces=args.min_faces,
+        max_faces=args.max_faces,
+        taken_from=args.taken_from,
+        taken_until=args.taken_until,
+        group_id=args.group_id,
+        path_contains=args.path_contains,
+        place_contains=getattr(args, "place", None),
+        content_type=getattr(args, "content_type", None),
+        kind=getattr(args, "kind", None),
+        min_quality=getattr(args, "min_quality", None),
+        mark=args.mark,
+        duplicate=args.duplicate,
+        tag=getattr(args, "tag", None),
+    )
     filters = {k: v for k, v in wanted.items() if v is not None}
     with DatabaseManager(settings.db_path) as db:
         if args.text:
             update_search_index(settings, db)
         rows = db.find_images(sort=args.sort, limit=args.limit, **filters)
     for r in rows:
-        print(f"{r['id']:>7}  {r['effective_ts'] or '-':19}  faces={r['face_count']:<2}  {r['path']}")
+        print(
+            f"{r['id']:>7}  {r['effective_ts'] or '-':19}  faces={r['face_count']:<2}  {r['path']}"
+        )
     print(f"{len(rows)} result(s)" + (f" (limit {args.limit})" if len(rows) == args.limit else ""))
     return 0
+
 
 def cmd_prune(args: argparse.Namespace, settings: Settings) -> int:
     _require_db(settings)
@@ -226,8 +247,13 @@ def cmd_prune(args: argparse.Namespace, settings: Settings) -> int:
             print("Warning: every checked file is missing. Is the drive connected?")
         if not args.yes:
             try:
-                answer = input("Remove these records and their generated files? "
-                               "Type 'yes' to continue: ").strip().lower()
+                answer = (
+                    input(
+                        "Remove these records and their generated files? Type 'yes' to continue: "
+                    )
+                    .strip()
+                    .lower()
+                )
             except EOFError:
                 answer = ""
             if answer != "yes":
@@ -237,8 +263,10 @@ def cmd_prune(args: argparse.Namespace, settings: Settings) -> int:
     print(f"Removed {removed} record(s). Your photos were not touched.")
     return 0
 
+
 def cmd_doctor(args: argparse.Namespace, settings: Settings) -> int:
     from engine.doctor import run_checks
+
     checks = run_checks(settings, args.input)
     for c in checks:
         print(f"[{c.status.upper():4}] {c.name}: {c.detail}")
@@ -249,6 +277,7 @@ def cmd_doctor(args: argparse.Namespace, settings: Settings) -> int:
 
 def cmd_maintain(args: argparse.Namespace, settings: Settings) -> int:
     from services.pipeline import maintenance as m
+
     _require_db(settings)
     with DatabaseManager(settings.db_path) as db:
         if args.check_files:
@@ -270,20 +299,24 @@ def cmd_maintain(args: argparse.Namespace, settings: Settings) -> int:
 
 def cmd_analyze(args: argparse.Namespace, settings: Settings) -> int:
     from services.pipeline.enrich import enrich_existing
+
     _require_db(settings)
     with DatabaseManager(settings.db_path) as db:
         print(f"Analysed {enrich_existing(settings, db)} photo(s).")
         named = update_places(settings, db, force=args.refresh_places)
         persons = update_persons(settings, db)
-        print(f"Places named: {named}. Duplicate clusters: {update_duplicates(settings, db)}. "
-              f"Bursts: {update_bursts(settings, db)}. Groups: {update_groups(settings, db)}. "
-              f"People: {persons}.")
+        print(
+            f"Places named: {named}. Duplicate clusters: {update_duplicates(settings, db)}. "
+            f"Bursts: {update_bursts(settings, db)}. Groups: {update_groups(settings, db)}. "
+            f"People: {persons}."
+        )
         update_search_index(settings, db)
     return 0
 
 
 def cmd_tag(args: argparse.Namespace, settings: Settings) -> int:
     from services.intelligence.tagging import tag_existing
+
     _require_db(settings)
     if args.store_embeddings:
         settings = settings.with_overrides(store_embeddings=True)
@@ -303,8 +336,10 @@ def cmd_watch(args: argparse.Namespace, settings: Settings) -> int:
     from services.pipeline.watcher import FolderWatcher
 
     settings = apply_profile(settings, "gentle").with_overrides(
-        watch_interval_s=args.interval, watch_settle_s=args.settle,
-        watch_pause_on_battery=False if args.allow_battery else None)
+        watch_interval_s=args.interval,
+        watch_settle_s=args.settle,
+        watch_pause_on_battery=False if args.allow_battery else None,
+    )
     settings.ensure_dirs()
 
     def show(ev) -> None:
@@ -326,12 +361,19 @@ def cmd_watch(args: argparse.Namespace, settings: Settings) -> int:
 
 
 def cmd_reset(args: argparse.Namespace, settings: Settings) -> int:
-    scope = "the database" if args.db_only else (
-        "the database and generated files (thumbnails, face crops, annotated copies, "
-        "group list)")
+    scope = (
+        "the database"
+        if args.db_only
+        else (
+            "the database and generated files (thumbnails, face crops, annotated copies, "
+            "group list)"
+        )
+    )
     if not args.yes:
-        print(f"This clears {scope} in {settings.workspace}.\n"
-              "Your original photos are not touched. Models and reports are kept.")
+        print(
+            f"This clears {scope} in {settings.workspace}.\n"
+            "Your original photos are not touched. Models and reports are kept."
+        )
         try:
             answer = input("Type 'yes' to continue: ").strip().lower()
         except EOFError:
@@ -343,8 +385,12 @@ def cmd_reset(args: argparse.Namespace, settings: Settings) -> int:
         with DatabaseManager(settings.db_path) as db:
             db.reset()
     if not args.db_only:
-        for target in (settings.thumbnails_dir, settings.face_crops_dir,
-                       settings.annotated_dir, settings.grouped_dir):
+        for target in (
+            settings.thumbnails_dir,
+            settings.face_crops_dir,
+            settings.annotated_dir,
+            settings.grouped_dir,
+        ):
             if target.is_dir() and is_within(target, settings.workspace):
                 try:
                     shutil.rmtree(target)
@@ -380,14 +426,22 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     settings = _settings(args)
     write_log = args.command in ("scan", "process") or settings.workspace.is_dir()
-    setup_logging(settings.log_path if write_log else None,
-                  verbose=args.verbose, quiet=args.quiet)
+    setup_logging(settings.log_path if write_log else None, verbose=args.verbose, quiet=args.quiet)
     try:
         return COMMANDS[args.command](args, settings)
     except KeyboardInterrupt:
         print("\nInterrupted.", file=sys.stderr)
         return 130
-    except (CliError, ValidationError, ModelDownloadError, DetectorUnavailableError,
-            TaggerUnavailableError, PipelineError, DatabaseError, sqlite3.Error, OSError) as exc:
+    except (
+        CliError,
+        ValidationError,
+        ModelDownloadError,
+        DetectorUnavailableError,
+        TaggerUnavailableError,
+        PipelineError,
+        DatabaseError,
+        sqlite3.Error,
+        OSError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

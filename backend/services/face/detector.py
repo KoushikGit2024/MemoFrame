@@ -4,6 +4,7 @@ No backend here computes, stores or compares face embeddings, so identifying
 or matching people across photographs is not possible with this module.
 Detectors are not thread-safe: create one per worker process.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -43,10 +44,13 @@ class FaceDetector(ABC):
 
     def detect(self, loaded: LoadedImage) -> list[FaceBox]:
         """Detect faces; boxes in FULL-resolution coordinates, left-to-right."""
-        return self._finalize(self._detect_bgr(loaded.to_bgr()),
-                              loaded.scale, loaded.width, loaded.height)
+        return self._finalize(
+            self._detect_bgr(loaded.to_bgr()), loaded.scale, loaded.width, loaded.height
+        )
 
-    def detect_tiled(self, loaded: LoadedImage, tile: int = 960, overlap: float = 0.25) -> list[FaceBox]:
+    def detect_tiled(
+        self, loaded: LoadedImage, tile: int = 960, overlap: float = 0.25
+    ) -> list[FaceBox]:
         """Run the detector on overlapping tiles (finds small faces in large photos).
 
         ``loaded`` should be a LARGER decode than the normal pass (e.g. 3200 px).
@@ -58,10 +62,13 @@ class FaceDetector(ABC):
         raw: list[RawBox] = []
         for y0 in _starts(h, tile, step):
             for x0 in _starts(w, tile, step):
-                crop = np.ascontiguousarray(bgr[y0:y0 + tile, x0:x0 + tile])
+                crop = np.ascontiguousarray(bgr[y0 : y0 + tile, x0 : x0 + tile])
                 for x, y, bw, bh, s, *extra in self._detect_bgr(crop):
-                    lm = (tuple(v + (x0 if i % 2 == 0 else y0) for i, v in enumerate(extra[0]))
-                          if extra and extra[0] else None)
+                    lm = (
+                        tuple(v + (x0 if i % 2 == 0 else y0) for i, v in enumerate(extra[0]))
+                        if extra and extra[0]
+                        else None
+                    )
                     raw.append((x + x0, y + y0, bw, bh, s, lm))
         return merge_faces(self._finalize(raw, loaded.scale, loaded.width, loaded.height))
 
@@ -75,9 +82,16 @@ class FaceDetector(ABC):
             if (x1 - x0) < self.min_face_px or (y1 - y0) < self.min_face_px:
                 continue
             lm = tuple(round(float(v) * scale, 2) for v in extra[0]) if extra and extra[0] else None
-            boxes.append(FaceBox(x=int(round(x0)), y=int(round(y0)),
-                                 w=int(round(x1 - x0)), h=int(round(y1 - y0)),
-                                 confidence=round(float(score), 4), landmarks=lm))
+            boxes.append(
+                FaceBox(
+                    x=int(round(x0)),
+                    y=int(round(y0)),
+                    w=int(round(x1 - x0)),
+                    h=int(round(y1 - y0)),
+                    confidence=round(float(score), 4),
+                    landmarks=lm,
+                )
+            )
         boxes.sort(key=lambda b: (b.x, b.y))
         return boxes
 
@@ -119,11 +133,26 @@ class YuNetDetector(FaceDetector):
             data = np.frombuffer(self._model_path.read_bytes(), dtype=np.uint8)
             creators = (
                 lambda: cv2.FaceDetectorYN.create(
-                    "onnx", data, np.empty(0, np.uint8), (320, 320),
-                    self._conf, self._nms, 5000, backend, target),
+                    "onnx",
+                    data,
+                    np.empty(0, np.uint8),
+                    (320, 320),
+                    self._conf,
+                    self._nms,
+                    5000,
+                    backend,
+                    target,
+                ),
                 lambda: cv2.FaceDetectorYN.create(
-                    str(self._model_path), "", (320, 320),
-                    self._conf, self._nms, 5000, backend, target),
+                    str(self._model_path),
+                    "",
+                    (320, 320),
+                    self._conf,
+                    self._nms,
+                    5000,
+                    backend,
+                    target,
+                ),
             )
             for create in creators:
                 try:
@@ -145,8 +174,17 @@ class YuNetDetector(FaceDetector):
         if rows is None:
             return []
         # Row layout: x, y, w, h, 10 landmark values, score.
-        return [(float(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[14]),
-                 tuple(float(v) for v in r[4:14])) for r in rows]
+        return [
+            (
+                float(r[0]),
+                float(r[1]),
+                float(r[2]),
+                float(r[3]),
+                float(r[14]),
+                tuple(float(v) for v in r[4:14]),
+            )
+            for r in rows
+        ]
 
 
 class InsightFaceDetector(FaceDetector):
@@ -164,6 +202,7 @@ class InsightFaceDetector(FaceDetector):
         super().__init__(confidence_threshold, min_face_px)
         try:
             import importlib
+
             insightface_app = importlib.import_module("insightface.app")
             FaceAnalysis = getattr(insightface_app, "FaceAnalysis")
         except (ImportError, AttributeError) as exc:
@@ -177,8 +216,10 @@ class InsightFaceDetector(FaceDetector):
         root.mkdir(parents=True, exist_ok=True)
         # allowed_modules=["detection"]: the recognition model is never loaded.
         self._app = FaceAnalysis(
-            name="buffalo_sc", root=str(root),
-            allowed_modules=["detection"], providers=providers,
+            name="buffalo_sc",
+            root=str(root),
+            allowed_modules=["detection"],
+            providers=providers,
         )
         self._app.prepare(
             ctx_id=0 if use_gpu else -1,
@@ -195,9 +236,12 @@ class InsightFaceDetector(FaceDetector):
         out: list[Any] = []
         for f in faces:
             x1, y1, x2, y2 = (float(v) for v in f.bbox)
-            kps = getattr(f, "kps", None)       # 5 points: eyes, nose, mouth corners
-            lm = (tuple(float(v) for v in np.asarray(kps).reshape(-1))
-                  if kps is not None and np.asarray(kps).size == 10 else None)
+            kps = getattr(f, "kps", None)  # 5 points: eyes, nose, mouth corners
+            lm = (
+                tuple(float(v) for v in np.asarray(kps).reshape(-1))
+                if kps is not None and np.asarray(kps).size == 10
+                else None
+            )
             out.append((x1, y1, x2 - x1, y2 - y1, float(f.det_score), lm))
         return out
 

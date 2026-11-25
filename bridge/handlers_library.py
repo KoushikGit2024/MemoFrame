@@ -1,4 +1,5 @@
 """RPC handlers for photo library queries, detail inspection, marks, dates, tags, and search."""
+
 from __future__ import annotations
 
 import base64
@@ -7,9 +8,11 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-def ensure_face_crop(workspace: Path, face: dict[str, Any], img_path: str | None, size: int = 320) -> str | None:
+def ensure_face_crop(
+    workspace: Path, face: dict[str, Any], img_path: str | None, size: int = 320
+) -> str | None:
     """Generate a crisp square face crop (Lanczos resampled) centered on the face with proportional margin.
-    
+
     Caches to workspace/face_crops/face_{face_id}_{size}.jpg to make grid face zoom instant.
     """
     fid = face.get("id")
@@ -27,7 +30,11 @@ def ensure_face_crop(workspace: Path, face: dict[str, Any], img_path: str | None
     if existing:
         ep = Path(str(existing))
         if not ep.is_absolute():
-            ep = (workspace.parent / ep).resolve() if (workspace.parent / ep).is_file() else (workspace / ep).resolve()
+            ep = (
+                (workspace.parent / ep).resolve()
+                if (workspace.parent / ep).is_file()
+                else (workspace / ep).resolve()
+            )
         if ep.is_file():
             # If size matches or existing is already a square crop, we can use it
             return str(ep)
@@ -100,11 +107,15 @@ def enrich_photos(
         if workspace and img_faces:
             target_face = None
             if target_person_id is not None:
-                target_face = next((f for f in img_faces if f.get("person_id") == target_person_id), None)
+                target_face = next(
+                    (f for f in img_faces if f.get("person_id") == target_person_id), None
+                )
             if not target_face:
                 target_face = max(img_faces, key=lambda f: int(f.get("w", 0)) * int(f.get("h", 0)))
             if target_face:
-                crop = ensure_face_crop(workspace, target_face, str(row.get("path") or ""), size=320)
+                crop = ensure_face_crop(
+                    workspace, target_face, str(row.get("path") or ""), size=320
+                )
                 row["face_crop_path"] = crop
             else:
                 row["face_crop_path"] = None
@@ -125,7 +136,10 @@ def register_library_handlers(registry: dict[str, Any], ctx: Any) -> None:
         size = max(1, min(200, int(params.get("page_size") or 40)))
         eng = ctx.require_engine()
         with ctx.lock:
-            gone = filters.get("person_id") is not None and eng.get_person(int(filters["person_id"])) is None
+            gone = (
+                filters.get("person_id") is not None
+                and eng.get_person(int(filters["person_id"])) is None
+            )
             if gone:
                 filters.pop("person_id", None)
             total = int(eng.count(kind="photo", **filters))
@@ -267,20 +281,26 @@ def register_library_handlers(registry: dict[str, Any], ctx: Any) -> None:
             buf = io.BytesIO()
             im.save(buf, format="JPEG", quality=90)
             b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-            return {"data_url": f"data:image/jpeg;base64,{b64}", "width": im.width, "height": im.height}
+            return {
+                "data_url": f"data:image/jpeg;base64,{b64}",
+                "width": im.width,
+                "height": im.height,
+            }
 
-    registry.update({
-        "photos.query": photos_query,
-        "photos.detail": photo_detail,
-        "photos.toggle_mark": photo_toggle_mark,
-        "photos.set_date": photo_set_date,
-        "photos.clear_date": photo_clear_date,
-        "photos.similar": photos_similar,
-        "photos.failed": photos_failed,
-        "photos.decode": photo_decode,
-        "dates.suspicious": dates_suspicious,
-        "tags.list": tags_list,
-        "saved_searches.list": saved_searches_list,
-        "saved_searches.save": saved_searches_save,
-        "saved_searches.delete": saved_searches_delete,
-    })
+    registry.update(
+        {
+            "photos.query": photos_query,
+            "photos.detail": photo_detail,
+            "photos.toggle_mark": photo_toggle_mark,
+            "photos.set_date": photo_set_date,
+            "photos.clear_date": photo_clear_date,
+            "photos.similar": photos_similar,
+            "photos.failed": photos_failed,
+            "photos.decode": photo_decode,
+            "dates.suspicious": dates_suspicious,
+            "tags.list": tags_list,
+            "saved_searches.list": saved_searches_list,
+            "saved_searches.save": saved_searches_save,
+            "saved_searches.delete": saved_searches_delete,
+        }
+    )

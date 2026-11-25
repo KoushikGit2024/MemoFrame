@@ -1,4 +1,5 @@
 """Atomic per-workspace GUI preferences stored as JSON inside the workspace."""
+
 from __future__ import annotations
 
 import json

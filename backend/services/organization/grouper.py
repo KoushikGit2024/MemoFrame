@@ -3,6 +3,7 @@
 Faces are never used. Pure functions: rows in, group descriptions out, ready
 for ``DatabaseManager.replace_groups``.
 """
+
 from __future__ import annotations
 
 import math
@@ -18,7 +19,7 @@ log = get_logger("processing.image_grouper")
 
 _ISO = "%Y-%m-%dT%H:%M:%S"
 _TRUSTED_SOURCES = frozenset({TS_EXIF_ORIGINAL, TS_EXIF_DATETIME, TS_CONTAINER})
-VISUAL_WINDOW = 2000          # max images per agglomerative clustering run
+VISUAL_WINDOW = 2000  # max images per agglomerative clustering run
 _EARTH_RADIUS_KM = 6371.0088
 
 
@@ -47,7 +48,9 @@ def _parse_ts(value: Any) -> datetime | None:
         return None
 
 
-def split_events(items: Sequence[_Item], gap_hours: float, gps_split_km: float) -> list[list[_Item]]:
+def split_events(
+    items: Sequence[_Item], gap_hours: float, gps_split_km: float
+) -> list[list[_Item]]:
     """Split time-sorted items into events by time gap and (optional) GPS jump."""
     gap = timedelta(hours=gap_hours)
     events: list[list[_Item]] = []
@@ -58,7 +61,8 @@ def split_events(items: Sequence[_Item], gap_hours: float, gps_split_km: float) 
             too_late = (item.when - current[-1].when) > gap
             moved = (
                 gps_split_km > 0
-                and item.lat is not None and item.lon is not None
+                and item.lat is not None
+                and item.lon is not None
                 and last_gps is not None
                 and haversine_km(last_gps[0], last_gps[1], item.lat, item.lon) > gps_split_km
             )
@@ -73,25 +77,29 @@ def split_events(items: Sequence[_Item], gap_hours: float, gps_split_km: float) 
     return events
 
 
-def _event_groups(items: list[_Item], label: str, gap_hours: float, gps_km: float) -> list[dict[str, Any]]:
+def _event_groups(
+    items: list[_Item], label: str, gap_hours: float, gps_km: float
+) -> list[dict[str, Any]]:
     items = sorted(items, key=lambda i: (i.when, i.image_id))
     groups = []
     for chunk in split_events(items, gap_hours, gps_km):
         start, end = chunk[0].when, chunk[-1].when
-        groups.append({
-            "kind": "event",
-            "name": f"{label} {start:%Y-%m-%d %H:%M}",
-            "start_ts": start.strftime(_ISO),
-            "end_ts": end.strftime(_ISO),
-            "image_ids": [i.image_id for i in chunk],
-        })
+        groups.append(
+            {
+                "kind": "event",
+                "name": f"{label} {start:%Y-%m-%d %H:%M}",
+                "start_ts": start.strftime(_ISO),
+                "end_ts": end.strftime(_ISO),
+                "image_ids": [i.image_id for i in chunk],
+            }
+        )
     return groups
 
 
 def _visual_groups(rows: Sequence[Mapping[str, Any]], distance: float) -> list[dict[str, Any]]:
     """Cluster undated images by colour histogram (average-linkage agglomerative)."""
     import numpy as np
-    from sklearn.cluster import AgglomerativeClustering   # lazy: heavy import
+    from sklearn.cluster import AgglomerativeClustering  # lazy: heavy import
 
     usable: list[tuple[int, Any]] = []
     for row in sorted(rows, key=lambda r: int(r["id"])):
@@ -104,24 +112,35 @@ def _visual_groups(rows: Sequence[Mapping[str, Any]], distance: float) -> list[d
 
     groups: list[dict[str, Any]] = []
     for start in range(0, len(usable), VISUAL_WINDOW):
-        window = usable[start:start + VISUAL_WINDOW]
+        window = usable[start : start + VISUAL_WINDOW]
         ids = [i for i, _ in window]
         if len(window) == 1:
             labels = [0]
         else:
             matrix = np.stack([v for _, v in window])
-            labels = AgglomerativeClustering(
-                n_clusters=None, distance_threshold=distance,
-                metric="euclidean", linkage="average",
-            ).fit_predict(matrix).tolist()
+            labels = (
+                AgglomerativeClustering(
+                    n_clusters=None,
+                    distance_threshold=distance,
+                    metric="euclidean",
+                    linkage="average",
+                )
+                .fit_predict(matrix)
+                .tolist()
+            )
         buckets: dict[int, list[int]] = {}
         for image_id, lab in zip(ids, labels):
             buckets.setdefault(lab, []).append(image_id)
         for members in buckets.values():
-            groups.append({
-                "kind": "visual", "name": None,
-                "start_ts": None, "end_ts": None, "image_ids": members,
-            })
+            groups.append(
+                {
+                    "kind": "visual",
+                    "name": None,
+                    "start_ts": None,
+                    "end_ts": None,
+                    "image_ids": members,
+                }
+            )
     for n, g in enumerate(groups, start=1):
         g["name"] = f"Visual group {n}"
     return groups
@@ -170,8 +189,12 @@ def group_images(
 
 
 def refine_events(
-    groups: list[dict[str, Any]], times: Mapping[int, datetime], *,
-    min_size: int = 3, merge_gap_hours: float = 6.0, max_hours: float = 36.0,
+    groups: list[dict[str, Any]],
+    times: Mapping[int, datetime],
+    *,
+    min_size: int = 3,
+    merge_gap_hours: float = 6.0,
+    max_hours: float = 36.0,
 ) -> list[dict[str, Any]]:
     """Split very long events at their largest gap, then merge tiny events into a
     neighbour within ``merge_gap_hours`` (never past ``max_hours``). Only "Event" groups change."""
@@ -191,7 +214,7 @@ def refine_events(
             span = (times[part[-1]] - times[part[0]]).total_seconds() / 3600
             if len(part) > 1 and span > max_hours:
                 _, k = max((times[part[j + 1]] - times[part[j]], j) for j in range(len(part) - 1))
-                stack.extend([part[k + 1:], part[:k + 1]])
+                stack.extend([part[k + 1 :], part[: k + 1]])
             else:
                 chunks.append(part)
     chunks.sort(key=lambda c: key(c[0]))
@@ -215,9 +238,16 @@ def refine_events(
             changed = True
             break
 
-    out = [{"kind": "event", "name": f"Event {times[c[0]]:%Y-%m-%d %H:%M}",
-            "start_ts": times[c[0]].strftime(_ISO), "end_ts": times[c[-1]].strftime(_ISO),
-            "image_ids": c} for c in chunks]
+    out = [
+        {
+            "kind": "event",
+            "name": f"Event {times[c[0]]:%Y-%m-%d %H:%M}",
+            "start_ts": times[c[0]].strftime(_ISO),
+            "end_ts": times[c[-1]].strftime(_ISO),
+            "image_ids": c,
+        }
+        for c in chunks
+    ]
     return out + keep
 
 

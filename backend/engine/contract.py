@@ -1,4 +1,5 @@
 """Public API version. MAJOR = breaking change, MINOR = new methods or fields."""
+
 from __future__ import annotations
 
 import inspect

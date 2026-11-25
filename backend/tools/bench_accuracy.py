@@ -1,11 +1,12 @@
 """Accuracy on YOUR labelled data (I cannot supply labels).
 
-  detector:   python tools/bench_accuracy.py detector --folder F --labels labels.json [--iou 0.4]
-      labels.json: {"img1.jpg": [[x, y, w, h], ...], "img2.jpg": []}   (full-resolution pixels)
-  duplicates: python tools/bench_accuracy.py duplicates --folder F --truth truth.json
-      truth.json:  {"clusters": [["a.jpg", "a_copy.jpg"], ["b.jpg", "b_resized.jpg", "b.png"]]}
-      Every other image in the folder is treated as unique.
+detector:   python tools/bench_accuracy.py detector --folder F --labels labels.json [--iou 0.4]
+    labels.json: {"img1.jpg": [[x, y, w, h], ...], "img2.jpg": []}   (full-resolution pixels)
+duplicates: python tools/bench_accuracy.py duplicates --folder F --truth truth.json
+    truth.json:  {"clusters": [["a.jpg", "a_copy.jpg"], ["b.jpg", "b_resized.jpg", "b.png"]]}
+    Every other image in the folder is treated as unique.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -17,13 +18,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import Settings                                # noqa: E402
-from services.intelligence.analysis import compute_dhash                    # noqa: E402
-from services.organization.duplicates import find_duplicates        # noqa: E402
-from services.face.detector import create_detector             # noqa: E402
-from services.vision.loader import load_image                   # noqa: E402
-from services.organization.similarity import compute_phash            # noqa: E402
-from utils.model_downloader import ensure_model            # noqa: E402
+from config import Settings  # noqa: E402
+from services.intelligence.analysis import compute_dhash  # noqa: E402
+from services.organization.duplicates import find_duplicates  # noqa: E402
+from services.face.detector import create_detector  # noqa: E402
+from services.vision.loader import load_image  # noqa: E402
+from services.organization.similarity import compute_phash  # noqa: E402
+from utils.model_downloader import ensure_model  # noqa: E402
 
 
 def iou(a, b) -> float:
@@ -59,9 +60,13 @@ def detector(args) -> None:
                 tp += 1
                 open_truth.remove(best)
         fn += len(open_truth)
-    print(f"images={len(labels)} true_faces={tp + fn} detected_ok={tp} missed={fn} false_alarms={fp}")
-    print(f"recall={ratio(tp, tp + fn):.3f} precision={ratio(tp, tp + fp):.3f} "
-          f"(IoU>={args.iou}, confidence>={s.confidence_threshold})")
+    print(
+        f"images={len(labels)} true_faces={tp + fn} detected_ok={tp} missed={fn} false_alarms={fp}"
+    )
+    print(
+        f"recall={ratio(tp, tp + fn):.3f} precision={ratio(tp, tp + fp):.3f} "
+        f"(IoU>={args.iou}, confidence>={s.confidence_threshold})"
+    )
 
 
 def duplicates(args) -> None:
@@ -72,14 +77,22 @@ def duplicates(args) -> None:
     files = sorted(p for p in folder.iterdir() if p.suffix.lower() in s.extensions)
     for i, p in enumerate(files, start=1):
         li = load_image(p, s.max_detect_side)
-        records.append((i, hashlib.sha256(p.read_bytes()).hexdigest(),
-                        compute_phash(li.pil), compute_dhash(li.pil)))
+        records.append(
+            (
+                i,
+                hashlib.sha256(p.read_bytes()).hexdigest(),
+                compute_phash(li.pil),
+                compute_dhash(li.pil),
+            )
+        )
         names[i] = p.name
     rows = find_duplicates(records, s.phash_near_threshold, s.dhash_confirm_threshold)
     clusters: dict[int, list[str]] = {}
     for image_id, cid, _ in rows:
         clusters.setdefault(cid, []).append(names[image_id])
-    pairs = lambda groups: {frozenset(p) for g in groups for p in itertools.combinations(sorted(g), 2)}
+    pairs = lambda groups: {
+        frozenset(p) for g in groups for p in itertools.combinations(sorted(g), 2)
+    }
     want, got = pairs(truth), pairs(clusters.values())
     tp = len(want & got)
     print(f"images={len(files)} true_pairs={len(want)} found_pairs={len(got)} correct={tp}")

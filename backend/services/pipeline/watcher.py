@@ -3,6 +3,7 @@
 Nothing is ever written next to the photos. Offline folders are skipped, and nothing is marked
 missing here.
 """
+
 from __future__ import annotations
 
 import time
@@ -27,14 +28,20 @@ from utils.system_info import on_battery
 
 log = get_logger("processing.watcher")
 
-SMALL_BATCH = 20          # fewer ready files than this are processed in-process (no worker spawn)
-_STEP = 0.5               # sleep granularity, so cancel is quick
+SMALL_BATCH = 20  # fewer ready files than this are processed in-process (no worker spawn)
+_STEP = 0.5  # sleep granularity, so cancel is quick
 
 
 class FolderWatcher:
     def __init__(
-        self, settings: Settings, db: DatabaseManager, roots: Sequence[Path], control: RunControl,
-        *, interval_s: float | None = None, settle_s: float | None = None,
+        self,
+        settings: Settings,
+        db: DatabaseManager,
+        roots: Sequence[Path],
+        control: RunControl,
+        *,
+        interval_s: float | None = None,
+        settle_s: float | None = None,
         pause_on_battery: bool | None = None,
         sleep: Callable[[float], None] = time.sleep,
         now: Callable[[], float] = time.time,
@@ -44,8 +51,9 @@ class FolderWatcher:
         self.roots = [Path(r) for r in roots]
         self.interval_s = settings.watch_interval_s if interval_s is None else interval_s
         self.settle_s = settings.watch_settle_s if settle_s is None else settle_s
-        self.pause_on_battery = (settings.watch_pause_on_battery
-                                 if pause_on_battery is None else pause_on_battery)
+        self.pause_on_battery = (
+            settings.watch_pause_on_battery if pause_on_battery is None else pause_on_battery
+        )
         self._sleep, self._now, self._battery = sleep, now, battery
         self._known = {r["path"]: (r["size"], r["mtime_ns"]) for r in db.list_fingerprints()}
         self._seen: dict[str, tuple[int, int]] = {}
@@ -73,13 +81,17 @@ class FolderWatcher:
                 continue
             self._offline_reported.discard(root)
             for path, size, mtime in iter_image_files(
-                    root, self.settings.extensions, exclude=[self.settings.workspace]):
+                root, self.settings.extensions, exclude=[self.settings.workspace]
+            ):
                 key, fp = str(path), (size, mtime)
                 if self._known.get(key) == fp:
                     continue
                 current.add(key)
-                if (self._seen.get(key) == fp and t - mtime / 1e9 >= self.settle_s
-                        and self._readable(path)):
+                if (
+                    self._seen.get(key) == fp
+                    and t - mtime / 1e9 >= self.settle_s
+                    and self._readable(path)
+                ):
                     ready.append((path, size, mtime))
                 else:
                     self._seen[key] = fp
@@ -125,19 +137,28 @@ class FolderWatcher:
                 for path, size, mtime in ready:
                     self._known[str(path)] = (size, mtime)
                     self._seen.pop(str(path), None)
-                run_settings = (self.settings if len(ready) >= SMALL_BATCH
-                                else self.settings.with_overrides(workers=1))
-                summary = process_pending(run_settings, self.db, show_progress=False,
-                                          control=self.control)
+                run_settings = (
+                    self.settings
+                    if len(ready) >= SMALL_BATCH
+                    else self.settings.with_overrides(workers=1)
+                )
+                summary = process_pending(
+                    run_settings, self.db, show_progress=False, control=self.control
+                )
                 processed += summary.processed
                 failed += summary.failed
                 if summary.interrupted:
                     self.control.cancel()
                     break
                 self._refresh()
-                self.control.emit(ProgressEvent(
-                    "watch", done=processed, failed=failed,
-                    message=f"processed {summary.processed} new photo(s)"))
+                self.control.emit(
+                    ProgressEvent(
+                        "watch",
+                        done=processed,
+                        failed=failed,
+                        message=f"processed {summary.processed} new photo(s)",
+                    )
+                )
             self._wait(self.interval_s)
         self.control.emit(ProgressEvent("watch", done=processed, failed=failed, message="stopped"))
         return {"cycles": cycles, "processed": processed, "failed": failed}

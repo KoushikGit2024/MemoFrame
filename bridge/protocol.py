@@ -1,4 +1,5 @@
 """NDJSON-RPC framing and error serialization for the Electron-Python bridge."""
+
 from __future__ import annotations
 
 import json

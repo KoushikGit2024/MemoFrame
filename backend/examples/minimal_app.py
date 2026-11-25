@@ -1,4 +1,5 @@
 """Smallest possible app using ONLY the public engine API.  python examples/minimal_app.py"""
+
 import queue
 import sys
 import threading
@@ -44,7 +45,9 @@ def poll() -> None:
                 if kind == "error":
                     messagebox.showerror("Error", payload)
                 else:
-                    status.set(f"Done: {payload['processed']} photos, {payload['total_faces']} faces detected")
+                    status.set(
+                        f"Done: {payload['processed']} photos, {payload['total_faces']} faces detected"
+                    )
             else:
                 status.set(f"{ev.stage}: {ev.done}/{ev.total} {ev.current or ev.message}")
                 if ev.total:

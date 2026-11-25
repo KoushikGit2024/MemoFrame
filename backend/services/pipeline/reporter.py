@@ -1,4 +1,5 @@
 """Reports: console text, JSON/CSV files, and the group manifest."""
+
 from __future__ import annotations
 
 import csv
@@ -64,7 +65,7 @@ def _csv_bytes(header: Sequence[str], rows: Iterable[Sequence[Any]]) -> bytes:
     writer = csv.writer(buffer)
     writer.writerow(header)
     writer.writerows(rows)
-    return buffer.getvalue().encode("utf-8-sig")      # BOM: Excel on Windows reads UTF-8
+    return buffer.getvalue().encode("utf-8-sig")  # BOM: Excel on Windows reads UTF-8
 
 
 def write_group_manifest(settings: Settings, db: DatabaseManager) -> Path:
@@ -75,12 +76,37 @@ def write_group_manifest(settings: Settings, db: DatabaseManager) -> Path:
     rows: list[list[Any]] = []
     for g in db.get_groups():
         for img in db.get_group_images(g["id"]):
-            rows.append([g["id"], g["kind"], g["name"], g["start_ts"], g["end_ts"],
-                         img["id"], img["path"], img["exif_ts"], img["face_count"]])
+            rows.append(
+                [
+                    g["id"],
+                    g["kind"],
+                    g["name"],
+                    g["start_ts"],
+                    g["end_ts"],
+                    img["id"],
+                    img["path"],
+                    img["exif_ts"],
+                    img["face_count"],
+                ]
+            )
     dest = settings.grouped_dir / "groups.csv"
-    atomic_write_bytes(dest, _csv_bytes(
-        ["group_id", "kind", "name", "start_ts", "end_ts",
-         "image_id", "path", "exif_ts", "face_count"], rows))
+    atomic_write_bytes(
+        dest,
+        _csv_bytes(
+            [
+                "group_id",
+                "kind",
+                "name",
+                "start_ts",
+                "end_ts",
+                "image_id",
+                "path",
+                "exif_ts",
+                "face_count",
+            ],
+            rows,
+        ),
+    )
     return dest
 
 
@@ -108,12 +134,26 @@ def write_report_files(settings: Settings, db: DatabaseManager) -> list[Path]:
     for cluster_id, members in db.get_duplicate_clusters().items():
         keeper = choose_keeper(members)
         for m in members:
-            dup_rows.append([cluster_id, m["kind"], m["id"] == keeper, m["id"],
-                             m["path"], m["size"], m["width"], m["height"]])
+            dup_rows.append(
+                [
+                    cluster_id,
+                    m["kind"],
+                    m["id"] == keeper,
+                    m["id"],
+                    m["path"],
+                    m["size"],
+                    m["width"],
+                    m["height"],
+                ]
+            )
     dest = out / f"duplicates_{stamp}.csv"
-    atomic_write_bytes(dest, _csv_bytes(
-        ["cluster_id", "kind", "suggested_keep", "image_id", "path", "size", "width", "height"],
-        dup_rows))
+    atomic_write_bytes(
+        dest,
+        _csv_bytes(
+            ["cluster_id", "kind", "suggested_keep", "image_id", "path", "size", "width", "height"],
+            dup_rows,
+        ),
+    )
     paths.append(dest)
 
     if failed:

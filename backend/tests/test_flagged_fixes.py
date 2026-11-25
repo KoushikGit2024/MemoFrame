@@ -35,12 +35,14 @@ def test_reset_keeps_sources_and_searches_unless_asked(settings):
 
 def test_process_faces_does_not_reread_the_file(settings, tmp_path, make_image, monkeypatch):
     from services.face import processor
+
     p = make_image(tmp_path / "a.jpg", 1)
     data = p.read_bytes()
     p.unlink()
 
     def boom(*a, **k):
         raise AssertionError("re-read from disk")
+
     monkeypatch.setattr(processor, "load_image", boom)
     out = processor.process_faces(1, p, [FaceBox(10, 10, 40, 40, 0.9)], settings, data=data)
     assert out[0].crop_path and Path(out[0].crop_path).is_file()
