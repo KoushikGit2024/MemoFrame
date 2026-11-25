@@ -1,12 +1,14 @@
 'use strict';
 
-const { spawn } = require('child_process');
+const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const readline = require('readline');
 
 class BackendClient {
   constructor(appRoot, onEvent) {
     this.appRoot = appRoot;
+    this.repoRoot = this._resolveRepoRoot(appRoot);
     this.onEvent = onEvent || (() => {});
     this.proc = null;
     this.nextId = 1;
@@ -14,31 +16,64 @@ class BackendClient {
     this.closed = false;
   }
 
-  _pythonCandidates() {
-    if (process.env.MEMOFRAME_PYTHON) {
-      return [process.env.MEMOFRAME_PYTHON];
+  _resolveRepoRoot(appRoot) {
+    const parent = path.resolve(appRoot, '..');
+    if (fs.existsSync(path.join(parent, 'bridge', 'server.py'))) {
+      return parent;
     }
-    return process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
+    if (fs.existsSync(path.join(appRoot, 'bridge', 'server.py'))) {
+      return appRoot;
+    }
+    if (process.resourcesPath && fs.existsSync(path.join(process.resourcesPath, 'bridge', 'server.py'))) {
+      return process.resourcesPath;
+    }
+    return parent;
+  }
+
+  _pythonCandidates() {
+    const list = [];
+    if (process.env.MEMOFRAME_PYTHON) list.push(process.env.MEMOFRAME_PYTHON);
+    const isWin = process.platform === 'win32';
+    const rels = isWin
+      ? [
+          ['.venv', 'Scripts', 'python.exe'],
+          ['venv', 'Scripts', 'python.exe'],
+          ['backend', '.venv', 'Scripts', 'python.exe'],
+          ['backend', 'venv', 'Scripts', 'python.exe'],
+        ]
+      : [
+          ['.venv', 'bin', 'python'],
+          ['venv', 'bin', 'python'],
+          ['backend', '.venv', 'bin', 'python'],
+          ['backend', 'venv', 'bin', 'python'],
+        ];
+    for (const parts of rels) {
+      const candidate = path.join(this.repoRoot, ...parts);
+      if (fs.existsSync(candidate)) list.push(candidate);
+    }
+    list.push(...(isWin ? ['python', 'python3'] : ['python3', 'python']));
+    return list;
   }
 
   start() {
     if (this.proc) return;
-    const candidates = this._pythonCandidates();
-    this._spawnWithFallback(candidates, 0);
+    this._spawnWithFallback(this._pythonCandidates(), 0);
   }
 
   _spawnWithFallback(candidates, index) {
     const exe = candidates[index];
-    const projectRoot = path.resolve(this.appRoot, '..');
-    const bridgeDir = path.join(projectRoot, 'bridge');
+    const backendDir = process.env.MEMOFRAME_BACKEND_DIR || path.join(this.repoRoot, 'backend');
     const env = {
       ...process.env,
       PYTHONUNBUFFERED: '1',
-      PYTHONPATH: [projectRoot, process.env.PYTHONPATH || ''].filter(Boolean).join(path.delimiter),
+      MEMOFRAME_BACKEND_DIR: backendDir,
+      PYTHONPATH: [this.repoRoot, backendDir, process.env.PYTHONPATH || '']
+        .filter(Boolean)
+        .join(path.delimiter),
     };
 
     const child = spawn(exe, ['-m', 'bridge.server'], {
-      cwd: projectRoot,
+      cwd: this.repoRoot,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
@@ -56,9 +91,7 @@ class BackendClient {
 
     child.stderr.on('data', (chunk) => {
       const msg = chunk.toString('utf8').trim();
-      if (msg) {
-        this.onEvent('bridge.stderr', { message: msg });
-      }
+      if (msg) this.onEvent('bridge.stderr', { message: msg });
     });
 
     const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });

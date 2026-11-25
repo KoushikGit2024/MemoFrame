@@ -298,7 +298,11 @@ def process_pending(
     if settings.detector_backend.lower() == "yunet":
         ensure_model(settings.yunet_path)
     _ensure_sface(settings)
-    create_tagger(settings)                 # fail fast if tagging is on but its files are missing
+    try:
+        create_tagger(settings)
+    except Exception as exc:
+        log.warning("Scene tagging unavailable: %s. Tagging will be skipped.", exc)
+        settings = replace(settings, tagging_enabled=False)
     if settings.low_priority:
         lower_process_priority()
 
@@ -306,6 +310,9 @@ def process_pending(
     if settings.storage_type == "hdd" and workers > 2:
         log.info("HDD mode: using 2 workers instead of %d (parallel reads slow a hard drive)", workers)
         workers = 2
+
+    if control is not None:
+        control.emit(ProgressEvent("process", 0, total, message=f"Starting analysis of {total} photos..."))
 
     executor: ProcessPoolExecutor | None = None
     if workers > 1:

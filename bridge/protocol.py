@@ -34,7 +34,7 @@ def _json_default(obj: Any) -> Any:
 
 def encode_line(payload: dict[str, Any]) -> str:
     """Serialize a response or event dict as a single newline-delimited JSON line."""
-    return json.dumps(payload, default=_json_default, ensure_ascii=False) + "\n"
+    return json.dumps(payload, default=_json_default, ensure_ascii=True) + "\n"
 
 
 def decode_line(raw: str) -> dict[str, Any]:

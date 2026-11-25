@@ -23,6 +23,7 @@ export interface FaceRecord {
   confidence?: number;
   person_id?: number | null;
   person_name?: string | null;
+  crop_path?: string | null;
   path?: string;
 }
 
@@ -30,6 +31,7 @@ export interface PhotoRecord {
   id: number;
   path?: string;
   thumb_path?: string | null;
+  face_crop_path?: string | null;
   width?: number;
   height?: number;
   format?: string;
@@ -135,6 +137,9 @@ export interface ScanState {
   paused: boolean;
   percent: number;
   label: string;
+  stage?: string;
+  done?: number;
+  total?: number;
 }
 
 export interface ToastItem {

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, FileText, FolderOpen, ShieldCheck, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, FolderOpen, Loader2, ShieldCheck, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { revealFile, rpc } from '../lib/api';
-import { THEMES } from '../lib/themes';
+import { THEME_FAMILIES, THEME_MAP } from '../lib/themes';
 import type { DoctorReport, WorkspaceStats } from '../types/memoframe';
 import { SuspiciousDatesModal } from '../modals/DateModals';
 import { FailedPhotosModal, ResetWorkspaceModal } from '../modals/UtilityModals';
@@ -161,28 +161,67 @@ export default function SettingsView() {
           <section className="bg-card border border-subtle rounded-sm p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <h2 className="text-sm font-semibold text-primary">Appearance &amp; Color Theme</h2>
-                <p className="text-xs text-secondary">Switch instantly between dark studio palettes and Light Canvas.</p>
+                <h2 className="text-sm font-semibold text-primary">Appearance &amp; Color Palette</h2>
+                <p className="text-xs text-secondary">Every palette includes a custom tailored Light Mode and Dark Mode.</p>
               </div>
-              <button type="button" onClick={toggleLightDark} className="h-8 px-3 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent">
-                Toggle Light / Dark
+              <button
+                type="button"
+                onClick={toggleLightDark}
+                className="h-8 px-3 rounded-xs border border-hairline bg-elevated text-xs font-medium text-primary hover:border-accent transition-colors"
+              >
+                {THEME_MAP[theme]?.isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               </button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-              {THEMES.map((t) => {
-                const active = t.name === theme;
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {THEME_FAMILIES.map((family) => {
+                const isFamilyActive = theme === family.darkTheme || theme === family.lightTheme;
+                const darkMeta = THEME_MAP[family.darkTheme];
+                const lightMeta = THEME_MAP[family.lightTheme];
+
                 return (
-                  <button key={t.name} type="button" onClick={() => applyTheme(t.name)} className={`p-2.5 rounded-xs border text-left flex flex-col gap-2 transition-colors ${active ? 'border-accent bg-accent-light' : 'border-subtle bg-elevated hover:border-hairline'}`}>
+                  <div
+                    key={family.id}
+                    className={`p-3 rounded-xs border flex flex-col gap-2.5 transition-all ${
+                      isFamilyActive
+                        ? 'border-accent bg-accent-light/50 ring-1 ring-accent'
+                        : 'border-subtle bg-elevated/60 hover:border-hairline'
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <span className="w-3.5 h-3.5 rounded-[2px] border border-hairline" style={{ backgroundColor: t.bg }} />
-                        <span className="w-3.5 h-3.5 rounded-[2px] border border-hairline" style={{ backgroundColor: t.card }} />
-                        <span className="w-3.5 h-3.5 rounded-[2px] border border-hairline" style={{ backgroundColor: t.accent }} />
-                      </div>
-                      <span className="text-[10px] text-secondary">{t.isDark ? 'Dark' : 'Light'}</span>
+                      <span className="text-xs font-semibold text-primary">{family.label}</span>
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border border-hairline shadow-sm"
+                        style={{ backgroundColor: family.previewAccent }}
+                      />
                     </div>
-                    <span className="text-xs font-medium text-primary truncate">{t.name}</span>
-                  </button>
+
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => applyTheme(family.darkTheme)}
+                        className={`h-7 px-2 rounded-xs border text-[11px] font-medium flex items-center justify-center gap-1 transition-colors ${
+                          theme === family.darkTheme
+                            ? 'bg-accent text-accent-text border-accent font-semibold'
+                            : 'bg-card border-hairline text-secondary hover:text-primary'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-[1px]" style={{ backgroundColor: darkMeta?.bg || '#111' }} />
+                        <span>Dark</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyTheme(family.lightTheme)}
+                        className={`h-7 px-2 rounded-xs border text-[11px] font-medium flex items-center justify-center gap-1 transition-colors ${
+                          theme === family.lightTheme
+                            ? 'bg-accent text-accent-text border-accent font-semibold'
+                            : 'bg-card border-hairline text-secondary hover:text-primary'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-[1px] border border-subtle" style={{ backgroundColor: lightMeta?.bg || '#fff' }} />
+                        <span>Light</span>
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -212,21 +251,48 @@ export default function SettingsView() {
               <p className="text-xs text-secondary">Verify database integrity, inspect logs, export diagnostics, or reclaim thumbnail cache.</p>
             </div>
             <div className="flex items-center flex-wrap gap-2">
-              <button type="button" disabled={!connected || Boolean(busyLabel)} onClick={handleDoctor} className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-45">
-                <ShieldCheck className="w-3.5 h-3.5" strokeWidth={1.6} />
-                <span>Run Doctor Check</span>
+              <button
+                type="button"
+                disabled={!connected || Boolean(busyLabel)}
+                onClick={handleDoctor}
+                className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-45 transition-colors"
+              >
+                {busyLabel === 'Running diagnostic health check' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
+                ) : (
+                  <ShieldCheck className="w-3.5 h-3.5" strokeWidth={1.6} />
+                )}
+                <span>{busyLabel === 'Running diagnostic health check' ? 'Checking...' : 'Run Doctor Check'}</span>
               </button>
-              <button type="button" disabled={!connected || Boolean(busyLabel)} onClick={handleClearCache} className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent disabled:opacity-45">
-                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.6} />
-                <span>Clean Stale Cache</span>
+              <button
+                type="button"
+                disabled={!connected || Boolean(busyLabel)}
+                onClick={handleClearCache}
+                className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent disabled:opacity-45 transition-colors"
+              >
+                {busyLabel === 'Cleaning stale thumbnail cache' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" strokeWidth={1.6} />
+                )}
+                <span>{busyLabel === 'Cleaning stale thumbnail cache' ? 'Cleaning...' : 'Clean Stale Cache'}</span>
               </button>
               <button type="button" onClick={() => revealFile(config.log_path)} className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent">
                 <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.6} />
                 <span>Show Log File</span>
               </button>
-              <button type="button" disabled={!connected || Boolean(busyLabel)} onClick={handleExportDiag} className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent disabled:opacity-45">
-                <FileText className="w-3.5 h-3.5" strokeWidth={1.6} />
-                <span>Export Diagnostics</span>
+              <button
+                type="button"
+                disabled={!connected || Boolean(busyLabel)}
+                onClick={handleExportDiag}
+                className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent disabled:opacity-45 transition-colors"
+              >
+                {busyLabel === 'Exporting diagnostic archive' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                ) : (
+                  <FileText className="w-3.5 h-3.5" strokeWidth={1.6} />
+                )}
+                <span>{busyLabel === 'Exporting diagnostic archive' ? 'Exporting...' : 'Export Diagnostics'}</span>
               </button>
             </div>
             {doctor && (
@@ -288,8 +354,19 @@ export default function SettingsView() {
               ))}
             </div>
             {(busyLabel || maintNote) && (
-              <div className="text-xs text-secondary font-mono bg-input border border-subtle rounded-xs px-3 py-2">
-                {busyLabel ? `${busyLabel}...` : maintNote}
+              <div className={`text-xs font-mono rounded-xs px-3 py-2 flex items-center gap-2 transition-all ${
+                busyLabel
+                  ? 'bg-accent-light/60 border border-accent text-accent animate-pulse'
+                  : 'bg-input border border-subtle text-secondary'
+              }`}>
+                {busyLabel ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                    <span>{busyLabel}...</span>
+                  </>
+                ) : (
+                  <span>{maintNote}</span>
+                )}
               </div>
             )}
           </section>

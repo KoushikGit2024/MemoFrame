@@ -36,6 +36,26 @@ export function revealFile(filePath: string): Promise<boolean> {
   return window.memoframe.revealFile(filePath);
 }
 
+export async function openFile(filePath: string): Promise<boolean> {
+  // If Electron preload has registered openFile, try that first
+  if (typeof window.memoframe?.openFile === 'function') {
+    try {
+      const ok = await window.memoframe.openFile(filePath);
+      if (ok) return true;
+    } catch {
+      // Fall through to bridge RPC fallback
+    }
+  }
+
+  // Fallback via Python backend bridge RPC (works without restarting Electron)
+  try {
+    const res = await rpc<{ ok?: boolean }>('system.open_file', { path: filePath });
+    return Boolean(res?.ok);
+  } catch {
+    return false;
+  }
+}
+
 export function onBackendEvent(callback: (payload: BackendEventPayload) => void): () => void {
   if (!window.memoframe?.onEvent) return () => {};
   return window.memoframe.onEvent(callback);

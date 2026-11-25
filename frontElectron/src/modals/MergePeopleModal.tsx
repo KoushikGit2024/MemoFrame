@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { rpc } from '../lib/api';
 import type { PersonRecord } from '../types/memoframe';
@@ -67,8 +68,14 @@ export default function MergePeopleModal({ persons, onClose, onMerged }: MergePe
           <button type="button" onClick={onClose} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
             Cancel
           </button>
-          <button type="button" disabled={!selection || busy} onClick={handleMerge} className="h-8 px-3 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-40">
-            Merge Selected
+          <button
+            type="button"
+            disabled={!selection || busy}
+            onClick={handleMerge}
+            className="h-8 px-3 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors"
+          >
+            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />}
+            <span>{busy ? 'Merging...' : 'Merge Selected'}</span>
           </button>
         </>
       }

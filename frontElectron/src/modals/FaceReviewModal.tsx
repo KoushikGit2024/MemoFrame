@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, ImageOff, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { rpc } from '../lib/api';
 import type { FaceRecord, PersonRecord } from '../types/memoframe';
@@ -9,18 +9,55 @@ const PAGE = 60;
 
 function FaceThumb({ face }: { face: FaceRecord }) {
   const [src, setSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
   useEffect(() => {
     let alive = true;
-    if (!face?.path) return undefined;
+    if (!face?.path) {
+      setLoading(false);
+      setError(true);
+      return undefined;
+    }
+    setLoading(true);
+    setError(false);
     rpc<{ data_url?: string | null }>('faces.crop', { path: face.path, x: face.x, y: face.y, w: face.w, h: face.h, size: 96 })
-      .then((res) => { if (alive && res?.data_url) setSrc(res.data_url); })
-      .catch(() => {});
+      .then((res) => {
+        if (!alive) return;
+        if (res?.data_url) {
+          setSrc(res.data_url);
+        } else {
+          setError(true);
+        }
+      })
+      .catch(() => {
+        if (alive) setError(true);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
     return () => { alive = false; };
   }, [face]);
 
   return (
-    <div className="w-[88px] h-[88px] bg-input border border-subtle rounded-xs overflow-hidden flex items-center justify-center text-[11px] text-secondary">
-      {src ? <img src={src} alt={`Face ${face.id}`} className="w-full h-full object-cover" /> : 'Offline'}
+    <div className="w-[88px] h-[88px] bg-input border border-subtle rounded-xs overflow-hidden flex items-center justify-center text-[11px] text-secondary relative select-none">
+      {loading ? (
+        <div className="w-full h-full bg-elevated/70 animate-shimmer flex items-center justify-center">
+          <div className="w-6 h-6 rounded-full border border-hairline bg-card/60 opacity-60" />
+        </div>
+      ) : error || !src ? (
+        <div className="w-full h-full bg-input/80 flex flex-col items-center justify-center gap-1 text-[10px] text-secondary/70 p-1 text-center">
+          <ImageOff className="w-4 h-4 opacity-50 text-secondary" strokeWidth={1.6} />
+          <span>Unavailable</span>
+        </div>
+      ) : (
+        <img
+          src={src}
+          alt={`Face ${face.id}`}
+          onError={() => setError(true)}
+          className="w-full h-full object-cover transition-opacity duration-150"
+        />
+      )}
     </div>
   );
 }
@@ -41,6 +78,10 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
   const [nameInput, setNameInput] = useState('');
   const [assignQuery, setAssignQuery] = useState('');
   const dirtyRef = useRef(false);
+
+  const [confirmingAll, setConfirmingAll] = useState(false);
+  const [submittingName, setSubmittingName] = useState(false);
+  const [assigningFaceId, setAssigningFaceId] = useState<number | null>(null);
 
   const loadFaces = useCallback(async (offset = 0, append = false) => {
     try {
@@ -64,7 +105,8 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
   }, [personId]);
 
   const handleConfirmAll = async () => {
-    if (personId === null) return;
+    if (personId === null || confirmingAll) return;
+    setConfirmingAll(true);
     try {
       const res = await rpc<{ confirmed?: number }>('persons.confirm', { person_id: personId });
       dirtyRef.current = true;
@@ -72,11 +114,14 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
       loadFaces(0, false);
     } catch (err) {
       notify(err instanceof Error ? err.message : String(err), 'error');
+    } finally {
+      setConfirmingAll(false);
     }
   };
 
   const handleNameSubmit = async () => {
-    if (!editingFace || !nameInput.trim()) return;
+    if (!editingFace || !nameInput.trim() || submittingName) return;
+    setSubmittingName(true);
     try {
       await rpc('faces.name', { face_id: editingFace.id, name: nameInput.trim() });
       dirtyRef.current = true;
@@ -84,10 +129,14 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
       loadFaces(0, false);
     } catch (err) {
       notify(err instanceof Error ? err.message : String(err), 'error');
+    } finally {
+      setSubmittingName(false);
     }
   };
 
   const handleAssign = async (faceId: number, targetPersonId: number | null) => {
+    if (assigningFaceId !== null) return;
+    setAssigningFaceId(faceId);
     try {
       await rpc('faces.assign', { face_id: faceId, person_id: targetPersonId });
       dirtyRef.current = true;
@@ -95,6 +144,8 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
       loadFaces(0, false);
     } catch (err) {
       notify(err instanceof Error ? err.message : String(err), 'error');
+    } finally {
+      setAssigningFaceId(null);
     }
   };
 
@@ -123,12 +174,26 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
           </div>
           <div className="flex items-center gap-2">
             {personId !== null && (
-              <button type="button" onClick={handleConfirmAll} className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover">
-                <Check className="w-3.5 h-3.5" strokeWidth={1.8} />
-                <span>Confirm All Faces</span>
+              <button
+                type="button"
+                disabled={confirmingAll}
+                onClick={handleConfirmAll}
+                className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors"
+              >
+                {confirmingAll ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
+                ) : (
+                  <Check className="w-3.5 h-3.5" strokeWidth={1.8} />
+                )}
+                <span>{confirmingAll ? 'Confirming...' : 'Confirm All Faces'}</span>
               </button>
             )}
-            <button type="button" onClick={() => onClose?.(dirtyRef.current)} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+            <button
+              type="button"
+              disabled={confirmingAll || submittingName || assigningFaceId !== null}
+              onClick={() => onClose?.(dirtyRef.current)}
+              className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated disabled:opacity-50"
+            >
               Close
             </button>
           </div>
@@ -148,14 +213,21 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
               <input
                 type="text"
                 autoFocus
+                disabled={submittingName}
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleNameSubmit(); }}
                 placeholder="Enter person name..."
-                className="flex-1 h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent"
+                className="flex-1 h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent disabled:opacity-50"
               />
-              <button type="button" onClick={handleNameSubmit} className="h-8 px-3 bg-accent text-accent-text rounded-xs text-xs font-medium">
-                Save
+              <button
+                type="button"
+                disabled={submittingName || !nameInput.trim()}
+                onClick={handleNameSubmit}
+                className="h-8 px-3 inline-flex items-center gap-1.5 bg-accent text-accent-text rounded-xs text-xs font-medium disabled:opacity-50 transition-colors hover:bg-accent-hover"
+              >
+                {submittingName && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />}
+                <span>{submittingName ? 'Saving...' : 'Save'}</span>
               </button>
             </div>
           ) : (

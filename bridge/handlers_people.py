@@ -7,19 +7,86 @@ from pathlib import Path
 from typing import Any
 
 
+from bridge.handlers_library import ensure_face_crop
+
+
+def _ensure_person_crop(ctx: Any, person: dict[str, Any]) -> str | None:
+    """Ensure person has a cached cover crop on disk, generating it on the fly if needed."""
+    cover_crop = person.get("cover_crop_path")
+    if cover_crop:
+        p = Path(str(cover_crop))
+        if not p.is_absolute():
+            p = (ctx.workspace.parent / p).resolve() if (ctx.workspace.parent / p).is_file() else (ctx.workspace / p).resolve()
+        if p.is_file():
+            return str(p)
+
+    crop_dir = ctx.workspace / "face_crops"
+    crop_dir.mkdir(parents=True, exist_ok=True)
+
+    img_path = person.get("image_path")
+    x = person.get("x")
+    y = person.get("y")
+    w = person.get("w")
+    h = person.get("h")
+    cid = person.get("cover_face_id") or person.get("id") or 0
+
+    # If list_persons didn't provide image_path or coords because cover_face_id wasn't set or was invalid,
+    # find the best face for this person directly
+    if not img_path or not Path(str(img_path)).is_file() or not w or int(w) <= 0:
+        try:
+            eng = getattr(ctx, "engine", None)
+            if eng and hasattr(eng, "db"):
+                pid = person.get("id")
+                row = eng.db._query_one(
+                    "SELECT f.id, f.crop_path, f.x, f.y, f.w, f.h, img.path AS image_path "
+                    "FROM faces f JOIN images img ON img.id = f.image_id "
+                    "WHERE f.person_id = ? "
+                    "ORDER BY f.confidence * f.w * f.h DESC LIMIT 1",
+                    (pid,)
+                )
+                if row:
+                    if row["crop_path"] and Path(str(row["crop_path"])).is_file():
+                        return str(row["crop_path"])
+                    img_path = row["image_path"]
+                    x, y, w, h = row["x"], row["y"], row["w"], row["h"]
+                    cid = row["id"]
+        except Exception:
+            pass
+
+    if not img_path or not Path(str(img_path)).is_file() or not w or not h or int(w) <= 0 or int(h) <= 0:
+        return None
+
+    face_dict = {"id": cid, "x": x, "y": y, "w": w, "h": h}
+    return ensure_face_crop(ctx.workspace, face_dict, str(img_path), size=180)
+
+
 def register_people_handlers(registry: dict[str, Any], ctx: Any) -> None:
     """Register people and face management RPC handlers."""
 
     def persons_list(_params: dict[str, Any]) -> list[dict[str, Any]]:
         eng = ctx.require_engine()
         with ctx.lock:
-            return list(eng.get_persons() or [])
+            raw = list(eng.get_persons() or [])
+        res: list[dict[str, Any]] = []
+        for p in raw:
+            p_dict = dict(p)
+            crop = _ensure_person_crop(ctx, p_dict)
+            if crop:
+                p_dict["cover_crop_path"] = crop
+            res.append(p_dict)
+        return res
 
     def persons_get(params: dict[str, Any]) -> dict[str, Any] | None:
         eng = ctx.require_engine()
         with ctx.lock:
             row = eng.get_person(int(params["person_id"]))
-            return dict(row) if row else None
+            if not row:
+                return None
+            p_dict = dict(row)
+            crop = _ensure_person_crop(ctx, p_dict)
+            if crop:
+                p_dict["cover_crop_path"] = crop
+            return p_dict
 
     def persons_rename(params: dict[str, Any]) -> dict[str, Any]:
         person_id = int(params["person_id"])

@@ -13,7 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { THEMES, THEME_MAP } from '../lib/themes';
+import { THEME_FAMILIES, THEME_MAP } from '../lib/themes';
 import type { ViewKey } from '../types/memoframe';
 
 const NAV_ITEMS: ReadonlyArray<{ key: ViewKey; label: string; icon: LucideIcon }> = [
@@ -113,28 +113,30 @@ export default function NavRail() {
           <div className="bg-card border border-subtle rounded-sm p-2.5 flex flex-col gap-2">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.08em] text-secondary">
               <span className="font-semibold">Theme</span>
-              <span>{theme.split(' ')[0]}</span>
+              <span className="font-mono text-[10.5px] truncate max-w-[100px]">{theme.replace(' Dark', '').replace(' Light', '')}</span>
             </div>
             <button
               type="button"
               onClick={toggleLightDark}
               className="h-7 px-2 flex items-center justify-center gap-1.5 rounded-xs border border-hairline bg-elevated text-primary text-xs font-medium hover:border-secondary transition-colors"
             >
-              {isDark ? <Sun className="w-3.5 h-3.5" strokeWidth={1.6} /> : <Moon className="w-3.5 h-3.5" strokeWidth={1.6} />}
-              <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+              {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" strokeWidth={1.6} /> : <Moon className="w-3.5 h-3.5 text-accent" strokeWidth={1.6} />}
+              <span>{isDark ? 'Switch to Light' : 'Switch to Dark'}</span>
             </button>
-            <div className="flex items-center justify-between px-0.5 pt-0.5">
-              {THEMES.map((t) => {
-                const selected = t.name === theme;
+            <div className="grid grid-cols-6 gap-1 pt-0.5">
+              {THEME_FAMILIES.map((f) => {
+                const isSelected = theme === f.darkTheme || theme === f.lightTheme;
                 return (
                   <button
-                    key={t.name}
+                    key={f.id}
                     type="button"
-                    title={`Switch to ${t.name}`}
-                    onClick={() => applyTheme(t.name)}
-                    style={{ backgroundColor: selected ? t.accent : t.card }}
-                    className={`w-5 h-5 rounded-xs border transition-transform ${
-                      selected ? 'border-accent ring-1 ring-accent ring-offset-1 ring-offset-card' : 'border-hairline hover:border-secondary'
+                    title={`${f.label} (${isDark ? 'Dark' : 'Light'})`}
+                    onClick={() => applyTheme(isDark ? f.darkTheme : f.lightTheme)}
+                    style={{ backgroundColor: f.previewAccent }}
+                    className={`h-5 rounded-xs border transition-all ${
+                      isSelected
+                        ? 'border-accent ring-2 ring-accent ring-offset-1 ring-offset-card scale-105'
+                        : 'border-hairline hover:scale-105 hover:border-secondary'
                     }`}
                   />
                 );

@@ -20,7 +20,7 @@ from engine.contract import API_VERSION
 from engine.doctor import run_checks
 from engine.errors import EngineError, ErrorCode, translate
 from engine.lock import WorkspaceLock
-from engine.settings_file import load_settings, write_default_config
+from engine.settings_file import load_settings, update_config_file, write_default_config
 from engine.profiles import apply_profile
 from services.pipeline import maintenance
 from services.pipeline import orchestrator as pipeline
@@ -623,12 +623,8 @@ class Engine:
         """Clear the database and generated files. Original photos are never touched.
         Scanned folders and saved searches are kept unless you ask to clear them."""
         before = self.db.report_stats()["total_images"]
-        self.db.reset()
+        self.db.reset(clear_sources=clear_sources, clear_saved_searches=clear_saved_searches)
         self.db.rebuild_fts()
-        if clear_sources:
-            self.db.clear_sources()
-        if clear_saved_searches:
-            self.db.clear_saved_searches()
         if not keep_generated:
             maintenance.clear_cache(self.settings, self.db,
                                     ("thumbnails", "face_crops", "annotated"))
@@ -637,3 +633,11 @@ class Engine:
                 shutil.rmtree(grouped, ignore_errors=True)
             self.settings.ensure_dirs()
         return {"images_removed": before, "cleared_images": before}
+
+    @_translated
+    def update_config(self, **updates: Any) -> dict[str, Any]:
+        """Validate and atomically persist config.toml updates and refresh in-memory settings."""
+        clean = update_config_file(self.settings.workspace, **updates)
+        if clean:
+            self.settings = self.settings.with_overrides(**clean)
+        return clean

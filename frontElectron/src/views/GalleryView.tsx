@@ -7,6 +7,7 @@ import {
   Grid2x2,
   Grid3x3,
   Images,
+  Loader2,
   ScanFace,
   Search,
   Table2,
@@ -360,15 +361,31 @@ export default function GalleryView() {
         <div className="flex-1 min-h-0 overflow-y-auto pr-1">
           <div className={`grid ${layoutMode === 'compact' ? 'grid-cols-[repeat(auto-fill,minmax(154px,1fr))] gap-2' : 'grid-cols-[repeat(auto-fill,minmax(204px,1fr))] gap-3'}`}>
             {items.map((item) => (
-              <PhotoCard key={item.id} photo={item} compact={layoutMode === 'compact'} faceZoom={faceZoom} onOpen={setLightboxPhoto} />
+              <PhotoCard
+                key={item.id}
+                photo={item}
+                compact={layoutMode === 'compact'}
+                faceZoom={faceZoom}
+                targetPersonId={selectedPersonId}
+                onOpen={setLightboxPhoto}
+              />
             ))}
           </div>
         </div>
       )}
 
       <div className="bg-card border border-subtle rounded-sm px-3 py-1.5 flex items-center justify-between shrink-0">
-        <span className="text-xs text-secondary font-mono tabular-nums">
-          {loading ? 'Loading...' : items.length ? `Showing ${offset + 1}-${offset + items.length} of ${total.toLocaleString()} photos` : 'No photos matched'}
+        <span className="text-xs text-secondary font-mono tabular-nums inline-flex items-center gap-1.5">
+          {loading ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+              <span className="text-accent font-medium animate-pulse">Loading photos...</span>
+            </>
+          ) : items.length ? (
+            `Showing ${offset + 1}-${offset + items.length} of ${total.toLocaleString()} photos`
+          ) : (
+            'No photos matched'
+          )}
         </span>
         <div className="flex items-center gap-1.5">
           <button type="button" disabled={page <= 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="h-7 px-2 inline-flex items-center gap-1 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated disabled:opacity-40">

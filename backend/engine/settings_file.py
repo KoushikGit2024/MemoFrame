@@ -190,3 +190,46 @@ def load_settings(workspace: Path, profile: str | None = None, *,
     if not index_videos:
         settings = settings.with_overrides(extensions=settings.extensions - VIDEO_EXTENSIONS)
     return settings.with_overrides(**clean)
+
+
+def _format_toml_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def update_config_file(workspace: Path, **updates: Any) -> dict[str, Any]:
+    """Validate and atomically update one or more keys in workspace/config.toml."""
+    clean: dict[str, Any] = {}
+    for key, val in updates.items():
+        if key not in _FIELDS:
+            raise _bad(f"unknown setting: {key}")
+        clean[key] = _check(key, val)
+    if not clean:
+        return {}
+
+    path = write_default_config(Path(workspace).expanduser().resolve())
+    lines = path.read_text(encoding="utf-8").splitlines()
+    remaining = dict(clean)
+    new_lines: list[str] = []
+
+    for line in lines:
+        stripped = line.lstrip()
+        matched_key = None
+        if not stripped.startswith("#") and "=" in stripped:
+            candidate = stripped.split("=", 1)[0].strip()
+            if candidate in remaining:
+                matched_key = candidate
+        if matched_key is not None:
+            new_lines.append(f"{matched_key} = {_format_toml_value(remaining.pop(matched_key))}")
+        else:
+            new_lines.append(line)
+
+    for key, val in remaining.items():
+        new_lines.append(f"{key} = {_format_toml_value(val)}")
+
+    atomic_write_bytes(path, ("\n".join(new_lines) + "\n").encode("utf-8"))
+    return clean

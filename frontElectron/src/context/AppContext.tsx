@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { onBackendEvent, rpc, selectFolder } from '../lib/api';
-import { THEME_MAP } from '../lib/themes';
+import { THEME_FAMILIES, THEME_MAP } from '../lib/themes';
 import { basename } from '../lib/utils';
 import type {
   EngineConfig,
@@ -47,8 +47,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [activeView, setActiveView] = useState<ViewKey>('photos');
-  const [theme, setThemeState] = useState('Dark Slate');
-  const [lastDarkTheme, setLastDarkTheme] = useState('Dark Slate');
+  const [theme, setThemeState] = useState('Nordic Slate Dark');
   const [connected, setConnected] = useState(false);
   const [backendError, setBackendError] = useState('');
   const [workspace, setWorkspace] = useState('');
@@ -75,18 +74,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!THEME_MAP[name]) return;
     document.documentElement.setAttribute('data-theme', name);
     setThemeState(name);
-    if (name !== 'Light Canvas') setLastDarkTheme(name);
     if (persist) {
       rpc('prefs.set', { key: 'theme', value: name }).catch(() => {});
-      if (name !== 'Light Canvas') {
-        rpc('prefs.set', { key: 'last_dark_theme', value: name }).catch(() => {});
-      }
     }
   }, []);
 
   const toggleLightDark = useCallback(() => {
-    applyTheme(theme === 'Light Canvas' ? (lastDarkTheme || 'Dark Slate') : 'Light Canvas', true);
-  }, [theme, lastDarkTheme, applyTheme]);
+    const currentMeta = THEME_MAP[theme];
+    const isDark = currentMeta?.isDark ?? true;
+    const family = THEME_FAMILIES.find(
+      (f) => f.darkTheme === theme || f.lightTheme === theme,
+    ) || THEME_FAMILIES[0];
+
+    const targetTheme = isDark ? family.lightTheme : family.darkTheme;
+    applyTheme(targetTheme, true);
+  }, [theme, applyTheme]);
 
   const initBackend = useCallback(async () => {
     try {
@@ -95,8 +97,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setBackendError(info.backend_error || '');
       setWorkspace(info.workspace || '');
       if (info.config) setConfig(info.config);
-      const savedDark = typeof info.prefs?.last_dark_theme === 'string' ? info.prefs.last_dark_theme : '';
-      if (savedDark && THEME_MAP[savedDark]) setLastDarkTheme(savedDark);
       const savedTheme = typeof info.prefs?.theme === 'string' ? info.prefs.theme : '';
       if (savedTheme && THEME_MAP[savedTheme]) applyTheme(savedTheme, false);
       if (info.config_warnings?.length) {
@@ -113,11 +113,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return onBackendEvent(({ event, data }) => {
       if (event === 'bridge.ready') initBackend();
       if (event === 'scan.progress') {
+        const payloadData = (data || {}) as Record<string, unknown>;
         setScan((s) => ({
           ...s,
           running: true,
-          percent: Number(data.percent || 0),
-          label: String(data.label || 'Scanning...'),
+          percent: Number(payloadData.percent || 0),
+          label: String(payloadData.label || 'Scanning...'),
+          stage: String(payloadData.stage || ''),
+          done: Number(payloadData.done || 0),
+          total: Number(payloadData.total || 0),
         }));
       }
       if (event === 'scan.finished') {

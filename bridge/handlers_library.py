@@ -7,8 +7,71 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-def enrich_photos(engine: Any, items: Sequence[dict[str, Any]], include_thumbs: bool = True) -> list[dict[str, Any]]:
-    """Attach faces (single batch query) and optional thumbnail paths to photo records."""
+def ensure_face_crop(workspace: Path, face: dict[str, Any], img_path: str | None, size: int = 320) -> str | None:
+    """Generate a crisp square face crop (Lanczos resampled) centered on the face with proportional margin.
+    
+    Caches to workspace/face_crops/face_{face_id}_{size}.jpg to make grid face zoom instant.
+    """
+    fid = face.get("id")
+    if not fid:
+        return None
+
+    crop_dir = workspace / "face_crops"
+    crop_dir.mkdir(parents=True, exist_ok=True)
+    out_path = crop_dir / f"crop_face_{fid}_{size}.jpg"
+    if out_path.is_file():
+        return str(out_path)
+
+    # Check if face already has an existing valid crop on disk
+    existing = face.get("crop_path")
+    if existing:
+        ep = Path(str(existing))
+        if not ep.is_absolute():
+            ep = (workspace.parent / ep).resolve() if (workspace.parent / ep).is_file() else (workspace / ep).resolve()
+        if ep.is_file():
+            # If size matches or existing is already a square crop, we can use it
+            return str(ep)
+
+    if not img_path or not Path(str(img_path)).is_file():
+        return None
+
+    w = face.get("w")
+    h = face.get("h")
+    if not w or not h or int(w) <= 0 or int(h) <= 0:
+        return None
+
+    try:
+        from PIL import Image, ImageOps
+
+        with Image.open(str(img_path)) as raw_im:
+            im = ImageOps.exif_transpose(raw_im).convert("RGB")
+            xi, yi, wi, hi = int(face.get("x") or 0), int(face.get("y") or 0), int(w), int(h)
+
+            # Balanced square box with ~27.5% padding around head/chin
+            side = int(max(wi, hi) * 1.55)
+            side = min(side, im.width, im.height)
+            cx = xi + wi // 2
+            cy = yi + hi // 2
+
+            left = max(0, min(im.width - side, cx - side // 2))
+            top = max(0, min(im.height - side, cy - side // 2))
+
+            crop = im.crop((left, top, left + side, top + side))
+            crop = crop.resize((size, size), Image.Resampling.LANCZOS)
+            crop.save(str(out_path), "JPEG", quality=92, optimize=True)
+            return str(out_path)
+    except Exception:
+        return None
+
+
+def enrich_photos(
+    engine: Any,
+    items: Sequence[dict[str, Any]],
+    include_thumbs: bool = True,
+    target_person_id: int | None = None,
+    workspace: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Attach faces (single batch query), thumbnail paths, and pre-generated square face crops to photo records."""
     if not items:
         return []
     ids = [int(p["id"]) for p in items if "id" in p]
@@ -23,12 +86,31 @@ def enrich_photos(engine: Any, items: Sequence[dict[str, Any]], include_thumbs: 
     for p in items:
         pid = int(p.get("id", 0))
         row = dict(p)
-        row["faces"] = faces_by_img.get(pid, faces_by_img.get(str(pid), []))
+        img_faces = faces_by_img.get(pid, faces_by_img.get(str(pid), []))
+        row["faces"] = img_faces
+
+        # Resolve thumbnail
         if include_thumbs and pid:
             try:
                 row["thumb_path"] = engine.thumbnail(pid)
             except Exception:
                 row["thumb_path"] = None
+
+        # Resolve square face crop for face-zoom mode
+        if workspace and img_faces:
+            target_face = None
+            if target_person_id is not None:
+                target_face = next((f for f in img_faces if f.get("person_id") == target_person_id), None)
+            if not target_face:
+                target_face = max(img_faces, key=lambda f: int(f.get("w", 0)) * int(f.get("h", 0)))
+            if target_face:
+                crop = ensure_face_crop(workspace, target_face, str(row.get("path") or ""), size=320)
+                row["face_crop_path"] = crop
+            else:
+                row["face_crop_path"] = None
+        else:
+            row["face_crop_path"] = None
+
         enriched.append(row)
     return enriched
 
@@ -50,7 +132,14 @@ def register_library_handlers(registry: dict[str, Any], ctx: Any) -> None:
             pages = max(1, (total + size - 1) // size)
             page = min(page, pages - 1)
             raw_items = eng.find(kind="photo", sort=sort, limit=size, offset=page * size, **filters)
-            items = enrich_photos(eng, raw_items, include_thumbs=True)
+            target_pid = int(filters["person_id"]) if filters.get("person_id") is not None else None
+            items = enrich_photos(
+                eng,
+                raw_items,
+                include_thumbs=True,
+                target_person_id=target_pid,
+                workspace=ctx.workspace,
+            )
         return {"items": items, "total": total, "pages": pages, "page": page, "person_gone": gone}
 
     def photo_detail(params: dict[str, Any]) -> dict[str, Any]:
@@ -122,7 +211,11 @@ def register_library_handlers(registry: dict[str, Any], ctx: Any) -> None:
         limit = int(params.get("limit") or 500)
         eng = ctx.require_engine()
         with ctx.lock:
-            return list(eng.find(status="failed", limit=limit) or [])
+            if hasattr(eng, "failed_images") and callable(eng.failed_images):
+                rows = list(eng.failed_images() or [])
+            else:
+                rows = list(eng.find(status="failed", limit=limit) or [])
+            return rows[:limit]
 
     def dates_suspicious(params: dict[str, Any]) -> list[dict[str, Any]]:
         limit = int(params.get("limit") or 500)

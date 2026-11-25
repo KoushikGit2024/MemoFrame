@@ -45,6 +45,16 @@ function registerIpcHandlers(backendClient, getMainWindow) {
     }
     return false;
   });
+
+  ipcMain.handle('memoframe:open-file', async (_event, targetPath) => {
+    if (!targetPath) return false;
+    const resolved = path.resolve(String(targetPath));
+    if (fs.existsSync(resolved)) {
+      const err = await shell.openPath(resolved);
+      return !err;
+    }
+    return false;
+  });
 }
 
 module.exports = { registerIpcHandlers };

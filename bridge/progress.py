@@ -43,6 +43,36 @@ def describe(ev: Mapping[str, Any]) -> str:
     return f"{text} · {ev['current']}" if ev.get("current") else text
 
 
+class StepProgress:
+    """Calculates step-wise progress percentage (0-100) that restarts for each pipeline stage."""
+
+    def __init__(self) -> None:
+        self.current_stage: str = ""
+        self.current_pct: int = 0
+
+    def update(self, event: Mapping[str, Any]) -> int:
+        stage = str(event.get("stage", "") or "")
+        done = int(event.get("done") or 0)
+        total = int(event.get("total") or 0)
+
+        # If a new stage starts, restart progress from 0
+        if stage != self.current_stage:
+            self.current_stage = stage
+            self.current_pct = 0
+
+        if total > 0:
+            pct = int(min(100, max(0, (done / total) * 100)))
+            self.current_pct = max(self.current_pct, pct)
+        elif event.get("message") and "done" in str(event.get("message", "")).lower():
+            self.current_pct = 100
+
+        return self.current_pct
+
+    def reset(self) -> None:
+        self.current_stage = ""
+        self.current_pct = 0
+
+
 class StageProgress:
     """Calculates monotonic overall progress percentage (0-100) across pipeline stages."""
 

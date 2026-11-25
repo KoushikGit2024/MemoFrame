@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, CheckCircle2, RefreshCw, Star } from 'lucide-react';
+import { Check, CheckCircle2, Loader2, RefreshCw, Star } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { rpc } from '../lib/api';
 import { formatDims, formatQuality, LatestTask } from '../lib/utils';
@@ -117,12 +117,16 @@ export default function DuplicatesView() {
                           type="button"
                           disabled={busy}
                           onClick={() => keepSingle(photo.id)}
-                          className={`h-8 px-3 inline-flex items-center justify-center gap-1.5 rounded-xs text-xs font-medium transition-colors ${
+                          className={`h-8 px-3 inline-flex items-center justify-center gap-1.5 rounded-xs text-xs font-medium transition-colors disabled:opacity-50 ${
                             isBest ? 'bg-accent text-accent-text hover:bg-accent-hover' : 'bg-elevated border border-hairline text-primary hover:border-accent'
                           }`}
                         >
-                          <Check className="w-3.5 h-3.5" strokeWidth={1.8} />
-                          <span>Keep This Only</span>
+                          {busy ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" strokeWidth={1.8} />
+                          )}
+                          <span>{busy ? 'Resolving...' : 'Keep This Only'}</span>
                         </button>
                       </div>
                     );

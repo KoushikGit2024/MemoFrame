@@ -1,24 +1,43 @@
 import { useState } from 'react';
 import { ImageOff, ScanFace } from 'lucide-react';
 import { mediaUrl } from '../lib/api';
-import { basename, computeFaceZoomStyle, formatDate, formatQuality } from '../lib/utils';
+import { basename, formatDate, formatQuality } from '../lib/utils';
 import type { PhotoRecord } from '../types/memoframe';
 
 interface PhotoCardProps {
   photo: PhotoRecord;
   compact?: boolean;
   faceZoom?: boolean;
+  targetPersonId?: number | null;
   onOpen?: (photo: PhotoRecord) => void;
   className?: string;
 }
 
-export default function PhotoCard({ photo, compact = false, faceZoom = false, onOpen, className = '' }: PhotoCardProps) {
+export default function PhotoCard({ photo, compact = false, faceZoom = false, targetPersonId: _targetPersonId = null, onOpen, className = '' }: PhotoCardProps) {
+  // If thumbnail fails or is missing, fall back to photo.path
+  const [useFallback, setUseFallback] = useState(false);
   const [imgErr, setImgErr] = useState(false);
-  const srcPath = photo.thumb_path || photo.path;
+
+  // In faceZoom mode, display the crisp backend square face crop directly (Felicity model).
+  // In normal mode, use the lightweight whole-photo thumbnail.
+  const faceCrop = photo.face_crop_path || photo.faces?.[0]?.crop_path;
+  const srcPath = (faceZoom && faceCrop)
+    ? faceCrop
+    : (!useFallback && photo.thumb_path)
+      ? photo.thumb_path
+      : photo.path;
+
   const imgSrc = !imgErr && srcPath ? mediaUrl(srcPath) : '';
-  const zoomStyle = faceZoom ? computeFaceZoomStyle(photo) : null;
   const faceCount = photo.faces?.length ?? photo.face_count ?? 0;
   const dateText = formatDate(photo.effective_ts || photo.exif_ts).slice(0, 10);
+
+  const handleImageError = () => {
+    if (!useFallback && photo.thumb_path && photo.path && photo.thumb_path !== photo.path) {
+      setUseFallback(true);
+    } else {
+      setImgErr(true);
+    }
+  };
 
   return (
     <div
@@ -34,9 +53,8 @@ export default function PhotoCard({ photo, compact = false, faceZoom = false, on
             src={imgSrc}
             alt={basename(photo.path)}
             loading="lazy"
-            onError={() => setImgErr(true)}
-            style={zoomStyle || undefined}
-            className="w-full h-full object-cover transition-transform duration-150"
+            onError={handleImageError}
+            className="w-full h-full object-cover transition-opacity duration-150"
           />
         ) : (
           <ImageOff className="w-6 h-6 text-secondary opacity-40" strokeWidth={1.5} />

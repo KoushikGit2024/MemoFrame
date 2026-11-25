@@ -51,7 +51,10 @@ _SORTS = {
     "date_desc": f"{_EFF} IS NULL, {_EFF} DESC, i.id DESC",
     "quality": "i.quality IS NULL, i.quality DESC, i.id",
     "path": "i.path COLLATE NOCASE, i.id",
+    "path_desc": "i.path COLLATE NOCASE DESC, i.id DESC",
     "size": "i.size DESC, i.id",
+    "size_asc": "i.size ASC, i.id",
+    "faces": "i.face_count DESC, i.id",
 }
 _MONTHS = ("January February March April May June July August "
            "September October November December").split()
@@ -576,7 +579,7 @@ class DatabaseManager:
 
     def failed_images(self) -> list[sqlite3.Row]:
         """``path, error`` for every failed image."""
-        return self._query("SELECT path, error FROM images WHERE status = 'failed' ORDER BY path")
+        return self._query("SELECT id, path, error FROM images WHERE status = 'failed' ORDER BY path")
 
     # ------------------------------------------------------------------
     # Persons & Face Embeddings
@@ -1406,17 +1409,37 @@ class DatabaseManager:
     # ------------------------------------------------------------------
     # Maintenance
     # ------------------------------------------------------------------
-    def reset(self) -> None:
-        """Delete all rows (database only; the CLI decides about output files)."""
+    def reset(self, *, clear_sources: bool = False, clear_saved_searches: bool = False,
+              clear_archive: bool = False) -> None:
+        """Delete all metadata rows (database only; the CLI decides about output files)."""
         with self._tx() as conn:
             conn.execute("DELETE FROM faces")
             conn.execute("DELETE FROM persons")
             conn.execute("DELETE FROM duplicates")
             conn.execute("DELETE FROM bursts")
+            conn.execute("DELETE FROM marks")
+            conn.execute("DELETE FROM tags")
+            conn.execute("DELETE FROM date_overrides")
+            conn.execute("DELETE FROM embeddings")
             conn.execute("DELETE FROM images")
             conn.execute("DELETE FROM groups")
             conn.execute("DELETE FROM meta")
+            if clear_archive:
+                conn.execute("DELETE FROM marks_archive")
+            if clear_sources:
+                conn.execute("DELETE FROM sources")
+            if clear_saved_searches:
+                conn.execute("DELETE FROM saved_searches")
+            # Clear full text search virtual table
+            try:
+                conn.execute("DELETE FROM fts_images")
+            except Exception:
+                pass
         with self._lock:
+            try:
+                self._db.execute("INSERT INTO fts_images(fts_images) VALUES('rebuild')")
+            except Exception:
+                pass
             self._db.execute("VACUUM")
         log.info("Database reset.")
 

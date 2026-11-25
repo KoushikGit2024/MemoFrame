@@ -19,24 +19,75 @@ protocol.registerSchemesAsPrivileged([
       standard: true,
       secure: true,
       supportFetchAPI: true,
+      corsEnabled: true,
       stream: true,
+      bypassCSP: true,
     },
   },
 ]);
+
+const MIME_TYPES = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.bmp': 'image/bmp',
+  '.svg': 'image/svg+xml',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+};
 
 function registerMediaProtocol() {
   protocol.handle('memoframe-media', async (request) => {
     try {
       const parsed = new URL(request.url);
       const rawPath = parsed.searchParams.get('path');
-      if (!rawPath) return new Response('Missing path parameter', { status: 400 });
-      const resolved = path.resolve(rawPath);
-      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
-        return new Response('Not found', { status: 404 });
+      if (!rawPath) {
+        return new Response('Missing path parameter', {
+          status: 400,
+          headers: { 'Access-Control-Allow-Origin': '*' },
+        });
       }
-      return net.fetch(pathToFileURL(resolved).toString());
-    } catch {
-      return new Response('Bad request', { status: 400 });
+      let resolved = path.resolve(rawPath);
+      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+        // Fallback for paths relative to repository root
+        const repoRoot = path.resolve(APP_ROOT, '..');
+        const repoResolved = path.resolve(repoRoot, rawPath);
+        if (fs.existsSync(repoResolved) && fs.statSync(repoResolved).isFile()) {
+          resolved = repoResolved;
+        } else {
+          return new Response('Not found', {
+            status: 404,
+            headers: { 'Access-Control-Allow-Origin': '*' },
+          });
+        }
+      }
+
+      const ext = path.extname(resolved).toLowerCase();
+      const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+      // Stream file asynchronously off-thread using Chromium's native net.fetch
+      // This completely avoids blocking the Electron main UI event loop.
+      const fileUrl = pathToFileURL(resolved).toString();
+      const response = await net.fetch(fileUrl);
+      const headers = new Headers(response.headers);
+      headers.set('Content-Type', contentType);
+      headers.set('Access-Control-Allow-Origin', '*');
+      headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+
+      return new Response(response.body, {
+        status: 200,
+        headers,
+      });
+    } catch (err) {
+      return new Response('Bad request', {
+        status: 400,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      });
     }
   });
 }
@@ -49,6 +100,7 @@ function createWindow() {
     minHeight: 540,
     title: 'MemoFrame — Local Photo & Face Intelligence',
     backgroundColor: '#0f1216',
+    show: false,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -66,6 +118,8 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(APP_ROOT, 'dist', 'index.html'));
   }
+
+  mainWindow.once('ready-to-show', () => mainWindow && mainWindow.show());
 
   mainWindow.on('closed', () => {
     mainWindow = null;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Clock, RefreshCw } from 'lucide-react';
+import { ArrowRight, Clock, Loader2, RefreshCw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { rpc } from '../lib/api';
 import { LatestTask } from '../lib/utils';
@@ -108,8 +108,14 @@ export default function TimelineView() {
           })}
 
           {remaining > 0 && (
-            <button type="button" disabled={loading} onClick={() => loadPage(groups.length, true)} className="h-9 px-4 self-center rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated mb-3">
-              Show {Math.min(PAGE_STEP, remaining)} more ({remaining} remaining)
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => loadPage(groups.length, true)}
+              className="h-9 px-4 self-center rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated mb-3 inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />}
+              <span>{loading ? 'Loading more events...' : `Show ${Math.min(PAGE_STEP, remaining)} more (${remaining} remaining)`}</span>
             </button>
           )}
         </div>

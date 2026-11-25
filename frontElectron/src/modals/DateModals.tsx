@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { rpc } from '../lib/api';
 import type { SuspiciousDateRow } from '../types/memoframe';
@@ -62,6 +63,7 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [changed, setChanged] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
 
   useEffect(() => {
     rpc<SuspiciousDateRow[]>('dates.suspicious', { limit: 500 })
@@ -81,29 +83,39 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
   const applyBulkDate = async (iso: string) => {
     setShowPicker(false);
     const ids = [...selectedIds];
-    for (const id of ids) {
-      try {
-        await rpc('photos.set_date', { image_id: id, iso, reason: 'manual (bulk)' });
-      } catch (err) {
-        notify(err instanceof Error ? err.message : String(err), 'error');
+    setBusyAction('apply');
+    try {
+      for (const id of ids) {
+        try {
+          await rpc('photos.set_date', { image_id: id, iso, reason: 'manual (bulk)' });
+        } catch (err) {
+          notify(err instanceof Error ? err.message : String(err), 'error');
+        }
       }
+      setRows((prev) => prev.map((r) => (selectedIds.has(r.id) ? { ...r, override_ts: iso } : r)));
+      setChanged(true);
+      notify(`Updated ${ids.length} photo date(s).`, 'success');
+    } finally {
+      setBusyAction(null);
     }
-    setRows((prev) => prev.map((r) => (selectedIds.has(r.id) ? { ...r, override_ts: iso } : r)));
-    setChanged(true);
-    notify(`Updated ${ids.length} photo date(s).`, 'success');
   };
 
   const clearSelected = async () => {
     const ids = [...selectedIds];
-    for (const id of ids) {
-      try {
-        await rpc('photos.clear_date', { image_id: id });
-      } catch (err) {
-        notify(err instanceof Error ? err.message : String(err), 'error');
+    setBusyAction('clear');
+    try {
+      for (const id of ids) {
+        try {
+          await rpc('photos.clear_date', { image_id: id });
+        } catch (err) {
+          notify(err instanceof Error ? err.message : String(err), 'error');
+        }
       }
+      setRows((prev) => prev.map((r) => (selectedIds.has(r.id) ? { ...r, override_ts: null } : r)));
+      setChanged(true);
+    } finally {
+      setBusyAction(null);
     }
-    setRows((prev) => prev.map((r) => (selectedIds.has(r.id) ? { ...r, override_ts: null } : r)));
-    setChanged(true);
   };
 
   return (
@@ -116,14 +128,31 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
         footer={
           <div className="w-full flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <button type="button" disabled={selectedIds.size === 0} onClick={() => setShowPicker(true)} className="h-8 px-3 rounded-xs bg-accent text-accent-text text-xs font-medium disabled:opacity-40">
-                Set Date ({selectedIds.size})
+              <button
+                type="button"
+                disabled={selectedIds.size === 0 || busyAction !== null}
+                onClick={() => setShowPicker(true)}
+                className="h-8 px-3 rounded-xs bg-accent text-accent-text text-xs font-medium disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors"
+              >
+                {busyAction === 'apply' && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />}
+                <span>{busyAction === 'apply' ? 'Setting...' : `Set Date (${selectedIds.size})`}</span>
               </button>
-              <button type="button" disabled={selectedIds.size === 0} onClick={clearSelected} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary disabled:opacity-40">
-                Clear Correction
+              <button
+                type="button"
+                disabled={selectedIds.size === 0 || busyAction !== null}
+                onClick={clearSelected}
+                className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors"
+              >
+                {busyAction === 'clear' && <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary" />}
+                <span>{busyAction === 'clear' ? 'Clearing...' : 'Clear Correction'}</span>
               </button>
             </div>
-            <button type="button" onClick={() => onClose?.(changed)} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+            <button
+              type="button"
+              disabled={busyAction !== null}
+              onClick={() => onClose?.(changed)}
+              className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated"
+            >
               Close
             </button>
           </div>

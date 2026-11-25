@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Layers, Maximize2, RefreshCw, Star } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Layers, Loader2, Maximize2, RefreshCw, Star } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { mediaUrl, rpc } from '../lib/api';
 import { formatQuality, LatestTask } from '../lib/utils';
@@ -137,7 +137,10 @@ export default function BurstsView() {
               {currentFrame ? (
                 <img src={mediaUrl(currentFrame.path || currentFrame.thumb_path)} alt={`Frame ${frameIdx + 1}`} className="max-w-full max-h-full object-contain" />
               ) : (
-                <span className="text-xs text-secondary">Loading frames...</span>
+                <span className="text-xs text-accent inline-flex items-center gap-1.5 animate-pulse">
+                  <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                  <span>Loading frames...</span>
+                </span>
               )}
             </div>
 
@@ -203,12 +206,27 @@ export default function BurstsView() {
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" disabled={busy} onClick={handleKeepAll} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
-                  Keep All
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={handleKeepAll}
+                  className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated disabled:opacity-50 inline-flex items-center gap-1.5 transition-colors"
+                >
+                  {busy && <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary" />}
+                  <span>{busy ? 'Processing...' : 'Keep All'}</span>
                 </button>
-                <button type="button" disabled={busy || !currentFrame} onClick={handleKeepCurrent} className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover">
-                  <Check className="w-3.5 h-3.5" strokeWidth={1.8} />
-                  <span>Keep This Frame, Hide Rest</span>
+                <button
+                  type="button"
+                  disabled={busy || !currentFrame}
+                  onClick={handleKeepCurrent}
+                  className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                >
+                  {busy ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" strokeWidth={1.8} />
+                  )}
+                  <span>{busy ? 'Updating...' : 'Keep This Frame, Hide Rest'}</span>
                 </button>
               </div>
             </div>

@@ -1,6 +1,7 @@
 """Stdio NDJSON-RPC bridge server connecting Electron to MemoFrame's Python Engine."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import os
 import sys
 import threading
@@ -39,7 +40,7 @@ class BridgeContext:
             raise BridgeError(
                 "BACKEND_NOT_CONNECTED",
                 self.backend_error or "Python backend engine is not connected.",
-                "Place this Electron frontend alongside your backend/ folder or set MEMOFRAME_BACKEND_DIR.",
+                "Ensure MemoFrame's backend/ dependencies are installed in the active Python environment.",
             )
         return self.engine
 
@@ -74,7 +75,7 @@ def build_registry(ctx: BridgeContext) -> dict[str, Callable[[dict[str, Any]], A
 
 
 class BridgeServer:
-    """Threaded NDJSON-RPC server reading requests from stdin and writing responses to stdout."""
+    """Concurrent NDJSON-RPC server reading requests from stdin and writing responses to stdout."""
 
     def __init__(self, ctx: BridgeContext, out_stream: TextIO | None = None) -> None:
         self.ctx = ctx
@@ -86,8 +87,15 @@ class BridgeServer:
     def _write(self, payload: dict[str, Any]) -> None:
         line = encode_line(payload)
         with self._write_lock:
-            self._out.write(line)
-            self._out.flush()
+            try:
+                if hasattr(self._out, 'buffer'):
+                    self._out.buffer.write(line.encode('utf-8'))
+                    self._out.buffer.flush()
+                else:
+                    self._out.write(line)
+                    self._out.flush()
+            except OSError:
+                pass
 
     def emit_event(self, event: str, data: Any) -> None:
         self._write(make_event(event, data))
@@ -111,24 +119,36 @@ class BridgeServer:
     def serve(self, in_stream: TextIO | None = None) -> None:
         stream = in_stream or sys.stdin
         self.emit_event("bridge.ready", {"connected": self.ctx.engine is not None})
+        pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="MemoFrameRPC")
         try:
             for raw in stream:
                 line = raw.strip()
                 if not line:
                     continue
-                self._write(self.handle_line(line))
+                pool.submit(lambda raw_msg=line: self._write(self.handle_line(raw_msg)))
         finally:
+            pool.shutdown(wait=False)
             self.ctx.close()
 
 
+def _find_backend_dir() -> Path | None:
+    env_dir = os.environ.get("MEMOFRAME_BACKEND_DIR")
+    if env_dir and Path(env_dir).is_dir():
+        return Path(env_dir).resolve()
+    repo_root = Path(__file__).resolve().parent.parent
+    for candidate in (repo_root / "backend", repo_root.parent / "backend"):
+        if candidate.is_dir():
+            return candidate.resolve()
+    return None
+
+
 def _resolve_backend_and_open() -> BridgeContext:
-    root_dir = Path(__file__).resolve().parent.parent
-    backend_dir = Path(os.environ.get("MEMOFRAME_BACKEND_DIR") or (root_dir / "backend"))
-    if backend_dir.is_dir() and str(backend_dir) not in sys.path:
+    backend_dir = _find_backend_dir()
+    if backend_dir is not None and str(backend_dir) not in sys.path:
         sys.path.insert(0, str(backend_dir))
 
     env_ws = os.environ.get("MEMOFRAME_WORKSPACE")
-    default_ws = Path(env_ws) if env_ws else (Path.home() / ".memoframe")
+    default_ws = Path(env_ws) if env_ws else (Path(__file__).resolve().parent.parent / "workspace")
     try:
         from config import DEFAULT_WORKSPACE
         from engine import Engine

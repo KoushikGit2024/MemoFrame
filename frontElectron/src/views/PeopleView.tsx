@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { GitMerge, RefreshCw, ScanFace, Search, Users } from 'lucide-react';
+import { GitMerge, Loader2, RefreshCw, ScanFace, Search, Users } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { rpc } from '../lib/api';
 import { LatestTask } from '../lib/utils';
@@ -18,6 +18,7 @@ export default function PeopleView() {
   const [reviewPersonId, setReviewPersonId] = useState<number | null | undefined>(undefined);
   const [renaming, setRenaming] = useState<PersonRecord | null>(null);
   const [renameText, setRenameText] = useState('');
+  const [renamingBusy, setRenamingBusy] = useState(false);
   const loaderRef = useRef(new LatestTask());
 
   const loadPersons = useCallback(() => {
@@ -37,7 +38,8 @@ export default function PeopleView() {
   }, [persons, query]);
 
   const submitRename = async () => {
-    if (!renaming || !renameText.trim()) return;
+    if (!renaming || !renameText.trim() || renamingBusy) return;
+    setRenamingBusy(true);
     try {
       await rpc('persons.rename', { person_id: renaming.id, new_name: renameText.trim(), confirm: true });
       setRenaming(null);
@@ -46,6 +48,8 @@ export default function PeopleView() {
       invalidate();
     } catch (err) {
       notify(err instanceof Error ? err.message : String(err), 'error');
+    } finally {
+      setRenamingBusy(false);
     }
   };
 
@@ -138,11 +142,22 @@ export default function PeopleView() {
           onClose={() => setRenaming(null)}
           footer={
             <>
-              <button type="button" onClick={() => setRenaming(null)} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+              <button
+                type="button"
+                disabled={renamingBusy}
+                onClick={() => setRenaming(null)}
+                className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated disabled:opacity-50"
+              >
                 Cancel
               </button>
-              <button type="button" onClick={submitRename} className="h-8 px-3 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover">
-                Save Name
+              <button
+                type="button"
+                disabled={renamingBusy || !renameText.trim()}
+                onClick={submitRename}
+                className="h-8 px-3 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-50 inline-flex items-center gap-1.5 transition-colors"
+              >
+                {renamingBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />}
+                <span>{renamingBusy ? 'Saving...' : 'Save Name'}</span>
               </button>
             </>
           }
