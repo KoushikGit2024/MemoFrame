@@ -1,9 +1,9 @@
 /* Explicit Domain Contracts for MemoFrame Frontend & Python Engine Bridge */
 
-export type ViewKey = 'photos' | 'people' | 'duplicates' | 'bursts' | 'timeline' | 'settings';
-export type LayoutMode = 'grid' | 'compact' | 'table';
-export type ToastKind = 'info' | 'success' | 'error';
-export type PersonSortMode = 'most' | 'name_asc' | 'name_desc' | 'newest';
+export type ViewKey = "photos" | "people" | "duplicates" | "bursts" | "timeline" | "settings";
+export type LayoutMode = "grid" | "compact" | "table";
+export type ToastKind = "info" | "success" | "error";
+export type PersonSortMode = "most" | "name_asc" | "name_desc" | "newest";
 
 export interface ThemeMeta {
   name: string;

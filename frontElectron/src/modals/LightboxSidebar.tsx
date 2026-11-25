@@ -10,9 +10,9 @@ import {
   Sparkles,
   Star,
   ZoomIn,
-} from 'lucide-react';
-import { formatDate, formatDims, formatQuality } from '../lib/utils';
-import type { FaceRecord, PersonRecord, PhotoRecord, TagRecord } from '../types/memoframe';
+} from "lucide-react";
+import { formatDate, formatDims, formatQuality } from "../lib/utils";
+import type { FaceRecord, PersonRecord, PhotoRecord, TagRecord } from "../types/memoframe";
 
 export interface LightboxSidebarProps {
   photo: PhotoRecord;
@@ -26,14 +26,14 @@ export interface LightboxSidebarProps {
   persons: PersonRecord[];
   savingFaceName: boolean;
   assigningFace: boolean;
-  togglingMark: 'favourite' | 'hidden' | null;
+  togglingMark: "favourite" | "hidden" | null;
   restoringDate: boolean;
   openingDefaultApp: boolean;
   onZoomToFace: (face: FaceRecord) => void;
   onNameFace: () => void;
   onAssignFace: (personId: number | null) => void;
   onCloseActiveFace: () => void;
-  onToggleMark: (mark: 'favourite' | 'hidden') => void;
+  onToggleMark: (mark: "favourite" | "hidden") => void;
   onShowDateModal: () => void;
   onRestoreDate: () => void;
   onShowSimilar: () => void;
@@ -69,23 +69,25 @@ export default function LightboxSidebar({
   onOpenInDefaultApp,
   onRevealInFolder,
 }: LightboxSidebarProps) {
-  const isFav = marks.includes('favourite');
-  const isHidden = marks.includes('hidden');
+  const isFav = marks.includes("favourite");
+  const isHidden = marks.includes("hidden");
 
   return (
     <aside className="w-[300px] shrink-0 border-l border-subtle bg-card p-3.5 flex flex-col gap-3 overflow-y-auto">
       <div className="flex flex-col gap-2.5 flex-1">
         {[
-          ['Date Taken', formatDate(photo.effective_ts || photo.exif_ts)],
-          ['Resolution', formatDims(photo.width, photo.height)],
-          ['Format', String(photo.format || 'Unknown').toUpperCase()],
-          ['Faces Detected', String(faces.length)],
-          ['Quality Score', formatQuality(photo.quality)],
-          ['Tags', tags.map((t) => t.label).join(', ') || '—'],
-          ['File Path', photo.path || '—'],
+          ["Date Taken", formatDate(photo.effective_ts || photo.exif_ts)],
+          ["Resolution", formatDims(photo.width, photo.height)],
+          ["Format", String(photo.format || "Unknown").toUpperCase()],
+          ["Faces Detected", String(faces.length)],
+          ["Quality Score", formatQuality(photo.quality)],
+          ["Tags", tags.map(t => t.label).join(", ") || "—"],
+          ["File Path", photo.path || "—"],
         ].map(([k, v]) => (
           <div key={k}>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-secondary">{k}</div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-secondary">
+              {k}
+            </div>
             <div className="text-xs text-primary break-words mt-0.5 select-text">{v}</div>
           </div>
         ))}
@@ -94,7 +96,9 @@ export default function LightboxSidebar({
       {activeFace && (
         <div className="p-2.5 bg-violet-bg/35 border border-violet/65 rounded-xs flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-violet">Manage Face #{activeFace.id}</span>
+            <span className="text-[11px] font-semibold text-violet">
+              Manage Face #{activeFace.id}
+            </span>
             <button
               type="button"
               onClick={() => onZoomToFace(activeFace)}
@@ -109,9 +113,9 @@ export default function LightboxSidebar({
               type="text"
               value={faceNameInput}
               disabled={savingFaceName}
-              onChange={(e) => setFaceNameInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onNameFace();
+              onChange={e => setFaceNameInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") onNameFace();
               }}
               placeholder="Person name..."
               className="flex-1 h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-violet disabled:opacity-50"
@@ -122,20 +126,22 @@ export default function LightboxSidebar({
               onClick={onNameFace}
               className="btn-primary h-7 px-2 text-xs"
             >
-              {savingFaceName ? 'Saving...' : 'Save'}
+              {savingFaceName ? "Saving..." : "Save"}
             </button>
           </div>
           {persons.length > 0 && (
             <select
               defaultValue=""
               disabled={assigningFace}
-              onChange={(e) => {
+              onChange={e => {
                 if (e.target.value) onAssignFace(Number(e.target.value));
               }}
               className="h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-violet disabled:opacity-50"
             >
-              <option value="">{assigningFace ? 'Assigning...' : 'Assign to existing person...'}</option>
-              {persons.map((p) => (
+              <option value="">
+                {assigningFace ? "Assigning..." : "Assign to existing person..."}
+              </option>
+              {persons.map(p => (
                 <option key={p.id} value={p.id}>
                   {p.name} ({p.image_count || 0})
                 </option>
@@ -149,7 +155,7 @@ export default function LightboxSidebar({
               onClick={() => onAssignFace(null)}
               className="text-xs text-danger hover:underline disabled:opacity-50 cursor-pointer"
             >
-              {assigningFace ? 'Updating...' : 'Remove from person'}
+              {assigningFace ? "Updating..." : "Remove from person"}
             </button>
             <button
               type="button"
@@ -166,26 +172,36 @@ export default function LightboxSidebar({
         <button
           type="button"
           disabled={togglingMark !== null}
-          onClick={() => onToggleMark('favourite')}
+          onClick={() => onToggleMark("favourite")}
           className={`h-8 px-3 inline-flex items-center justify-center gap-1.5 rounded-xs border text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer ${
             isFav
-              ? 'bg-amber-bg border-amber text-amber font-semibold'
-              : 'bg-elevated border-hairline text-primary hover:border-amber/60 hover:text-amber'
+              ? "bg-amber-bg border-amber text-amber font-semibold"
+              : "bg-elevated border-hairline text-primary hover:border-amber/60 hover:text-amber"
           }`}
         >
-          <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-current' : ''}`} strokeWidth={1.7} />
+          <Star className={`w-3.5 h-3.5 ${isFav ? "fill-current" : ""}`} strokeWidth={1.7} />
           <span>
-            {togglingMark === 'favourite' ? 'Updating...' : isFav ? 'Remove Favourite' : 'Mark as Favourite'}
+            {togglingMark === "favourite"
+              ? "Updating..."
+              : isFav
+                ? "Remove Favourite"
+                : "Mark as Favourite"}
           </span>
         </button>
         <button
           type="button"
           disabled={togglingMark !== null}
-          onClick={() => onToggleMark('hidden')}
+          onClick={() => onToggleMark("hidden")}
           className="btn-neutral h-8 px-3 text-xs"
         >
-          {isHidden ? <Eye className="w-3.5 h-3.5" strokeWidth={1.6} /> : <EyeOff className="w-3.5 h-3.5" strokeWidth={1.6} />}
-          <span>{togglingMark === 'hidden' ? 'Updating...' : isHidden ? 'Unhide Photo' : 'Hide Photo'}</span>
+          {isHidden ? (
+            <Eye className="w-3.5 h-3.5" strokeWidth={1.6} />
+          ) : (
+            <EyeOff className="w-3.5 h-3.5" strokeWidth={1.6} />
+          )}
+          <span>
+            {togglingMark === "hidden" ? "Updating..." : isHidden ? "Unhide Photo" : "Hide Photo"}
+          </span>
         </button>
         <div className="grid grid-cols-2 gap-1.5">
           <button type="button" onClick={onShowDateModal} className="btn-neutral h-8 px-2 text-xs">
@@ -198,8 +214,11 @@ export default function LightboxSidebar({
             onClick={onRestoreDate}
             className="btn-neutral h-8 px-2 text-xs"
           >
-            <RotateCcw className={`w-3.5 h-3.5 ${restoringDate ? 'animate-spin' : ''}`} strokeWidth={1.6} />
-            <span>{restoringDate ? 'Restoring...' : 'Restore'}</span>
+            <RotateCcw
+              className={`w-3.5 h-3.5 ${restoringDate ? "animate-spin" : ""}`}
+              strokeWidth={1.6}
+            />
+            <span>{restoringDate ? "Restoring..." : "Restore"}</span>
           </button>
         </div>
         <button type="button" onClick={onShowSimilar} className="btn-secondary h-8 px-3 text-xs">

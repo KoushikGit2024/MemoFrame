@@ -8,3 +8,37 @@ search-path = [
     "frontend",
     "."
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [
+    ".git",
+    ".pytest_cache",
+    "__pycache__",
+    "dist",
+    "node_modules",
+    "workspace",
+    "ws_*",
+    "smoke_*",
+    "frontElectron"
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+ignore = [
+    "E501",  # line length handled by ruff format / soft enforcement
+    "E402",  # module level import not at top of file (sys.path manipulation required before imports)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+

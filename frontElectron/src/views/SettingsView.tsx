@@ -1,36 +1,62 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, FileText, FolderOpen, Loader2, Moon, Palette, ShieldCheck, Sun, Trash2 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
-import { revealFile, rpc } from '../lib/api';
-import { THEME_FAMILIES, THEME_MAP } from '../lib/themes';
-import type { DoctorReport, WorkspaceStats } from '../types/memoframe';
-import { SuspiciousDatesModal } from '../modals/DateModals';
-import { FailedPhotosModal, ResetWorkspaceModal } from '../modals/UtilityModals';
+import { useCallback, useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FileText,
+  FolderOpen,
+  Loader2,
+  Moon,
+  Palette,
+  ShieldCheck,
+  Sun,
+  Trash2,
+} from "lucide-react";
+import { useApp } from "../context/AppContext";
+import { revealFile, rpc } from "../lib/api";
+import { THEME_FAMILIES, THEME_MAP } from "../lib/themes";
+import type { DoctorReport, WorkspaceStats } from "../types/memoframe";
+import { SuspiciousDatesModal } from "../modals/DateModals";
+import { FailedPhotosModal, ResetWorkspaceModal } from "../modals/UtilityModals";
 
 const STAT_DEFS: ReadonlyArray<[keyof WorkspaceStats, string, string]> = [
-  ['total_images', 'Total Photos', 'border-l-accent-secondary'],
-  ['total_faces', 'Faces Detected', 'border-l-violet'],
-  ['duplicate_clusters', 'Duplicate Clusters', 'border-l-amber'],
-  ['groups', 'Event Groups', 'border-l-accent'],
-  ['videos', 'Videos Indexed', 'border-l-success'],
+  ["total_images", "Total Photos", "border-l-accent-secondary"],
+  ["total_faces", "Faces Detected", "border-l-violet"],
+  ["duplicate_clusters", "Duplicate Clusters", "border-l-amber"],
+  ["groups", "Event Groups", "border-l-accent"],
+  ["videos", "Videos Indexed", "border-l-success"],
 ];
 
 export default function SettingsView() {
-  const { connected, theme, applyTheme, toggleLightDark, config, setConfig, dataVersion, invalidate, notify, setSelectedPersonId } = useApp();
+  const {
+    connected,
+    theme,
+    applyTheme,
+    toggleLightDark,
+    config,
+    setConfig,
+    dataVersion,
+    invalidate,
+    notify,
+    setSelectedPersonId,
+  } = useApp();
   const [stats, setStats] = useState<WorkspaceStats>({});
   const [doctor, setDoctor] = useState<DoctorReport | null>(null);
-  const [busyLabel, setBusyLabel] = useState('');
-  const [maintNote, setMaintNote] = useState('');
+  const [busyLabel, setBusyLabel] = useState("");
+  const [maintNote, setMaintNote] = useState("");
   const [showDates, setShowDates] = useState(false);
   const [showFailed, setShowFailed] = useState(false);
   const [showReset, setShowReset] = useState(false);
 
   const refreshStats = useCallback(() => {
     if (!connected) return;
-    rpc<WorkspaceStats>('system.stats').then((res) => setStats(res || {})).catch(() => {});
+    rpc<WorkspaceStats>("system.stats")
+      .then(res => setStats(res || {}))
+      .catch(() => {});
   }, [connected]);
 
-  useEffect(() => { refreshStats(); }, [refreshStats, dataVersion]);
+  useEffect(() => {
+    refreshStats();
+  }, [refreshStats, dataVersion]);
 
   const runTask = async (label: string, fn: () => Promise<void>) => {
     if (busyLabel) return;
@@ -41,119 +67,154 @@ export default function SettingsView() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setMaintNote(`Failed: ${msg}`);
-      notify(msg, 'error');
+      notify(msg, "error");
     } finally {
-      setBusyLabel('');
+      setBusyLabel("");
     }
   };
 
-  const handleDoctor = () => runTask('Running diagnostic health check', async () => {
-    const report = await rpc<DoctorReport>('system.doctor');
-    setDoctor(report || { checks: [] });
-    setMaintNote('');
-  });
+  const handleDoctor = () =>
+    runTask("Running diagnostic health check", async () => {
+      const report = await rpc<DoctorReport>("system.doctor");
+      setDoctor(report || { checks: [] });
+      setMaintNote("");
+    });
 
-  const handleClearCache = () => runTask('Cleaning thumbnail cache', async () => {
-    const res = await rpc<{ freed_mb?: number }>('system.clear_cache');
-    setMaintNote(`Reclaimed about ${res.freed_mb || 0} MB of thumbnail cache.`);
-    notify(`Reclaimed ~${res.freed_mb || 0} MB of cache.`, 'success');
-    refreshStats();
-  });
+  const handleClearCache = () =>
+    runTask("Cleaning thumbnail cache", async () => {
+      const res = await rpc<{ freed_mb?: number }>("system.clear_cache");
+      setMaintNote(`Reclaimed about ${res.freed_mb || 0} MB of thumbnail cache.`);
+      notify(`Reclaimed ~${res.freed_mb || 0} MB of cache.`, "success");
+      refreshStats();
+    });
 
-  const handleExportDiag = () => runTask('Exporting diagnostics', async () => {
-    const res = await rpc<{ path?: string | null }>('system.export_diagnostics');
-    if (res?.path) {
-      setMaintNote(`Diagnostics saved to ${res.path}`);
-      notify('Diagnostics exported.', 'success');
-    }
-  });
+  const handleExportDiag = () =>
+    runTask("Exporting diagnostics", async () => {
+      const res = await rpc<{ path?: string | null }>("system.export_diagnostics");
+      if (res?.path) {
+        setMaintNote(`Diagnostics saved to ${res.path}`);
+        notify("Diagnostics exported.", "success");
+      }
+    });
 
-  const handleFlagToggle = async (field: 'tagging_enabled' | 'store_embeddings', checked: boolean) => {
+  const handleFlagToggle = async (
+    field: "tagging_enabled" | "store_embeddings",
+    checked: boolean
+  ) => {
     const prev = { ...config };
     const next = { ...config, [field]: checked };
     setConfig(next);
     try {
-      await rpc('system.update_config', {
+      await rpc("system.update_config", {
         tagging_enabled: next.tagging_enabled,
         store_embeddings: next.store_embeddings,
       });
-      setMaintNote('Saved. Restart MemoFrame for model changes to take effect (workspace/models/tags/).');
+      setMaintNote(
+        "Saved. Restart MemoFrame for model changes to take effect (workspace/models/tags/)."
+      );
     } catch (err) {
       setConfig(prev);
-      notify(err instanceof Error ? err.message : String(err), 'error');
+      notify(err instanceof Error ? err.message : String(err), "error");
     }
   };
 
-  const handleVerifyFiles = () => runTask('Checking indexed files', async () => {
-    const res = await rpc<{ ok?: number; missing?: number; offline?: number }>('system.check_files');
-    setMaintNote(`Files checked: ${res.ok || 0} present, ${res.missing || 0} missing, ${res.offline || 0} on unplugged drives.`);
-    refreshStats();
-  });
+  const handleVerifyFiles = () =>
+    runTask("Checking indexed files", async () => {
+      const res = await rpc<{ ok?: number; missing?: number; offline?: number }>(
+        "system.check_files"
+      );
+      setMaintNote(
+        `Files checked: ${res.ok || 0} present, ${res.missing || 0} missing, ${res.offline || 0} on unplugged drives.`
+      );
+      refreshStats();
+    });
 
-  const handlePruneMissing = () => runTask('Checking missing records', async () => {
-    const counts = await rpc<{ missing?: number }>('system.check_files');
-    const n = Number(counts.missing || 0);
-    if (!n) { setMaintNote('No missing photos found. Nothing to prune.'); return; }
-    if (!window.confirm(`${n} record(s) point to files that no longer exist. Remove them from the index? Original photos are never touched.`)) {
-      setMaintNote('');
-      return;
-    }
-    const res = await rpc<{ removed?: number }>('system.forget_missing');
-    setMaintNote(`Pruned ${res.removed || 0} missing record(s).`);
-    notify(`Removed ${res.removed || 0} missing record(s).`, 'success');
-    invalidate();
-    refreshStats();
-  });
+  const handlePruneMissing = () =>
+    runTask("Checking missing records", async () => {
+      const counts = await rpc<{ missing?: number }>("system.check_files");
+      const n = Number(counts.missing || 0);
+      if (!n) {
+        setMaintNote("No missing photos found. Nothing to prune.");
+        return;
+      }
+      if (
+        !window.confirm(
+          `${n} record(s) point to files that no longer exist. Remove them from the index? Original photos are never touched.`
+        )
+      ) {
+        setMaintNote("");
+        return;
+      }
+      const res = await rpc<{ removed?: number }>("system.forget_missing");
+      setMaintNote(`Pruned ${res.removed || 0} missing record(s).`);
+      notify(`Removed ${res.removed || 0} missing record(s).`, "success");
+      invalidate();
+      refreshStats();
+    });
 
-  const handleDetectMoves = () => runTask('Detecting moved files', async () => {
-    const res = await rpc<{ count?: number }>('system.moves');
-    setMaintNote(
-      res.count
-        ? `${res.count} photo(s) moved or renamed. Favourite/keep marks followed them.`
-        : 'No moved files found. Scan the new location first, then run again.',
-    );
-  });
+  const handleDetectMoves = () =>
+    runTask("Detecting moved files", async () => {
+      const res = await rpc<{ count?: number }>("system.moves");
+      setMaintNote(
+        res.count
+          ? `${res.count} photo(s) moved or renamed. Favourite/keep marks followed them.`
+          : "No moved files found. Scan the new location first, then run again."
+      );
+    });
 
-  const handleRebuild = () => runTask('Rebuilding groups and index', async () => {
-    const res = await rpc<{ groups?: number; duplicate_clusters?: number; persons?: number }>('system.rebuild');
-    setMaintNote(`Rebuilt: ${res.groups || 0} groups, ${res.duplicate_clusters || 0} duplicate clusters, ${res.persons || 0} people.`);
-    invalidate();
-    refreshStats();
-  });
+  const handleRebuild = () =>
+    runTask("Rebuilding groups and index", async () => {
+      const res = await rpc<{ groups?: number; duplicate_clusters?: number; persons?: number }>(
+        "system.rebuild"
+      );
+      setMaintNote(
+        `Rebuilt: ${res.groups || 0} groups, ${res.duplicate_clusters || 0} duplicate clusters, ${res.persons || 0} people.`
+      );
+      invalidate();
+      refreshStats();
+    });
 
-  const handleRepair = () => runTask('Repairing database', async () => {
-    const res = await rpc<{ face_counts_fixed?: number; requeued?: number; orphan_faces_removed?: number }>('system.repair');
-    setMaintNote(
-      `Repair finished: ${res.face_counts_fixed || 0} face counts fixed, ${res.requeued || 0} requeued, ${res.orphan_faces_removed || 0} orphan faces removed.`,
-    );
-    refreshStats();
-  });
+  const handleRepair = () =>
+    runTask("Repairing database", async () => {
+      const res = await rpc<{
+        face_counts_fixed?: number;
+        requeued?: number;
+        orphan_faces_removed?: number;
+      }>("system.repair");
+      setMaintNote(
+        `Repair finished: ${res.face_counts_fixed || 0} face counts fixed, ${res.requeued || 0} requeued, ${res.orphan_faces_removed || 0} orphan faces removed.`
+      );
+      refreshStats();
+    });
 
-  const handleTagExisting = () => runTask('Tagging existing photos', async () => {
-    const res = await rpc<{ tagged?: number }>('system.tag_existing');
-    setMaintNote(`Tagged ${res.tagged || 0} photo(s).`);
-    invalidate();
-  });
+  const handleTagExisting = () =>
+    runTask("Tagging existing photos", async () => {
+      const res = await rpc<{ tagged?: number }>("system.tag_existing");
+      setMaintNote(`Tagged ${res.tagged || 0} photo(s).`);
+      invalidate();
+    });
 
   const handleResetConfirm = (opts: { clear_sources: boolean; clear_saved_searches: boolean }) => {
     setShowReset(false);
-    runTask('Resetting workspace', async () => {
-      const res = await rpc<{ images_removed?: number }>('system.reset_workspace', opts);
+    runTask("Resetting workspace", async () => {
+      const res = await rpc<{ images_removed?: number }>("system.reset_workspace", opts);
       setSelectedPersonId(null);
       setMaintNote(`Reset complete: removed ${res.images_removed || 0} photo record(s).`);
-      notify(`Workspace reset (${res.images_removed || 0} records removed).`, 'success');
+      notify(`Workspace reset (${res.images_removed || 0} records removed).`, "success");
       invalidate();
       refreshStats();
     });
   };
 
-  const doctorIssues = (doctor?.checks || []).filter((c) => c.status !== 'ok');
+  const doctorIssues = (doctor?.checks || []).filter(c => c.status !== "ok");
 
   return (
     <div className="flex-1 min-h-0 flex flex-col px-5 pt-4 pb-3 gap-3 overflow-hidden">
       <div className="shrink-0">
         <h1 className="text-[17px] font-semibold text-primary">Workspace &amp; System Settings</h1>
-        <p className="text-xs text-secondary mt-0.5">Configure studio palette, inspect workspace health, and run library maintenance.</p>
+        <p className="text-xs text-secondary mt-0.5">
+          Configure studio palette, inspect workspace health, and run library maintenance.
+        </p>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
@@ -192,7 +253,7 @@ export default function SettingsView() {
 
             {/* Compact Family Strip */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-              {THEME_FAMILIES.map((family) => {
+              {THEME_FAMILIES.map(family => {
                 const isDarkActive = theme === family.darkTheme;
                 const isLightActive = theme === family.lightTheme;
                 const isFamilyActive = isDarkActive || isLightActive;
@@ -205,14 +266,20 @@ export default function SettingsView() {
                     onClick={() => applyTheme(currentIsDark ? family.darkTheme : family.lightTheme)}
                     className={`h-9 px-2.5 rounded-xs border flex items-center justify-between text-xs font-medium transition-all ${
                       isFamilyActive
-                        ? 'border-accent bg-accent-light text-primary ring-1 ring-accent/30'
-                        : 'border-subtle bg-elevated/50 text-secondary hover:text-primary hover:border-hairline hover:bg-elevated'
+                        ? "border-accent bg-accent-light text-primary ring-1 ring-accent/30"
+                        : "border-subtle bg-elevated/50 text-secondary hover:text-primary hover:border-hairline hover:bg-elevated"
                     }`}
                   >
                     <span className="truncate">{family.label}</span>
                     <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: family.previewAccent }} />
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: family.previewSecondary }} />
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: family.previewAccent }}
+                      />
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: family.previewSecondary }}
+                      />
                     </div>
                   </button>
                 );
@@ -223,25 +290,37 @@ export default function SettingsView() {
           <section className="bg-card border border-subtle rounded-sm p-4 flex flex-col gap-3">
             <div>
               <h2 className="text-sm font-semibold text-primary">Workspace Statistics</h2>
-              <p className="text-xs text-secondary">Live overview of indexed media, detected faces, duplicates, and events.</p>
+              <p className="text-xs text-secondary">
+                Live overview of indexed media, detected faces, duplicates, and events.
+              </p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {STAT_DEFS.map(([k, label, accentBorder]) => (
-                <div key={k} className={`bg-elevated border border-subtle border-l-2 ${accentBorder} rounded-xs px-3 py-2.5`}>
-                  <div className="font-mono text-lg font-semibold text-primary tabular-nums">{stats[k] ?? 0}</div>
+                <div
+                  key={k}
+                  className={`bg-elevated border border-subtle border-l-2 ${accentBorder} rounded-xs px-3 py-2.5`}
+                >
+                  <div className="font-mono text-lg font-semibold text-primary tabular-nums">
+                    {stats[k] ?? 0}
+                  </div>
                   <div className="text-[11px] text-secondary mt-0.5">{label}</div>
                 </div>
               ))}
             </div>
             <div className="text-xs text-secondary font-mono">
-              {stats.processed ?? 0} of {stats.total_images ?? 0} processed · {stats.images_with_faces ?? 0} with faces · {stats.duplicate_images ?? 0} redundant copies
+              {stats.processed ?? 0} of {stats.total_images ?? 0} processed ·{" "}
+              {stats.images_with_faces ?? 0} with faces · {stats.duplicate_images ?? 0} redundant
+              copies
             </div>
           </section>
 
           <section className="bg-card border border-subtle rounded-sm p-4 flex flex-col gap-3">
             <div>
               <h2 className="text-sm font-semibold text-primary">Engine Health &amp; Cache</h2>
-              <p className="text-xs text-secondary">Verify database integrity, inspect logs, export diagnostics, or reclaim thumbnail cache.</p>
+              <p className="text-xs text-secondary">
+                Verify database integrity, inspect logs, export diagnostics, or reclaim thumbnail
+                cache.
+              </p>
             </div>
             <div className="flex items-center flex-wrap gap-2">
               <button
@@ -250,12 +329,16 @@ export default function SettingsView() {
                 onClick={handleDoctor}
                 className="btn-primary h-8 px-3 text-xs"
               >
-                {busyLabel === 'Running diagnostic health check' ? (
+                {busyLabel === "Running diagnostic health check" ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
                 ) : (
                   <ShieldCheck className="w-3.5 h-3.5" strokeWidth={1.6} />
                 )}
-                <span>{busyLabel === 'Running diagnostic health check' ? 'Checking...' : 'Run Doctor Check'}</span>
+                <span>
+                  {busyLabel === "Running diagnostic health check"
+                    ? "Checking..."
+                    : "Run Doctor Check"}
+                </span>
               </button>
               <button
                 type="button"
@@ -263,14 +346,20 @@ export default function SettingsView() {
                 onClick={handleClearCache}
                 className="btn-neutral h-8 px-3 text-xs hover:border-amber/60"
               >
-                {busyLabel === 'Cleaning thumbnail cache' ? (
+                {busyLabel === "Cleaning thumbnail cache" ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-amber" />
                 ) : (
                   <Trash2 className="w-3.5 h-3.5 text-amber" strokeWidth={1.6} />
                 )}
-                <span>{busyLabel === 'Cleaning thumbnail cache' ? 'Cleaning...' : 'Clean Stale Cache'}</span>
+                <span>
+                  {busyLabel === "Cleaning thumbnail cache" ? "Cleaning..." : "Clean Stale Cache"}
+                </span>
               </button>
-              <button type="button" onClick={() => revealFile(config.log_path)} className="btn-neutral h-8 px-3 text-xs hover:border-accent-secondary/60">
+              <button
+                type="button"
+                onClick={() => revealFile(config.log_path)}
+                className="btn-neutral h-8 px-3 text-xs hover:border-accent-secondary/60"
+              >
                 <FolderOpen className="w-3.5 h-3.5 text-accent-secondary" strokeWidth={1.6} />
                 <span>Show Log File</span>
               </button>
@@ -280,16 +369,20 @@ export default function SettingsView() {
                 onClick={handleExportDiag}
                 className="btn-neutral h-8 px-3 text-xs hover:border-accent-secondary/60"
               >
-                {busyLabel === 'Exporting diagnostics' ? (
+                {busyLabel === "Exporting diagnostics" ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary" />
                 ) : (
                   <FileText className="w-3.5 h-3.5 text-accent-secondary" strokeWidth={1.6} />
                 )}
-                <span>{busyLabel === 'Exporting diagnostics' ? 'Exporting...' : 'Export Diagnostics'}</span>
+                <span>
+                  {busyLabel === "Exporting diagnostics" ? "Exporting..." : "Export Diagnostics"}
+                </span>
               </button>
             </div>
             {doctor && (
-              <div className={`p-2.5 rounded-xs border text-xs ${doctorIssues.length === 0 ? 'bg-success-bg border-success/55 text-success' : 'bg-danger-bg border-danger/55 text-danger'}`}>
+              <div
+                className={`p-2.5 rounded-xs border text-xs ${doctorIssues.length === 0 ? "bg-success-bg border-success/55 text-success" : "bg-danger-bg border-danger/55 text-danger"}`}
+              >
                 {doctorIssues.length === 0 ? (
                   <span className="inline-flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.7} />
@@ -298,7 +391,10 @@ export default function SettingsView() {
                 ) : (
                   <ul className="list-disc pl-4 space-y-1">
                     {doctorIssues.map((c, idx) => (
-                      <li key={idx}>{c.name}: {c.detail}{c.fix ? ` (fix: ${c.fix})` : ''}</li>
+                      <li key={idx}>
+                        {c.name}: {c.detail}
+                        {c.fix ? ` (fix: ${c.fix})` : ""}
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -308,19 +404,38 @@ export default function SettingsView() {
 
           <section className="bg-card border border-subtle rounded-sm p-4 flex flex-col gap-2.5">
             <div>
-              <h2 className="text-sm font-semibold text-primary">Scene Tags &amp; Similar Photos</h2>
-              <p className="text-xs text-secondary">Requires model files placed inside workspace/models/tags/.</p>
+              <h2 className="text-sm font-semibold text-primary">
+                Scene Tags &amp; Similar Photos
+              </h2>
+              <p className="text-xs text-secondary">
+                Requires model files placed inside workspace/models/tags/.
+              </p>
             </div>
             <label className="inline-flex items-center gap-2 text-xs text-primary cursor-pointer">
-              <input type="checkbox" checked={Boolean(config.tagging_enabled)} onChange={(e) => handleFlagToggle('tagging_enabled', e.target.checked)} className="accent-accent-secondary" />
+              <input
+                type="checkbox"
+                checked={Boolean(config.tagging_enabled)}
+                onChange={e => handleFlagToggle("tagging_enabled", e.target.checked)}
+                className="accent-accent-secondary"
+              />
               <span>Enable scene tagging</span>
             </label>
             <label className="inline-flex items-center gap-2 text-xs text-primary cursor-pointer">
-              <input type="checkbox" checked={Boolean(config.store_embeddings)} onChange={(e) => handleFlagToggle('store_embeddings', e.target.checked)} className="accent-accent-secondary" />
+              <input
+                type="checkbox"
+                checked={Boolean(config.store_embeddings)}
+                onChange={e => handleFlagToggle("store_embeddings", e.target.checked)}
+                className="accent-accent-secondary"
+              />
               <span>Store embeddings (required for Find Similar)</span>
             </label>
             <div>
-              <button type="button" disabled={!connected || Boolean(busyLabel)} onClick={handleTagExisting} className="btn-tertiary h-8 px-3 text-xs">
+              <button
+                type="button"
+                disabled={!connected || Boolean(busyLabel)}
+                onClick={handleTagExisting}
+                className="btn-tertiary h-8 px-3 text-xs"
+              >
                 Tag Existing Photos
               </button>
             </div>
@@ -328,30 +443,45 @@ export default function SettingsView() {
 
           <section className="bg-card border border-subtle rounded-sm p-4 flex flex-col gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-primary">Library &amp; Record Maintenance</h2>
-              <p className="text-xs text-secondary">Verify source files on disk, purge stale missing records, and repair database anomalies.</p>
+              <h2 className="text-sm font-semibold text-primary">
+                Library &amp; Record Maintenance
+              </h2>
+              <p className="text-xs text-secondary">
+                Verify source files on disk, purge stale missing records, and repair database
+                anomalies.
+              </p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {([
-                ['Verify Files', handleVerifyFiles],
-                ['Prune Missing Records', handlePruneMissing],
-                ['Detect Moved Files', handleDetectMoves],
-                ['Suspicious Dates...', () => setShowDates(true)],
-                ['Rebuild Groups & Index', handleRebuild],
-                ['Repair & Optimize DB', handleRepair],
-                ['Failed Photos...', () => setShowFailed(true)],
-              ] as const).map(([label, handler]) => (
-                <button key={label} type="button" disabled={!connected || Boolean(busyLabel)} onClick={handler} className="btn-neutral h-8 px-2.5 text-xs truncate hover:border-accent-secondary/60">
+              {(
+                [
+                  ["Verify Files", handleVerifyFiles],
+                  ["Prune Missing Records", handlePruneMissing],
+                  ["Detect Moved Files", handleDetectMoves],
+                  ["Suspicious Dates...", () => setShowDates(true)],
+                  ["Rebuild Groups & Index", handleRebuild],
+                  ["Repair & Optimize DB", handleRepair],
+                  ["Failed Photos...", () => setShowFailed(true)],
+                ] as const
+              ).map(([label, handler]) => (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={!connected || Boolean(busyLabel)}
+                  onClick={handler}
+                  className="btn-neutral h-8 px-2.5 text-xs truncate hover:border-accent-secondary/60"
+                >
                   {label}
                 </button>
               ))}
             </div>
             {(busyLabel || maintNote) && (
-              <div className={`text-xs font-mono rounded-xs px-3 py-2 flex items-center gap-2 transition-all ${
-                busyLabel
-                  ? 'bg-accent-secondary-light border border-accent-secondary/50 text-accent-secondary'
-                  : 'bg-input border border-subtle text-secondary'
-              }`}>
+              <div
+                className={`text-xs font-mono rounded-xs px-3 py-2 flex items-center gap-2 transition-all ${
+                  busyLabel
+                    ? "bg-accent-secondary-light border border-accent-secondary/50 text-accent-secondary"
+                    : "bg-input border border-subtle text-secondary"
+                }`}
+              >
                 {busyLabel ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary" />
@@ -370,18 +500,35 @@ export default function SettingsView() {
                 <AlertTriangle className="w-4 h-4" strokeWidth={1.7} />
                 <span>Danger Zone: Reset Workspace</span>
               </h2>
-              <p className="text-xs text-secondary mt-0.5">Clear all indexed photos, faces, duplicates, and events. Original files on disk are never touched.</p>
+              <p className="text-xs text-secondary mt-0.5">
+                Clear all indexed photos, faces, duplicates, and events. Original files on disk are
+                never touched.
+              </p>
             </div>
-            <button type="button" disabled={!connected || Boolean(busyLabel)} onClick={() => setShowReset(true)} className="btn-danger h-8 px-3 text-xs">
+            <button
+              type="button"
+              disabled={!connected || Boolean(busyLabel)}
+              onClick={() => setShowReset(true)}
+              className="btn-danger h-8 px-3 text-xs"
+            >
               Reset Workspace Data...
             </button>
           </section>
         </div>
       </div>
 
-      {showDates && <SuspiciousDatesModal onClose={(changed) => { setShowDates(false); if (changed) handleRebuild(); }} />}
+      {showDates && (
+        <SuspiciousDatesModal
+          onClose={changed => {
+            setShowDates(false);
+            if (changed) handleRebuild();
+          }}
+        />
+      )}
       {showFailed && <FailedPhotosModal onClose={() => setShowFailed(false)} />}
-      {showReset && <ResetWorkspaceModal onClose={() => setShowReset(false)} onConfirm={handleResetConfirm} />}
+      {showReset && (
+        <ResetWorkspaceModal onClose={() => setShowReset(false)} onConfirm={handleResetConfirm} />
+      )}
     </div>
   );
 }

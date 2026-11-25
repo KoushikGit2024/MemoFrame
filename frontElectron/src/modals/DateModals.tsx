@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
-import { rpc } from '../lib/api';
-import type { SuspiciousDateRow } from '../types/memoframe';
-import ModalShell from '../components/ModalShell';
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { useApp } from "../context/AppContext";
+import { rpc } from "../lib/api";
+import type { SuspiciousDateRow } from "../types/memoframe";
+import ModalShell from "../components/ModalShell";
 
 function toInputValue(iso?: string | null): string {
   if (iso && String(iso).length >= 16) {
-    return String(iso).slice(0, 19).replace(' ', 'T');
+    return String(iso).slice(0, 19).replace(" ", "T");
   }
   const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, "0");
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:00`;
 }
 
@@ -50,7 +50,7 @@ export function DateOverrideModal({ currentIso, onClose, onSave }: DateOverrideM
         type="datetime-local"
         step="1"
         value={val}
-        onChange={(e) => setVal(e.target.value)}
+        onChange={e => setVal(e.target.value)}
         className="h-9 px-3 bg-input border border-hairline rounded-xs text-sm font-mono text-primary focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber/30"
       />
     </ModalShell>
@@ -66,13 +66,13 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   useEffect(() => {
-    rpc<SuspiciousDateRow[]>('dates.suspicious', { limit: 500 })
-      .then((res) => setRows(res || []))
-      .catch((err) => notify(err instanceof Error ? err.message : String(err), 'error'));
+    rpc<SuspiciousDateRow[]>("dates.suspicious", { limit: 500 })
+      .then(res => setRows(res || []))
+      .catch(err => notify(err instanceof Error ? err.message : String(err), "error"));
   }, [notify]);
 
   const toggleRow = (id: number) => {
-    setSelectedIds((prev) => {
+    setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -83,18 +83,18 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
   const applyBulkDate = async (iso: string) => {
     setShowPicker(false);
     const ids = [...selectedIds];
-    setBusyAction('apply');
+    setBusyAction("apply");
     try {
       for (const id of ids) {
         try {
-          await rpc('photos.set_date', { image_id: id, iso, reason: 'manual (bulk)' });
+          await rpc("photos.set_date", { image_id: id, iso, reason: "manual (bulk)" });
         } catch (err) {
-          notify(err instanceof Error ? err.message : String(err), 'error');
+          notify(err instanceof Error ? err.message : String(err), "error");
         }
       }
-      setRows((prev) => prev.map((r) => (selectedIds.has(r.id) ? { ...r, override_ts: iso } : r)));
+      setRows(prev => prev.map(r => (selectedIds.has(r.id) ? { ...r, override_ts: iso } : r)));
       setChanged(true);
-      notify(`Updated ${ids.length} photo date(s).`, 'success');
+      notify(`Updated ${ids.length} photo date(s).`, "success");
     } finally {
       setBusyAction(null);
     }
@@ -102,16 +102,16 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
 
   const clearSelected = async () => {
     const ids = [...selectedIds];
-    setBusyAction('clear');
+    setBusyAction("clear");
     try {
       for (const id of ids) {
         try {
-          await rpc('photos.clear_date', { image_id: id });
+          await rpc("photos.clear_date", { image_id: id });
         } catch (err) {
-          notify(err instanceof Error ? err.message : String(err), 'error');
+          notify(err instanceof Error ? err.message : String(err), "error");
         }
       }
-      setRows((prev) => prev.map((r) => (selectedIds.has(r.id) ? { ...r, override_ts: null } : r)));
+      setRows(prev => prev.map(r => (selectedIds.has(r.id) ? { ...r, override_ts: null } : r)));
       setChanged(true);
     } finally {
       setBusyAction(null);
@@ -134,8 +134,12 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
                 onClick={() => setShowPicker(true)}
                 className="btn-primary h-8 px-3 text-xs"
               >
-                {busyAction === 'apply' && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />}
-                <span>{busyAction === 'apply' ? 'Setting...' : `Set Date (${selectedIds.size})`}</span>
+                {busyAction === "apply" && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
+                )}
+                <span>
+                  {busyAction === "apply" ? "Setting..." : `Set Date (${selectedIds.size})`}
+                </span>
               </button>
               <button
                 type="button"
@@ -143,8 +147,10 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
                 onClick={clearSelected}
                 className="btn-neutral h-8 px-3 text-xs"
               >
-                {busyAction === 'clear' && <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary" />}
-                <span>{busyAction === 'clear' ? 'Clearing...' : 'Clear Correction'}</span>
+                {busyAction === "clear" && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary" />
+                )}
+                <span>{busyAction === "clear" ? "Clearing..." : "Clear Correction"}</span>
               </button>
             </div>
             <button
@@ -170,23 +176,33 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {rows.map(r => {
                 const selected = selectedIds.has(r.id);
                 return (
                   <tr
                     key={r.id}
                     onClick={() => toggleRow(r.id)}
                     className={`border-b border-subtle cursor-pointer transition-colors ${
-                      selected ? 'bg-amber-bg/40' : 'hover:bg-elevated'
+                      selected ? "bg-amber-bg/40" : "hover:bg-elevated"
                     }`}
                   >
                     <td className="py-1.5 px-2.5 text-center">
-                      <input type="checkbox" checked={selected} onChange={() => {}} className="accent-amber" />
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => {}}
+                        className="accent-amber"
+                      />
                     </td>
-                    <td className="py-1.5 px-2.5 font-mono text-[11px] max-w-[340px] truncate" title={r.path}>{r.path}</td>
-                    <td className="py-1.5 px-2.5 font-mono text-secondary">{r.exif_ts || '—'}</td>
-                    <td className="py-1.5 px-2.5 text-danger">{r.date_flag || '—'}</td>
-                    <td className="py-1.5 px-2.5 font-mono text-success">{r.override_ts || ''}</td>
+                    <td
+                      className="py-1.5 px-2.5 font-mono text-[11px] max-w-[340px] truncate"
+                      title={r.path}
+                    >
+                      {r.path}
+                    </td>
+                    <td className="py-1.5 px-2.5 font-mono text-secondary">{r.exif_ts || "—"}</td>
+                    <td className="py-1.5 px-2.5 text-danger">{r.date_flag || "—"}</td>
+                    <td className="py-1.5 px-2.5 font-mono text-success">{r.override_ts || ""}</td>
                   </tr>
                 );
               })}
@@ -197,7 +213,7 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
 
       {showPicker && (
         <DateOverrideModal
-          currentIso={rows.find((r) => selectedIds.has(r.id))?.override_ts}
+          currentIso={rows.find(r => selectedIds.has(r.id))?.override_ts}
           onClose={() => setShowPicker(false)}
           onSave={applyBulkDate}
         />

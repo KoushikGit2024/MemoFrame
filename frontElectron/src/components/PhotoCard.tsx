@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { ImageOff, ScanFace, Star } from 'lucide-react';
-import { mediaUrl } from '../lib/api';
-import { basename, formatDate, formatQuality } from '../lib/utils';
-import type { PhotoRecord } from '../types/memoframe';
+import { useState } from "react";
+import { ImageOff, ScanFace, Star } from "lucide-react";
+import { mediaUrl } from "../lib/api";
+import { basename, formatDate, formatQuality } from "../lib/utils";
+import type { PhotoRecord } from "../types/memoframe";
 
 interface PhotoCardProps {
   photo: PhotoRecord;
@@ -13,7 +13,14 @@ interface PhotoCardProps {
   className?: string;
 }
 
-export default function PhotoCard({ photo, compact = false, faceZoom = false, targetPersonId: _targetPersonId = null, onOpen, className = '' }: PhotoCardProps) {
+export default function PhotoCard({
+  photo,
+  compact = false,
+  faceZoom = false,
+  targetPersonId: _targetPersonId = null,
+  onOpen,
+  className = "",
+}: PhotoCardProps) {
   // If thumbnail fails or is missing, fall back to photo.path
   const [useFallback, setUseFallback] = useState(false);
   const [imgErr, setImgErr] = useState(false);
@@ -21,13 +28,14 @@ export default function PhotoCard({ photo, compact = false, faceZoom = false, ta
   // In faceZoom mode, display the crisp backend square face crop directly (Felicity model).
   // In normal mode, use the lightweight whole-photo thumbnail.
   const faceCrop = photo.face_crop_path || photo.faces?.[0]?.crop_path;
-  const srcPath = (faceZoom && faceCrop)
-    ? faceCrop
-    : (!useFallback && photo.thumb_path)
-      ? photo.thumb_path
-      : photo.path;
+  const srcPath =
+    faceZoom && faceCrop
+      ? faceCrop
+      : !useFallback && photo.thumb_path
+        ? photo.thumb_path
+        : photo.path;
 
-  const imgSrc = !imgErr && srcPath ? mediaUrl(srcPath) : '';
+  const imgSrc = !imgErr && srcPath ? mediaUrl(srcPath) : "";
   const faceCount = photo.faces?.length ?? photo.face_count ?? 0;
   const isSuggested = Boolean(photo.suggested || photo.suggested_keep);
   const dateText = formatDate(photo.effective_ts || photo.exif_ts).slice(0, 10);
@@ -45,7 +53,12 @@ export default function PhotoCard({ photo, compact = false, faceZoom = false, ta
       role="button"
       tabIndex={0}
       onClick={() => onOpen?.(photo)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.(photo); } }}
+      onKeyDown={e => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen?.(photo);
+        }
+      }}
       className={`group bg-card border border-subtle hover:border-accent-secondary/75 rounded-sm overflow-hidden cursor-pointer flex flex-col transition-colors focus-visible:outline-none focus-visible:border-accent-secondary focus-visible:ring-1 focus-visible:ring-accent-secondary/40 ${className}`}
     >
       <div className="relative w-full aspect-[4/3] bg-input overflow-hidden flex items-center justify-center">
@@ -78,8 +91,13 @@ export default function PhotoCard({ photo, compact = false, faceZoom = false, ta
         )}
       </div>
 
-      <div className={`border-t border-subtle flex flex-col gap-0.5 ${compact ? 'px-2 py-1.5' : 'px-2.5 py-2'}`}>
-        <div className="text-xs font-medium text-primary truncate group-hover:text-accent-secondary transition-colors" title={photo.path || ''}>
+      <div
+        className={`border-t border-subtle flex flex-col gap-0.5 ${compact ? "px-2 py-1.5" : "px-2.5 py-2"}`}
+      >
+        <div
+          className="text-xs font-medium text-primary truncate group-hover:text-accent-secondary transition-colors"
+          title={photo.path || ""}
+        >
           {basename(photo.path) || `Photo #${photo.id}`}
         </div>
         {!compact && (

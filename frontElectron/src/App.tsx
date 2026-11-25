@@ -1,31 +1,38 @@
-import { useEffect, useState } from 'react';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { useApp } from './context/AppContext';
-import { rpc } from './lib/api';
-import NavRail from './components/NavRail';
-import StatusBar from './components/StatusBar';
-import ToastContainer from './components/ToastContainer';
-import ModelDownloadScreen from './components/ModelDownloadScreen';
-import GalleryView from './views/GalleryView';
-import PeopleView from './views/PeopleView';
-import DuplicatesView from './views/DuplicatesView';
-import BurstsView from './views/BurstsView';
-import TimelineView from './views/TimelineView';
-import SettingsView from './views/SettingsView';
-import LightboxModal from './modals/LightboxModal';
+import { useEffect, useState } from "react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import { useApp } from "./context/AppContext";
+import { rpc } from "./lib/api";
+import NavRail from "./components/NavRail";
+import StatusBar from "./components/StatusBar";
+import ToastContainer from "./components/ToastContainer";
+import ModelDownloadScreen from "./components/ModelDownloadScreen";
+import GalleryView from "./views/GalleryView";
+import PeopleView from "./views/PeopleView";
+import DuplicatesView from "./views/DuplicatesView";
+import BurstsView from "./views/BurstsView";
+import TimelineView from "./views/TimelineView";
+import SettingsView from "./views/SettingsView";
+import LightboxModal from "./modals/LightboxModal";
 
 function WorkspaceShell() {
-  const { activeView, connected, backendError, initBackend, lightboxPhoto, setLightboxPhoto } = useApp();
+  const { activeView, connected, backendError, initBackend, lightboxPhoto, setLightboxPhoto } =
+    useApp();
 
   const renderView = () => {
     switch (activeView) {
-      case 'people': return <PeopleView />;
-      case 'duplicates': return <DuplicatesView />;
-      case 'bursts': return <BurstsView />;
-      case 'timeline': return <TimelineView />;
-      case 'settings': return <SettingsView />;
-      case 'photos':
-      default: return <GalleryView />;
+      case "people":
+        return <PeopleView />;
+      case "duplicates":
+        return <DuplicatesView />;
+      case "bursts":
+        return <BurstsView />;
+      case "timeline":
+        return <TimelineView />;
+      case "settings":
+        return <SettingsView />;
+      case "photos":
+      default:
+        return <GalleryView />;
     }
   };
 
@@ -51,9 +58,7 @@ function WorkspaceShell() {
           </div>
         )}
 
-        <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          {renderView()}
-        </main>
+        <main className="flex-1 min-h-0 flex flex-col overflow-hidden">{renderView()}</main>
 
         <StatusBar />
       </div>
@@ -80,8 +85,8 @@ export default function App() {
     if (!connected) return;
 
     let mounted = true;
-    rpc<{ ready: boolean }>('models.status')
-      .then((res) => {
+    rpc<{ ready: boolean }>("models.status")
+      .then(res => {
         if (!mounted) return;
         if (res && res.ready) {
           setModelsReady(true);

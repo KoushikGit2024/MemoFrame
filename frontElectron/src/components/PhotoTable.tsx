@@ -1,5 +1,5 @@
-import { basename, formatDate, formatDims, formatQuality } from '../lib/utils';
-import type { PhotoRecord } from '../types/memoframe';
+import { basename, formatDate, formatDims, formatQuality } from "../lib/utils";
+import type { PhotoRecord } from "../types/memoframe";
 
 interface PhotoTableProps {
   photos: PhotoRecord[];
@@ -23,17 +23,17 @@ export default function PhotoTable({ photos, onOpen }: PhotoTableProps) {
           </tr>
         </thead>
         <tbody>
-          {photos.map((p) => {
+          {photos.map(p => {
             const faceCount = p.faces?.length ?? p.face_count ?? 0;
             const q = p.quality !== null && p.quality !== undefined ? Number(p.quality) : null;
             const qualityColor =
               q === null || Number.isNaN(q)
-                ? 'text-secondary'
+                ? "text-secondary"
                 : q >= 80
-                ? 'text-success'
-                : q < 40
-                ? 'text-amber'
-                : 'text-primary';
+                  ? "text-success"
+                  : q < 40
+                    ? "text-amber"
+                    : "text-primary";
 
             return (
               <tr
@@ -42,23 +42,37 @@ export default function PhotoTable({ photos, onOpen }: PhotoTableProps) {
                 onClick={() => onOpen?.(p)}
                 className="border-b border-subtle hover:bg-elevated/80 cursor-pointer transition-colors"
               >
-                <td className="py-2 px-2.5 text-center font-mono text-secondary tabular-nums">{p.id}</td>
-                <td className="py-2 px-2.5 font-medium text-primary max-w-[220px] truncate" title={p.path}>
+                <td className="py-2 px-2.5 text-center font-mono text-secondary tabular-nums">
+                  {p.id}
+                </td>
+                <td
+                  className="py-2 px-2.5 font-medium text-primary max-w-[220px] truncate"
+                  title={p.path}
+                >
                   {basename(p.path)}
                 </td>
                 <td className="py-2 px-2.5 font-mono text-secondary tabular-nums">
                   {formatDate(p.effective_ts || p.exif_ts)}
                 </td>
-                <td className={`py-2 px-2.5 text-center font-mono tabular-nums ${faceCount > 0 ? 'text-violet font-medium' : 'text-secondary'}`}>
+                <td
+                  className={`py-2 px-2.5 text-center font-mono tabular-nums ${faceCount > 0 ? "text-violet font-medium" : "text-secondary"}`}
+                >
                   {faceCount}
                 </td>
                 <td className={`py-2 px-2.5 text-center font-mono tabular-nums ${qualityColor}`}>
                   {formatQuality(p.quality)}
                 </td>
-                <td className="py-2 px-2.5 font-mono text-secondary tabular-nums">{formatDims(p.width, p.height)}</td>
-                <td className="py-2 px-2.5 text-center font-mono uppercase text-secondary">{p.format || '—'}</td>
-                <td className="py-2 px-2.5 text-secondary max-w-[300px] truncate font-mono text-[11px]" title={p.path}>
-                  {p.path || '—'}
+                <td className="py-2 px-2.5 font-mono text-secondary tabular-nums">
+                  {formatDims(p.width, p.height)}
+                </td>
+                <td className="py-2 px-2.5 text-center font-mono uppercase text-secondary">
+                  {p.format || "—"}
+                </td>
+                <td
+                  className="py-2 px-2.5 text-secondary max-w-[300px] truncate font-mono text-[11px]"
+                  title={p.path}
+                >
+                  {p.path || "—"}
                 </td>
               </tr>
             );

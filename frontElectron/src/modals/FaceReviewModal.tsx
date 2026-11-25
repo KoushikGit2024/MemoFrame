@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, ImageOff, Loader2 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
-import { rpc } from '../lib/api';
-import type { FaceRecord, PersonRecord } from '../types/memoframe';
-import ModalShell from '../components/ModalShell';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, ImageOff, Loader2 } from "lucide-react";
+import { useApp } from "../context/AppContext";
+import { rpc } from "../lib/api";
+import type { FaceRecord, PersonRecord } from "../types/memoframe";
+import ModalShell from "../components/ModalShell";
 
 const PAGE = 60;
 
@@ -21,8 +21,15 @@ function FaceThumb({ face }: { face: FaceRecord }) {
     }
     setLoading(true);
     setError(false);
-    rpc<{ data_url?: string | null }>('faces.crop', { path: face.path, x: face.x, y: face.y, w: face.w, h: face.h, size: 96 })
-      .then((res) => {
+    rpc<{ data_url?: string | null }>("faces.crop", {
+      path: face.path,
+      x: face.x,
+      y: face.y,
+      w: face.w,
+      h: face.h,
+      size: 96,
+    })
+      .then(res => {
         if (!alive) return;
         if (res?.data_url) {
           setSrc(res.data_url);
@@ -36,7 +43,9 @@ function FaceThumb({ face }: { face: FaceRecord }) {
       .finally(() => {
         if (alive) setLoading(false);
       });
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [face]);
 
   return (
@@ -74,32 +83,39 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
   const [hasMore, setHasMore] = useState(false);
   const [persons, setPersons] = useState<PersonRecord[]>([]);
   const [editingFace, setEditingFace] = useState<FaceRecord | null>(null);
-  const [editMode, setEditMode] = useState<'name' | 'assign'>('name');
-  const [nameInput, setNameInput] = useState('');
-  const [assignQuery, setAssignQuery] = useState('');
+  const [editMode, setEditMode] = useState<"name" | "assign">("name");
+  const [nameInput, setNameInput] = useState("");
+  const [assignQuery, setAssignQuery] = useState("");
   const dirtyRef = useRef(false);
 
   const [confirmingAll, setConfirmingAll] = useState(false);
   const [submittingName, setSubmittingName] = useState(false);
   const [assigningFaceId, setAssigningFaceId] = useState<number | null>(null);
 
-  const loadFaces = useCallback(async (offset = 0, append = false) => {
-    try {
-      const limit = append ? PAGE : Math.max(PAGE, faces.length || PAGE);
-      const list = await rpc<FaceRecord[]>('faces.list', { person_id: personId, limit, offset });
-      const rows = list || [];
-      setFaces((prev) => (append ? [...prev, ...rows] : rows));
-      setHasMore(rows.length >= limit);
-    } catch (err) {
-      notify(err instanceof Error ? err.message : String(err), 'error');
-    }
-  }, [personId, faces.length, notify]);
+  const loadFaces = useCallback(
+    async (offset = 0, append = false) => {
+      try {
+        const limit = append ? PAGE : Math.max(PAGE, faces.length || PAGE);
+        const list = await rpc<FaceRecord[]>("faces.list", { person_id: personId, limit, offset });
+        const rows = list || [];
+        setFaces(prev => (append ? [...prev, ...rows] : rows));
+        setHasMore(rows.length >= limit);
+      } catch (err) {
+        notify(err instanceof Error ? err.message : String(err), "error");
+      }
+    },
+    [personId, faces.length, notify]
+  );
 
   useEffect(() => {
     if (personId !== null) {
-      rpc<PersonRecord | null>('persons.get', { person_id: personId }).then((p) => setPerson(p)).catch(() => {});
+      rpc<PersonRecord | null>("persons.get", { person_id: personId })
+        .then(p => setPerson(p))
+        .catch(() => {});
     }
-    rpc<PersonRecord[]>('persons.list').then((list) => setPersons(list || [])).catch(() => {});
+    rpc<PersonRecord[]>("persons.list")
+      .then(list => setPersons(list || []))
+      .catch(() => {});
     loadFaces(0, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personId]);
@@ -108,12 +124,12 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
     if (personId === null || confirmingAll) return;
     setConfirmingAll(true);
     try {
-      const res = await rpc<{ confirmed?: number }>('persons.confirm', { person_id: personId });
+      const res = await rpc<{ confirmed?: number }>("persons.confirm", { person_id: personId });
       dirtyRef.current = true;
-      notify(`${res.confirmed || 0} face(s) confirmed.`, 'success');
+      notify(`${res.confirmed || 0} face(s) confirmed.`, "success");
       loadFaces(0, false);
     } catch (err) {
-      notify(err instanceof Error ? err.message : String(err), 'error');
+      notify(err instanceof Error ? err.message : String(err), "error");
     } finally {
       setConfirmingAll(false);
     }
@@ -123,12 +139,12 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
     if (!editingFace || !nameInput.trim() || submittingName) return;
     setSubmittingName(true);
     try {
-      await rpc('faces.name', { face_id: editingFace.id, name: nameInput.trim() });
+      await rpc("faces.name", { face_id: editingFace.id, name: nameInput.trim() });
       dirtyRef.current = true;
       setEditingFace(null);
       loadFaces(0, false);
     } catch (err) {
-      notify(err instanceof Error ? err.message : String(err), 'error');
+      notify(err instanceof Error ? err.message : String(err), "error");
     } finally {
       setSubmittingName(false);
     }
@@ -138,28 +154,32 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
     if (assigningFaceId !== null) return;
     setAssigningFaceId(faceId);
     try {
-      await rpc('faces.assign', { face_id: faceId, person_id: targetPersonId });
+      await rpc("faces.assign", { face_id: faceId, person_id: targetPersonId });
       dirtyRef.current = true;
       setEditingFace(null);
       loadFaces(0, false);
     } catch (err) {
-      notify(err instanceof Error ? err.message : String(err), 'error');
+      notify(err instanceof Error ? err.message : String(err), "error");
     } finally {
       setAssigningFaceId(null);
     }
   };
 
   const assignablePersons = persons.filter(
-    (p) => p.id !== personId && String(p.name || '').toLowerCase().includes(assignQuery.trim().toLowerCase()),
+    p =>
+      p.id !== personId &&
+      String(p.name || "")
+        .toLowerCase()
+        .includes(assignQuery.trim().toLowerCase())
   );
 
   return (
     <ModalShell
-      title={person ? `Review Faces: ${person.name}` : 'Unassigned Faces'}
+      title={person ? `Review Faces: ${person.name}` : "Unassigned Faces"}
       subtitle={
         personId === null
-          ? 'Faces removed from people or not yet grouped. Name them or assign to a person.'
-          : 'Move misgrouped faces elsewhere or confirm to lock face box labels.'
+          ? "Faces removed from people or not yet grouped. Name them or assign to a person."
+          : "Move misgrouped faces elsewhere or confirm to lock face box labels."
       }
       size="lg"
       onClose={() => onClose?.(dirtyRef.current)}
@@ -167,7 +187,11 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
         <div className="w-full flex items-center justify-between">
           <div>
             {hasMore && (
-              <button type="button" onClick={() => loadFaces(faces.length, true)} className="btn-neutral h-8 px-3 text-xs">
+              <button
+                type="button"
+                onClick={() => loadFaces(faces.length, true)}
+                className="btn-neutral h-8 px-3 text-xs"
+              >
                 Load More
               </button>
             )}
@@ -185,7 +209,7 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
                 ) : (
                   <Check className="w-3.5 h-3.5" strokeWidth={1.8} />
                 )}
-                <span>{confirmingAll ? 'Confirming...' : 'Confirm All Faces'}</span>
+                <span>{confirmingAll ? "Confirming..." : "Confirm All Faces"}</span>
               </button>
             )}
             <button
@@ -204,19 +228,29 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
         <div className="p-3 bg-violet-bg/40 border border-violet/60 rounded-xs flex flex-col gap-2 shrink-0">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-violet">
-              {editMode === 'name' ? `Name Face #${editingFace.id}` : `Assign Face #${editingFace.id} to Person`}
+              {editMode === "name"
+                ? `Name Face #${editingFace.id}`
+                : `Assign Face #${editingFace.id} to Person`}
             </span>
-            <button type="button" onClick={() => setEditingFace(null)} className="text-xs text-secondary hover:text-primary">Cancel</button>
+            <button
+              type="button"
+              onClick={() => setEditingFace(null)}
+              className="text-xs text-secondary hover:text-primary"
+            >
+              Cancel
+            </button>
           </div>
-          {editMode === 'name' ? (
+          {editMode === "name" ? (
             <div className="flex gap-2">
               <input
                 type="text"
                 autoFocus
                 disabled={submittingName}
                 value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleNameSubmit(); }}
+                onChange={e => setNameInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") handleNameSubmit();
+                }}
                 placeholder="Enter person name..."
                 className="flex-1 h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 disabled:opacity-50"
               />
@@ -226,8 +260,10 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
                 onClick={handleNameSubmit}
                 className="btn-primary h-8 px-3 text-xs"
               >
-                {submittingName && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />}
-                <span>{submittingName ? 'Saving...' : 'Save'}</span>
+                {submittingName && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
+                )}
+                <span>{submittingName ? "Saving..." : "Save"}</span>
               </button>
             </div>
           ) : (
@@ -236,12 +272,12 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
                 type="text"
                 autoFocus
                 value={assignQuery}
-                onChange={(e) => setAssignQuery(e.target.value)}
+                onChange={e => setAssignQuery(e.target.value)}
                 placeholder="Search person by name..."
                 className="h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30"
               />
               <div className="max-h-36 overflow-y-auto flex flex-col gap-1">
-                {assignablePersons.map((p) => (
+                {assignablePersons.map(p => (
                   <button
                     key={p.id}
                     type="button"
@@ -249,7 +285,9 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
                     className="px-2.5 py-1.5 rounded-xs text-left text-xs text-primary hover:bg-card hover:text-violet flex items-center justify-between transition-colors"
                   >
                     <span>{p.name}</span>
-                    <span className="font-mono text-[11px] text-secondary">#{p.id} · {p.image_count || 0} photos</span>
+                    <span className="font-mono text-[11px] text-secondary">
+                      #{p.id} · {p.image_count || 0} photos
+                    </span>
                   </button>
                 ))}
               </div>
@@ -262,41 +300,52 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
         <div className="py-12 text-center text-xs text-secondary">No faces here.</div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(124px,1fr))] gap-2.5">
-          {faces.map((f) => {
+          {faces.map(f => {
             const isConfirmed = Boolean(f.locked);
             return (
               <div
                 key={f.id}
                 className={`bg-elevated border rounded-xs p-2 flex flex-col items-center gap-1.5 transition-colors ${
                   isConfirmed
-                    ? 'border-success/50 bg-success-bg/25'
+                    ? "border-success/50 bg-success-bg/25"
                     : personId === null
-                    ? 'border-amber/35 border-dashed'
-                    : 'border-subtle'
+                      ? "border-amber/35 border-dashed"
+                      : "border-subtle"
                 }`}
               >
                 <FaceThumb face={f} />
                 <div className="text-[11px] font-mono text-secondary flex items-center gap-1">
                   <span>{Math.round(Number(f.confidence || 0) * 100)}%</span>
                   {isConfirmed && (
-                    <span title="Manually confirmed" className="inline-flex items-center text-success">
+                    <span
+                      title="Manually confirmed"
+                      className="inline-flex items-center text-success"
+                    >
                       <Check className="w-3 h-3" strokeWidth={2.2} />
                     </span>
                   )}
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setEditingFace(f); setEditMode('name'); setNameInput(''); }}
+                  onClick={() => {
+                    setEditingFace(f);
+                    setEditMode("name");
+                    setNameInput("");
+                  }}
                   className="w-full h-6 rounded-xs border border-hairline bg-card text-[11px] text-primary hover:border-violet hover:text-violet transition-colors"
                 >
                   Name...
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setEditingFace(f); setEditMode('assign'); setAssignQuery(''); }}
+                  onClick={() => {
+                    setEditingFace(f);
+                    setEditMode("assign");
+                    setAssignQuery("");
+                  }}
                   className="w-full h-6 rounded-xs border border-hairline bg-card text-[11px] text-primary hover:border-violet hover:text-violet transition-colors"
                 >
-                  {personId !== null ? 'Move to...' : 'Assign...'}
+                  {personId !== null ? "Move to..." : "Assign..."}
                 </button>
                 {personId !== null && (
                   <button

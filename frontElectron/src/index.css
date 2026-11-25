@@ -83,21 +83,21 @@ html[data-theme="Nordic Slate Light"] {
   --text-secondary: #5f6b7a;
   --accent: #0969da;
   --accent-hover: #218bff;
-  --accent-light: rgba(9, 105, 218, 0.10);
+  --accent-light: rgba(9, 105, 218, 0.1);
   --accent-text: #ffffff;
   --accent-secondary: #0969da;
   --accent-secondary-hover: #218bff;
-  --accent-secondary-light: rgba(9, 105, 218, 0.10);
+  --accent-secondary-light: rgba(9, 105, 218, 0.1);
   --color-violet: #7c3aed;
   --color-violet-hover: #6d28d9;
-  --color-violet-bg: rgba(124, 58, 237, 0.10);
+  --color-violet-bg: rgba(124, 58, 237, 0.1);
   --color-amber: #d97706;
   --color-amber-hover: #b45309;
-  --color-amber-bg: rgba(217, 119, 6, 0.10);
+  --color-amber-bg: rgba(217, 119, 6, 0.1);
   --danger: #cf222e;
-  --danger-bg: rgba(207, 34, 46, 0.10);
+  --danger-bg: rgba(207, 34, 46, 0.1);
   --success: #1a7f37;
-  --success-bg: rgba(26, 127, 55, 0.10);
+  --success-bg: rgba(26, 127, 55, 0.1);
   --badge-bg: #edf1f5;
 }
 
@@ -147,21 +147,21 @@ html[data-theme="Obsidian Rose Light"] {
   --text-secondary: #7e2b43;
   --accent: #e11d48;
   --accent-hover: #be123c;
-  --accent-light: rgba(225, 29, 72, 0.10);
+  --accent-light: rgba(225, 29, 72, 0.1);
   --accent-text: #ffffff;
   --accent-secondary: #0891b2;
   --accent-secondary-hover: #0e7490;
-  --accent-secondary-light: rgba(8, 145, 178, 0.10);
+  --accent-secondary-light: rgba(8, 145, 178, 0.1);
   --color-violet: #7c3aed;
   --color-violet-hover: #6d28d9;
-  --color-violet-bg: rgba(124, 58, 237, 0.10);
+  --color-violet-bg: rgba(124, 58, 237, 0.1);
   --color-amber: #d97706;
   --color-amber-hover: #b45309;
-  --color-amber-bg: rgba(217, 119, 6, 0.10);
+  --color-amber-bg: rgba(217, 119, 6, 0.1);
   --danger: #be123c;
-  --danger-bg: rgba(190, 18, 60, 0.10);
+  --danger-bg: rgba(190, 18, 60, 0.1);
   --success: #047857;
-  --success-bg: rgba(4, 120, 87, 0.10);
+  --success-bg: rgba(4, 120, 87, 0.1);
   --badge-bg: #ffe4e9;
 }
 
@@ -211,21 +211,21 @@ html[data-theme="Neon Cyberpunk Light"] {
   --text-secondary: #226468;
   --accent: #0891b2;
   --accent-hover: #0e7490;
-  --accent-light: rgba(8, 145, 178, 0.10);
+  --accent-light: rgba(8, 145, 178, 0.1);
   --accent-text: #ffffff;
   --accent-secondary: #c026d3;
   --accent-secondary-hover: #a21caf;
-  --accent-secondary-light: rgba(192, 38, 211, 0.10);
+  --accent-secondary-light: rgba(192, 38, 211, 0.1);
   --color-violet: #7e22ce;
   --color-violet-hover: #6b21a8;
-  --color-violet-bg: rgba(126, 34, 206, 0.10);
+  --color-violet-bg: rgba(126, 34, 206, 0.1);
   --color-amber: #b45309;
   --color-amber-hover: #92400e;
-  --color-amber-bg: rgba(180, 83, 9, 0.10);
+  --color-amber-bg: rgba(180, 83, 9, 0.1);
   --danger: #e11d48;
-  --danger-bg: rgba(225, 29, 72, 0.10);
+  --danger-bg: rgba(225, 29, 72, 0.1);
   --success: #15803d;
-  --success-bg: rgba(21, 128, 61, 0.10);
+  --success-bg: rgba(21, 128, 61, 0.1);
   --badge-bg: #dbf4f5;
 }
 
@@ -276,21 +276,21 @@ html[data-theme="Alpine Emerald Light"] {
   --text-secondary: #27633e;
   --accent: #059669;
   --accent-hover: #047857;
-  --accent-light: rgba(5, 150, 105, 0.10);
+  --accent-light: rgba(5, 150, 105, 0.1);
   --accent-text: #ffffff;
   --accent-secondary: #0d9488;
   --accent-secondary-hover: #0f766e;
-  --accent-secondary-light: rgba(13, 148, 136, 0.10);
+  --accent-secondary-light: rgba(13, 148, 136, 0.1);
   --color-violet: #6b21a8;
   --color-violet-hover: #581c87;
-  --color-violet-bg: rgba(107, 33, 168, 0.10);
+  --color-violet-bg: rgba(107, 33, 168, 0.1);
   --color-amber: #d97706;
   --color-amber-hover: #b45309;
-  --color-amber-bg: rgba(217, 119, 6, 0.10);
+  --color-amber-bg: rgba(217, 119, 6, 0.1);
   --danger: #dc2626;
-  --danger-bg: rgba(220, 38, 38, 0.10);
+  --danger-bg: rgba(220, 38, 38, 0.1);
   --success: #059669;
-  --success-bg: rgba(5, 150, 105, 0.10);
+  --success-bg: rgba(5, 150, 105, 0.1);
   --badge-bg: #dcf2e4;
 }
 
@@ -341,21 +341,21 @@ html[data-theme="Solar Flare Light"] {
   --text-secondary: #7a501a;
   --accent: #d97706;
   --accent-hover: #b45309;
-  --accent-light: rgba(217, 119, 6, 0.10);
+  --accent-light: rgba(217, 119, 6, 0.1);
   --accent-text: #ffffff;
   --accent-secondary: #ea580c;
   --accent-secondary-hover: #c2410c;
-  --accent-secondary-light: rgba(234, 88, 12, 0.10);
+  --accent-secondary-light: rgba(234, 88, 12, 0.1);
   --color-violet: #6d28d9;
   --color-violet-hover: #5b21b6;
-  --color-violet-bg: rgba(109, 40, 217, 0.10);
+  --color-violet-bg: rgba(109, 40, 217, 0.1);
   --color-amber: #ea580c;
   --color-amber-hover: #c2410c;
-  --color-amber-bg: rgba(234, 88, 12, 0.10);
+  --color-amber-bg: rgba(234, 88, 12, 0.1);
   --danger: #dc2626;
-  --danger-bg: rgba(220, 38, 38, 0.10);
+  --danger-bg: rgba(220, 38, 38, 0.1);
   --success: #15803d;
-  --success-bg: rgba(21, 128, 61, 0.10);
+  --success-bg: rgba(21, 128, 61, 0.1);
   --badge-bg: #fcefd6;
 }
 
@@ -406,21 +406,21 @@ html[data-theme="Vapor Wave Light"] {
   --text-secondary: #652d96;
   --accent: #9333ea;
   --accent-hover: #7e22ce;
-  --accent-light: rgba(147, 51, 234, 0.10);
+  --accent-light: rgba(147, 51, 234, 0.1);
   --accent-text: #ffffff;
   --accent-secondary: #db2777;
   --accent-secondary-hover: #be185d;
-  --accent-secondary-light: rgba(219, 39, 119, 0.10);
+  --accent-secondary-light: rgba(219, 39, 119, 0.1);
   --color-violet: #7e22ce;
   --color-violet-hover: #6b21a8;
-  --color-violet-bg: rgba(126, 34, 206, 0.10);
+  --color-violet-bg: rgba(126, 34, 206, 0.1);
   --color-amber: #d97706;
   --color-amber-hover: #b45309;
-  --color-amber-bg: rgba(217, 119, 6, 0.10);
+  --color-amber-bg: rgba(217, 119, 6, 0.1);
   --danger: #e11d48;
-  --danger-bg: rgba(225, 29, 72, 0.10);
+  --danger-bg: rgba(225, 29, 72, 0.1);
   --success: #0d9488;
-  --success-bg: rgba(13, 148, 136, 0.10);
+  --success-bg: rgba(13, 148, 136, 0.1);
   --badge-bg: #f0e1fc;
 }
 
@@ -447,8 +447,12 @@ html[data-theme="Vapor Wave Light"] {
 /* Shimmer */
 
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .animate-shimmer {
@@ -462,12 +466,12 @@ html[data-theme="Vapor Wave Light"] {
   transform: translateX(-100%);
   background-image: linear-gradient(
     90deg,
-    rgba(255,255,255,0) 0%,
-    rgba(255,255,255,.06) 35%,
-    rgba(255,255,255,.13) 50%,
-    rgba(255,255,255,.06) 65%,
-    rgba(255,255,255,0) 100%
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.06) 35%,
+    rgba(255, 255, 255, 0.13) 50%,
+    rgba(255, 255, 255, 0.06) 65%,
+    rgba(255, 255, 255, 0) 100%
   );
   animation: shimmer 1.6s infinite ease-in-out;
-  content: '';
+  content: "";
 }
