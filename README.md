@@ -47,7 +47,7 @@ MemoFrame/
 │       │   ├── image_loader.py       # Robust image decoding & EXIF auto-rotation
 │       │   ├── metadata_extractor.py # EXIF timestamps, GPS, camera metadata
 │       │   └── video_info.py         # Fast MP4/MOV header parser & poster extraction
-│       ├── database/           # SQLite persistence layer (schema v8 with WAL mode)
+│       ├── database/           # SQLite persistence layer (schema v9 with WAL mode)
 │       │   ├── schema.sql            # Table definitions (images, faces, persons, groups)
 │       │   ├── migrations.py         # Versioned schema migrations
 │       │   └── db_manager.py         # Thread-safe database operations & FTS5 queries
