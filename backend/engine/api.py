@@ -19,6 +19,8 @@ from database import DatabaseManager
 from engine.contract import API_VERSION
 from engine.doctor import run_checks
 from engine.errors import EngineError, ErrorCode, translate
+from engine.people_mixin import PersonEngineMixin
+from engine.search_mixin import SearchEngineMixin
 from engine.lock import WorkspaceLock
 from engine.settings_file import load_settings, update_config_file, write_default_config
 from engine.profiles import apply_profile
@@ -53,7 +55,7 @@ def _translated(fn: F) -> F:
     return wrapper  # type: ignore[return-value]
 
 
-class Engine:
+class Engine(PersonEngineMixin, SearchEngineMixin):
     """Open a workspace, run scans and processing, query results.
 
     Usage::
@@ -264,75 +266,6 @@ class Engine:
         return out
 
     @_translated
-    def get_persons(self) -> list[dict[str, Any]]:
-        """List all identified person clusters with names, cover faces, and counts."""
-        return [_row(r) for r in self.db.list_persons()]
-
-    @_translated
-    def get_person(self, person_id: int) -> dict[str, Any] | None:
-        """Get details for a single person cluster."""
-        row = self.db.get_person(person_id)
-        return _row(row) if row else None
-
-    @_translated
-    def rename_person(self, person_id: int, new_name: str, confirm_faces: bool = False) -> bool:
-        """Name a person. Faces are only locked (and their boxes labeled) when
-        ``confirm_faces`` is True; otherwise name faces individually with name_face()."""
-        clean = (new_name or "").strip()
-        if not clean:
-            raise EngineError(ErrorCode.INVALID_INPUT, "Person name cannot be empty.")
-        if self.db.get_person(person_id) is None:
-            raise EngineError(ErrorCode.INVALID_INPUT, f"No person with id {person_id}.")
-        ok = self.db.rename_person(person_id, clean)
-        if ok:
-            if confirm_faces:
-                self.db.confirm_person(person_id)
-            pipeline.update_search_index(self.settings, self.db)
-        return ok
-
-    def _people_changed(self) -> None:
-        pipeline.update_search_index(self.settings, self.db)   # names in the text index
-
-    @_translated
-    def get_person_faces(self, person_id: int, limit: int = 200, offset: int = 0) -> list[dict[str, Any]]:
-        """Faces of one person, best first. ``locked`` = confirmed by the user."""
-        return [_row(r) for r in self.db.person_faces(person_id, limit, offset)]
-
-    @_translated
-    def get_unassigned_faces(self, limit: int = 200, offset: int = 0) -> list[dict[str, Any]]:
-        return [_row(r) for r in self.db.unassigned_faces(limit, offset)]
-
-    @_translated
-    def assign_face(self, face_id: int, person_id: int | None) -> None:
-        """Move a face to a person, or pass None to remove it from all people. Permanent."""
-        self.db.assign_face(face_id, person_id)
-        self._people_changed()
-
-    @_translated
-    def create_person(self, name: str, face_ids: list[int]) -> int:
-        """Make a new named person from specific faces. Returns the new person id."""
-        pid = self.db.create_person(name, face_ids)
-        self._people_changed()
-        return pid
-
-    @_translated
-    def merge_persons(self, keep_id: int, merge_id: int) -> dict[str, Any] | None:
-        """Merge two clusters of the same person. ``merge_id`` disappears."""
-        self.db.merge_persons(keep_id, merge_id)
-        self._people_changed()
-        return self.get_person(keep_id)
-
-    @_translated
-    def confirm_person(self, person_id: int) -> int:
-        """Mark a cluster as correct: its faces are locked. Returns how many."""
-        return self.db.confirm_person(person_id)
-
-    @_translated
-    def unlock_face(self, face_id: int) -> bool:
-        """Let automatic clustering decide this face again (effective on next rebuild)."""
-        return self.db.unlock_face(face_id)
-
-    @_translated
     def failed_images(self) -> list[dict[str, Any]]:
         return [_row(r) for r in self.db.failed_images()]
 
@@ -479,54 +412,6 @@ class Engine:
         return [_row(r) for r in self.db.low_confidence_faces(below, limit)]
 
     # ---- Phase E ----------------------------------------------------------
-    @_translated
-    def find(self, *, sort: str = "date", limit: int = 100, offset: int = 0,
-             **filters: Any) -> list[dict[str, Any]]:
-        """Combined search. Filters: text, min_faces, max_faces, taken_from, taken_until,
-        group_id, path_contains, place_contains, content_type, kind, format, min_quality,
-        burst_id, in_burst, duplicate (none/any/exact/near), mark, no_mark,
-        include_missing, include_live_video, include_hidden.
-        ``sort``: date, date_desc, quality, path, size. Bad filters raise INVALID_INPUT."""
-        if filters.get("text"):
-            pipeline.update_search_index(self.settings, self.db)
-        return [_row(r) for r in self.db.find_images(sort=sort, limit=limit, offset=offset, **filters)]
-
-    @_translated
-    def count(self, **filters: Any) -> int:
-        if filters.get("text"):
-            pipeline.update_search_index(self.settings, self.db)
-        return self.db.count_images(**filters)
-
-    @_translated
-    def timeline(self, granularity: str = "month") -> list[dict[str, Any]]:
-        return self.db.timeline(granularity)
-
-    @_translated
-    def save_search(self, name: str, filters: dict[str, Any]) -> None:
-        self.db.save_search(name, filters)
-
-    @_translated
-    def list_saved_searches(self) -> list[dict[str, Any]]:
-        return self.db.list_saved_searches()
-
-    @_translated
-    def delete_saved_search(self, name: str) -> bool:
-        return self.db.delete_saved_search(name)
-
-    @_translated
-    def run_saved_search(self, name: str, *, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
-        saved = self.db.get_saved_search(name)
-        if saved is None:
-            raise EngineError(ErrorCode.INVALID_INPUT, f"No saved search named {name!r}.")
-        return self.find(limit=limit, offset=offset, **saved)
-
-    @_translated
-    def moves(self) -> list[dict[str, Any]]:
-        """Photos that appear to have been moved or renamed outside the app (marks follow them)."""
-        maintenance.refresh_states(self.db)
-        self.db.restore_marks()
-        return [_row(r) for r in self.db.find_moves()]
-
     # ---- Phase F ----------------------------------------------------------
     @_translated
     def tag_existing(self) -> dict[str, int]:
@@ -536,26 +421,6 @@ class Engine:
         n = tag_existing(self.settings, self.db, self.control)
         pipeline.update_search_index(self.settings, self.db)
         return {"tagged": n}
-
-    @_translated
-    def get_tags(self, image_id: int) -> list[dict[str, Any]]:
-        return [_row(r) for r in self.db.get_tags(image_id)]
-
-    @_translated
-    def list_tags(self, limit: int = 100) -> list[dict[str, Any]]:
-        """Tags with photo counts, most common first (for a tag browser)."""
-        return [{"label": r["label"], "count": int(r["n"])} for r in self.db.list_tag_counts(limit)]
-
-    @_translated
-    def similar(self, image_id: int, limit: int = 20) -> list[dict[str, Any]]:
-        """Photos with a similar whole-image content, best first (needs stored embeddings)."""
-        from services.intelligence.similar import find_similar
-        out = []
-        for other_id, score in find_similar(self.db, image_id, limit):
-            row = self.db.get_image(other_id)
-            if row is not None:
-                out.append({**_row(row), "similarity": round(score, 4)})
-        return out
 
     # ---- Phase G ----------------------------------------------------------
     @_translated
@@ -599,23 +464,6 @@ class Engine:
             img_id: [_row(r) for r in rows]
             for img_id, rows in self.db.faces_for_images(image_ids).items()
         }
-
-    @_translated
-    def name_face(self, face_id: int, name: str) -> int:
-        """Name a single face: reuses a person with `name` or creates one, and locks the face."""
-        clean = (name or "").strip()
-        if not clean:
-            raise EngineError(ErrorCode.INVALID_INPUT, "Person name cannot be empty.")
-        # Find existing person by this exact name (case-insensitive)
-        existing = [p for p in self.get_persons() if p.get("name", "").lower() == clean.lower()]
-        if existing:
-            pid = int(existing[0]["id"])
-            self.db.assign_face(face_id, pid)
-        else:
-            pid = self.db.create_person(clean, [face_id])
-        self.db.set_face_locked(face_id, True)
-        self._people_changed()
-        return pid
 
     @_translated
     def reset_workspace(self, *, keep_generated: bool = False, clear_sources: bool = False,

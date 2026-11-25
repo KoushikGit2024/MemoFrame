@@ -54,7 +54,7 @@ export default function DuplicatesView() {
           <h1 className="text-[17px] font-semibold text-primary">Duplicate Clusters ({clusters.length})</h1>
           <p className="text-xs text-secondary mt-0.5">Compare duplicate candidates side-by-side and keep the sharpest copy in one click.</p>
         </div>
-        <button type="button" onClick={loadClusters} className="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+        <button type="button" onClick={loadClusters} className="btn-neutral h-8 px-2.5 text-xs">
           <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.6} />
           <span>Refresh</span>
         </button>
@@ -74,14 +74,16 @@ export default function DuplicatesView() {
                   key={cl.cluster_id}
                   type="button"
                   onClick={() => setSelectedIdx(idx)}
-                  className={`w-full px-2.5 py-2 rounded-xs border text-left flex items-center justify-between text-xs ${
+                  className={`w-full px-2.5 py-2 rounded-xs border text-left flex items-center justify-between text-xs transition-colors ${
                     idx === selectedIdx
-                      ? 'bg-accent-light border-accent text-primary font-medium'
+                      ? 'bg-amber-bg border-amber/55 text-amber font-semibold'
                       : 'bg-transparent border-transparent text-primary hover:bg-elevated'
                   }`}
                 >
                   <span>Cluster #{idx + 1}</span>
-                  <span className="font-mono text-[11px] text-secondary capitalize">{cl.photos.length} · {cl.kind}</span>
+                  <span className={`font-mono text-[11px] capitalize ${idx === selectedIdx ? 'text-amber' : 'text-secondary'}`}>
+                    {cl.photos.length} · {cl.kind}
+                  </span>
                 </button>
               ))}
             </div>
@@ -100,10 +102,10 @@ export default function DuplicatesView() {
                   {activeCluster.photos.map((photo) => {
                     const isBest = photo.id === activeCluster.best_image_id;
                     return (
-                      <div key={photo.id} className={`w-[300px] shrink-0 bg-card border rounded-sm p-3 flex flex-col gap-2.5 ${isBest ? 'border-accent' : 'border-subtle'}`}>
+                      <div key={photo.id} className={`w-[300px] shrink-0 bg-card border rounded-sm p-3 flex flex-col gap-2.5 ${isBest ? 'border-amber/60' : 'border-subtle'}`}>
                         <div className="flex items-center justify-between">
-                          <span className={`h-5 px-2 inline-flex items-center gap-1 rounded-xs border text-[11px] font-medium ${isBest ? 'bg-accent-light border-accent text-primary' : 'bg-badge border-hairline text-secondary'}`}>
-                            {isBest && <Star className="w-3 h-3 text-accent" strokeWidth={1.8} />}
+                          <span className={`h-5 px-2 inline-flex items-center gap-1 rounded-xs border text-[11px] font-medium ${isBest ? 'bg-amber-bg border-amber/45 text-amber' : 'bg-badge border-hairline text-secondary'}`}>
+                            {isBest && <Star className="w-3 h-3 text-amber fill-current" strokeWidth={1.8} />}
                             <span>{isBest ? 'Recommended Keeper' : 'Duplicate Copy'}</span>
                           </span>
                           <span className="font-mono text-[11px] text-secondary">#{photo.id}</span>
@@ -117,12 +119,10 @@ export default function DuplicatesView() {
                           type="button"
                           disabled={busy}
                           onClick={() => keepSingle(photo.id)}
-                          className={`h-8 px-3 inline-flex items-center justify-center gap-1.5 rounded-xs text-xs font-medium transition-colors disabled:opacity-50 ${
-                            isBest ? 'bg-accent text-accent-text hover:bg-accent-hover' : 'bg-elevated border border-hairline text-primary hover:border-accent'
-                          }`}
+                          className={`h-8 px-3 text-xs ${isBest ? 'btn-success' : 'btn-neutral hover:border-accent-secondary'}`}
                         >
                           {busy ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
+                            <Loader2 className={`w-3.5 h-3.5 animate-spin ${isBest ? 'text-success-text' : 'text-secondary'}`} />
                           ) : (
                             <Check className="w-3.5 h-3.5" strokeWidth={1.8} />
                           )}

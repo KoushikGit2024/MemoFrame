@@ -65,14 +65,14 @@ export default function MergePeopleModal({ persons, onClose, onMerged }: MergePe
       onClose={onClose}
       footer={
         <>
-          <button type="button" onClick={onClose} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+          <button type="button" onClick={onClose} className="btn-neutral h-8 px-3 text-xs">
             Cancel
           </button>
           <button
             type="button"
             disabled={!selection || busy}
             onClick={handleMerge}
-            className="h-8 px-3 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors"
+            className="btn-primary h-8 px-3 text-xs"
           >
             {busy && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />}
             <span>{busy ? 'Merging...' : 'Merge Selected'}</span>
@@ -85,16 +85,29 @@ export default function MergePeopleModal({ persons, onClose, onMerged }: MergePe
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Filter by name..."
-        className="h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent"
+        className="h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs text-primary placeholder:text-secondary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30"
       />
       <div className="max-h-80 overflow-y-auto border border-subtle rounded-xs divide-y divide-subtle">
         {filtered.map((p) => {
           const checked = selectedIds.has(p.id);
+          const isKeeper = selection?.keeper.id === p.id;
           return (
-            <label key={p.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-elevated cursor-pointer">
-              <input type="checkbox" checked={checked} onChange={() => toggle(p.id)} className="accent-accent" />
-              <PersonAvatar person={p} size="sm" />
-              <span className="text-xs font-medium text-primary flex-1 truncate">{p.name}</span>
+            <label
+              key={p.id}
+              className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors ${
+                checked ? 'bg-violet-bg/45' : 'hover:bg-elevated'
+              }`}
+            >
+              <input type="checkbox" checked={checked} onChange={() => toggle(p.id)} className="accent-violet" />
+              <PersonAvatar person={p} size="sm" accent={checked ? 'violet' : 'default'} />
+              <span className={`text-xs font-medium flex-1 truncate ${checked ? 'text-violet' : 'text-primary'}`}>
+                {p.name}
+              </span>
+              {isKeeper && (
+                <span className="px-1.5 py-px rounded-xs bg-success-bg border border-success/40 text-[10px] font-medium text-success">
+                  Keeper
+                </span>
+              )}
               <span className="text-xs font-mono text-secondary">{p.image_count || 0} photos</span>
             </label>
           );

@@ -10,9 +10,17 @@ export default function ToastContainer() {
       {toasts.map((t) => {
         const Icon = t.kind === 'success' ? CheckCircle2 : t.kind === 'error' ? AlertCircle : Info;
         const borderClass =
-          t.kind === 'success' ? 'border-l-success' : t.kind === 'error' ? 'border-l-danger' : 'border-l-accent';
+          t.kind === 'success'
+            ? 'border-l-success'
+            : t.kind === 'error'
+            ? 'border-l-danger'
+            : 'border-l-accent-secondary';
         const iconClass =
-          t.kind === 'success' ? 'text-success' : t.kind === 'error' ? 'text-danger' : 'text-accent';
+          t.kind === 'success'
+            ? 'text-success'
+            : t.kind === 'error'
+            ? 'text-danger'
+            : 'text-accent-secondary';
 
         return (
           <div

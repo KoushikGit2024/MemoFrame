@@ -35,20 +35,23 @@ export function SimilarPhotosModal({ imageId, onClose, onOpenPhoto }: SimilarPho
       size="lg"
       onClose={onClose}
       footer={
-        <button type="button" onClick={onClose} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+        <button type="button" onClick={onClose} className="btn-neutral h-8 px-3 text-xs">
           Close
         </button>
       }
     >
       <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">
-        {items.map((it) => (
-          <div key={it.id} className="flex flex-col gap-1">
-            <PhotoCard photo={it} onOpen={onOpenPhoto} />
-            <div className="text-center font-mono text-[11px] text-secondary">
-              {Math.round(Number(it.similarity || 0) * 100)}% similar
+        {items.map((it) => {
+          const pct = Math.round(Number(it.similarity || 0) * 100);
+          return (
+            <div key={it.id} className="flex flex-col gap-1">
+              <PhotoCard photo={it} onOpen={onOpenPhoto} />
+              <div className={`text-center font-mono text-[11px] ${pct >= 80 ? 'text-accent-secondary font-medium' : 'text-secondary'}`}>
+                {pct}% similar
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </ModalShell>
   );
@@ -68,7 +71,7 @@ export function FailedPhotosModal({ onClose }: { onClose?: () => void }) {
       size="lg"
       onClose={onClose}
       footer={
-        <button type="button" onClick={onClose} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+        <button type="button" onClick={onClose} className="btn-neutral h-8 px-3 text-xs">
           Close
         </button>
       }
@@ -76,7 +79,7 @@ export function FailedPhotosModal({ onClose }: { onClose?: () => void }) {
       <div className="max-h-[420px] overflow-auto border border-subtle rounded-xs">
         <table className="w-full border-collapse text-xs">
           <thead>
-            <tr className="bg-elevated border-b border-hairline text-[11px] uppercase text-secondary">
+            <tr className="sticky top-0 z-10 bg-elevated border-b border-hairline text-[11px] uppercase text-secondary">
               <th className="py-2 px-2.5 text-left w-16">ID</th>
               <th className="py-2 px-2.5 text-left">File Path</th>
               <th className="py-2 px-2.5 text-left">Error</th>
@@ -116,14 +119,14 @@ export function ResetWorkspaceModal({ onClose, onConfirm }: ResetWorkspaceModalP
       onClose={onClose}
       footer={
         <>
-          <button type="button" onClick={onClose} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+          <button type="button" onClick={onClose} className="btn-neutral h-8 px-3 text-xs">
             Cancel
           </button>
           <button
             type="button"
             disabled={confirmText.trim() !== 'RESET'}
             onClick={() => onConfirm?.({ clear_sources: clearSources, clear_saved_searches: clearSaved })}
-            className="h-8 px-3 rounded-xs bg-danger text-white text-xs font-medium disabled:opacity-40"
+            className="h-8 px-3 inline-flex items-center justify-center rounded-xs bg-danger text-danger-text text-xs font-medium hover:bg-danger-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Reset Workspace
           </button>
@@ -147,7 +150,7 @@ export function ResetWorkspaceModal({ onClose, onConfirm }: ResetWorkspaceModalP
         value={confirmText}
         onChange={(e) => setConfirmText(e.target.value)}
         placeholder="Type RESET to confirm"
-        className="h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs font-mono text-primary focus:outline-none focus:border-danger"
+        className="h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs font-mono text-primary focus:outline-none focus:border-danger focus:ring-1 focus:ring-danger/30"
       />
     </ModalShell>
   );
@@ -166,12 +169,12 @@ export function LivePhotoModal({ videoPath, onClose }: { videoPath: string; onCl
           <button
             type="button"
             onClick={() => { if (videoRef.current) { videoRef.current.currentTime = 0; videoRef.current.play(); } }}
-            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium"
+            className="btn-primary h-8 px-3 text-xs"
           >
             <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.6} />
             <span>Replay</span>
           </button>
-          <button type="button" onClick={onClose} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+          <button type="button" onClick={onClose} className="btn-neutral h-8 px-3 text-xs">
             Close
           </button>
         </>

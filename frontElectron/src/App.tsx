@@ -35,7 +35,7 @@ function WorkspaceShell() {
 
       <div className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
         {!connected && backendError && (
-          <div className="px-4 py-2 bg-danger-bg border-b border-danger text-xs text-primary flex items-center justify-between gap-3 shrink-0">
+          <div className="px-4 py-2 bg-danger-bg border-b border-danger/50 text-xs text-primary flex items-center justify-between gap-3 shrink-0">
             <span className="inline-flex items-center gap-2 min-w-0">
               <AlertTriangle className="w-3.5 h-3.5 text-danger shrink-0" strokeWidth={1.7} />
               <span className="truncate">{backendError}</span>
@@ -43,7 +43,7 @@ function WorkspaceShell() {
             <button
               type="button"
               onClick={initBackend}
-              className="h-6 px-2 inline-flex items-center gap-1 rounded-xs border border-danger text-xs text-danger hover:bg-danger hover:text-white shrink-0"
+              className="btn-danger h-6 px-2 text-xs shrink-0"
             >
               <RefreshCw className="w-3 h-3" strokeWidth={1.6} />
               <span>Retry</span>

@@ -50,7 +50,7 @@ export default function TimelineView() {
           <h1 className="text-[17px] font-semibold text-primary">Events &amp; Timeline Groups ({total})</h1>
           <p className="text-xs text-secondary mt-0.5">Chronological bursts and automatically clustered photo events.</p>
         </div>
-        <button type="button" onClick={() => loadPage(0, false)} className="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+        <button type="button" onClick={() => loadPage(0, false)} className="btn-neutral h-8 px-2.5 text-xs">
           <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.6} />
           <span>Refresh</span>
         </button>
@@ -74,15 +74,19 @@ export default function TimelineView() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-sm font-semibold text-primary">{name}</h2>
                     {dateText && (
-                      <span className="h-5 px-2 inline-flex items-center rounded-xs bg-badge border border-hairline font-mono text-[11px] text-secondary">
+                      <span className="h-5 px-2 inline-flex items-center rounded-xs bg-amber-bg border border-amber/35 font-mono text-[11px] text-amber">
                         {dateText}
                       </span>
                     )}
-                    <span className="h-5 px-2 inline-flex items-center rounded-xs bg-accent-light border border-accent font-mono text-[11px] text-primary">
+                    <span className="h-5 px-2 inline-flex items-center rounded-xs bg-accent-light border border-accent/40 font-mono text-[11px] text-accent">
                       {g.image_count || 0} photos
                     </span>
                   </div>
-                  <button type="button" onClick={() => openGroupInGallery(Number(g.id), name)} className="h-7 px-2.5 inline-flex items-center gap-1 rounded-xs text-xs text-accent hover:bg-elevated">
+                  <button
+                    type="button"
+                    onClick={() => openGroupInGallery(Number(g.id), name)}
+                    className="h-7 px-2.5 inline-flex items-center gap-1 rounded-xs text-xs font-medium text-accent-secondary hover:bg-accent-secondary-light transition-colors"
+                  >
                     <span>View all {g.image_count || 0}</span>
                     <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.6} />
                   </button>
@@ -96,7 +100,7 @@ export default function TimelineView() {
                     <button
                       type="button"
                       onClick={() => openGroupInGallery(Number(g.id), name)}
-                      className="w-28 h-[148px] shrink-0 rounded-sm border border-dashed border-hairline bg-elevated/40 hover:border-accent flex flex-col items-center justify-center text-xs text-secondary hover:text-primary gap-1"
+                      className="w-28 h-[148px] shrink-0 rounded-sm border border-dashed border-hairline bg-elevated/40 hover:border-accent-secondary hover:text-accent-secondary flex flex-col items-center justify-center text-xs text-secondary gap-1 transition-colors"
                     >
                       <span className="font-mono font-semibold text-primary">+{extra}</span>
                       <span>more</span>
@@ -112,9 +116,9 @@ export default function TimelineView() {
               type="button"
               disabled={loading}
               onClick={() => loadPage(groups.length, true)}
-              className="h-9 px-4 self-center rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated mb-3 inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="btn-neutral h-9 px-4 self-center text-xs mb-3"
             >
-              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />}
+              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary" />}
               <span>{loading ? 'Loading more events...' : `Show ${Math.min(PAGE_STEP, remaining)} more (${remaining} remaining)`}</span>
             </button>
           )}

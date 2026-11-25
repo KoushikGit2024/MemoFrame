@@ -99,7 +99,7 @@ export default function BurstsView() {
           <h1 className="text-[17px] font-semibold text-primary">Burst Sequences ({bursts.length})</h1>
           <p className="text-xs text-secondary mt-0.5">Scrub frames with Left/Right arrow keys, keep the sharpest frame, and hide the rest.</p>
         </div>
-        <button type="button" onClick={loadBursts} className="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+        <button type="button" onClick={loadBursts} className="btn-neutral h-8 px-2.5 text-xs">
           <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.6} />
           <span>Refresh</span>
         </button>
@@ -119,14 +119,16 @@ export default function BurstsView() {
                   key={b.id}
                   type="button"
                   onClick={() => setBurstIdx(idx)}
-                  className={`w-full px-2.5 py-2 rounded-xs border text-left flex items-center justify-between text-xs ${
+                  className={`w-full px-2.5 py-2 rounded-xs border text-left flex items-center justify-between text-xs transition-colors ${
                     idx === burstIdx
-                      ? 'bg-accent-light border-accent text-primary font-medium'
+                      ? 'bg-amber-bg border-amber/55 text-amber font-semibold'
                       : 'bg-transparent border-transparent text-primary hover:bg-elevated'
                   }`}
                 >
                   <span>Burst #{idx + 1}</span>
-                  <span className="font-mono text-[11px] text-secondary">{b.image_count} frames</span>
+                  <span className={`font-mono text-[11px] ${idx === burstIdx ? 'text-amber' : 'text-secondary'}`}>
+                    {b.image_count} frames
+                  </span>
                 </button>
               ))}
             </div>
@@ -137,8 +139,8 @@ export default function BurstsView() {
               {currentFrame ? (
                 <img src={mediaUrl(currentFrame.path || currentFrame.thumb_path)} alt={`Frame ${frameIdx + 1}`} className="max-w-full max-h-full object-contain" />
               ) : (
-                <span className="text-xs text-accent inline-flex items-center gap-1.5 animate-pulse">
-                  <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                <span className="text-xs text-accent-secondary inline-flex items-center gap-1.5">
+                  <Loader2 className="w-4 h-4 animate-spin text-accent-secondary" />
                   <span>Loading frames...</span>
                 </span>
               )}
@@ -149,8 +151,8 @@ export default function BurstsView() {
                 {currentFrame ? `Frame ${frameIdx + 1} of ${frames.length} · Quality ${formatQuality(currentFrame.quality)}` : ''}
               </span>
               {currentFrame?.suggested && (
-                <span className="inline-flex items-center gap-1 text-accent font-medium">
-                  <Star className="w-3.5 h-3.5" strokeWidth={1.7} />
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs bg-amber-bg border border-amber/40 text-amber font-medium">
+                  <Star className="w-3 h-3 fill-current" strokeWidth={1.7} />
                   <span>Suggested (sharpest)</span>
                 </span>
               )}
@@ -162,7 +164,7 @@ export default function BurstsView() {
               max={Math.max(0, frames.length - 1)}
               value={frameIdx}
               onChange={(e) => setFrameIdx(Number(e.target.value))}
-              className="w-full accent-accent cursor-pointer"
+              className="w-full accent-accent-secondary cursor-pointer"
             />
 
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0">
@@ -171,13 +173,15 @@ export default function BurstsView() {
                   key={f.id}
                   type="button"
                   onClick={() => setFrameIdx(idx)}
-                  className={`w-[84px] shrink-0 p-1 rounded-xs border flex flex-col items-center gap-1 ${
-                    idx === frameIdx ? 'border-accent bg-accent-light' : 'border-subtle bg-card hover:border-hairline'
+                  className={`w-[84px] shrink-0 p-1 rounded-xs border flex flex-col items-center gap-1 transition-colors ${
+                    idx === frameIdx
+                      ? 'border-accent-secondary bg-accent-secondary-light'
+                      : 'border-subtle bg-card hover:border-hairline'
                   }`}
                 >
                   <img src={mediaUrl(f.thumb_path || f.path)} alt={`Thumb ${idx + 1}`} className="w-[74px] h-[52px] object-cover bg-input" />
                   <span className="text-[10.5px] font-mono text-primary inline-flex items-center gap-0.5">
-                    {f.suggested && <Star className="w-2.5 h-2.5 text-accent" strokeWidth={2} />}
+                    {f.suggested && <Star className="w-2.5 h-2.5 text-amber fill-current" strokeWidth={2} />}
                     <span>{idx + 1}</span>
                   </span>
                 </button>
@@ -186,21 +190,21 @@ export default function BurstsView() {
 
             <div className="flex items-center justify-between gap-2 flex-wrap shrink-0">
               <div className="flex items-center gap-1.5">
-                <button type="button" disabled={frameIdx <= 0} onClick={() => setFrameIdx((i) => Math.max(0, i - 1))} className="h-8 w-8 inline-flex items-center justify-center rounded-xs border border-hairline bg-card text-primary hover:bg-elevated disabled:opacity-40">
+                <button type="button" disabled={frameIdx <= 0} onClick={() => setFrameIdx((i) => Math.max(0, i - 1))} className="btn-neutral h-8 w-8">
                   <ChevronLeft className="w-4 h-4" strokeWidth={1.6} />
                 </button>
-                <button type="button" disabled={frameIdx >= frames.length - 1} onClick={() => setFrameIdx((i) => Math.min(frames.length - 1, i + 1))} className="h-8 w-8 inline-flex items-center justify-center rounded-xs border border-hairline bg-card text-primary hover:bg-elevated disabled:opacity-40">
+                <button type="button" disabled={frameIdx >= frames.length - 1} onClick={() => setFrameIdx((i) => Math.min(frames.length - 1, i + 1))} className="btn-neutral h-8 w-8">
                   <ChevronRight className="w-4 h-4" strokeWidth={1.6} />
                 </button>
                 <button
                   type="button"
                   onClick={() => { const best = frames.findIndex((f) => f.suggested); if (best >= 0) setFrameIdx(best); }}
-                  className="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated"
+                  className="btn-warning h-8 px-2.5 text-xs"
                 >
-                  <Star className="w-3.5 h-3.5 text-accent" strokeWidth={1.6} />
+                  <Star className="w-3.5 h-3.5" strokeWidth={1.6} />
                   <span>Suggested</span>
                 </button>
-                <button type="button" disabled={!currentFrame} onClick={() => currentFrame && setLightboxPhoto(currentFrame)} className="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+                <button type="button" disabled={!currentFrame} onClick={() => currentFrame && setLightboxPhoto(currentFrame)} className="btn-neutral h-8 px-2.5 text-xs">
                   <Maximize2 className="w-3.5 h-3.5" strokeWidth={1.6} />
                   <span>Open Full Size</span>
                 </button>
@@ -210,7 +214,7 @@ export default function BurstsView() {
                   type="button"
                   disabled={busy}
                   onClick={handleKeepAll}
-                  className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated disabled:opacity-50 inline-flex items-center gap-1.5 transition-colors"
+                  className="btn-neutral h-8 px-3 text-xs"
                 >
                   {busy && <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary" />}
                   <span>{busy ? 'Processing...' : 'Keep All'}</span>
@@ -219,10 +223,10 @@ export default function BurstsView() {
                   type="button"
                   disabled={busy || !currentFrame}
                   onClick={handleKeepCurrent}
-                  className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                  className="btn-success h-8 px-3 text-xs"
                 >
                   {busy ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-success-text" />
                   ) : (
                     <Check className="w-3.5 h-3.5" strokeWidth={1.8} />
                   )}

@@ -6,9 +6,17 @@ import type { PersonRecord } from '../types/memoframe';
 interface PersonAvatarProps {
   person?: PersonRecord | null;
   size?: 'sm' | 'md' | 'lg';
+  accent?: 'default' | 'violet' | 'amber' | 'success';
 }
 
-export default function PersonAvatar({ person, size = 'sm' }: PersonAvatarProps) {
+const ACCENT_RING: Record<NonNullable<PersonAvatarProps['accent']>, string> = {
+  default: 'border-subtle',
+  violet: 'border-violet/70',
+  amber: 'border-amber/60',
+  success: 'border-success/70',
+};
+
+export default function PersonAvatar({ person, size = 'sm', accent = 'default' }: PersonAvatarProps) {
   const [loaded, setLoaded] = useState(false);
   const [err, setErr] = useState(false);
 
@@ -28,7 +36,7 @@ export default function PersonAvatar({ person, size = 'sm' }: PersonAvatarProps)
 
   return (
     <span
-      className={`${dims} shrink-0 rounded-xs bg-input border border-subtle overflow-hidden inline-flex items-center justify-center font-semibold text-secondary relative select-none`}
+      className={`${dims} shrink-0 rounded-xs bg-input border ${ACCENT_RING[accent]} overflow-hidden inline-flex items-center justify-center font-semibold text-secondary relative select-none`}
     >
       {/* Background Initials Fallback - ALWAYS visible under image if image is missing or loading */}
       <span className="text-secondary/90 font-medium z-0">

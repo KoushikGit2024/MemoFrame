@@ -83,14 +83,22 @@ export default function ModelDownloadScreen({ onComplete }: ModelDownloadScreenP
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-app text-primary select-none p-6">
-      <div className="w-full max-w-md bg-card border border-subtle rounded-md p-6 shadow-2xl flex flex-col items-center text-center">
-        <div className="w-12 h-12 rounded-full bg-elevated border border-hairline flex items-center justify-center mb-4 text-accent">
+      <div className="w-full max-w-md bg-card border border-subtle rounded-md p-6 flex flex-col items-center text-center">
+        <div
+          className={`w-12 h-12 rounded-sm border flex items-center justify-center mb-4 ${
+            isDone
+              ? 'bg-success-bg border-success/45 text-success'
+              : error
+              ? 'bg-danger-bg border-danger/45 text-danger'
+              : 'bg-accent-secondary-light border-accent-secondary/40 text-accent-secondary'
+          }`}
+        >
           {isDone ? (
-            <CheckCircle2 className="w-6 h-6 text-emerald-400 animate-pulse" />
+            <CheckCircle2 className="w-6 h-6" strokeWidth={1.7} />
           ) : error ? (
-            <AlertTriangle className="w-6 h-6 text-danger" />
+            <AlertTriangle className="w-6 h-6" strokeWidth={1.7} />
           ) : (
-            <DownloadCloud className="w-6 h-6 animate-bounce" />
+            <DownloadCloud className="w-6 h-6 animate-pulse" strokeWidth={1.7} />
           )}
         </div>
 
@@ -114,14 +122,14 @@ export default function ModelDownloadScreen({ onComplete }: ModelDownloadScreenP
               </span>
             </div>
 
-            <div className="w-full h-2 bg-input rounded-full overflow-hidden border border-subtle">
+            <div className="w-full h-2 bg-input rounded-xs overflow-hidden border border-subtle">
               <div
-                className={`h-full transition-all duration-200 ${isDone ? 'bg-emerald-400' : 'bg-accent'}`}
+                className={`h-full transition-all duration-200 ${isDone ? 'bg-success' : 'bg-accent-secondary'}`}
                 style={{ width: `${Math.max(3, percent)}%` }}
               />
             </div>
 
-            <div className="text-[11px] text-tertiary text-left pt-1">
+            <div className="text-[11px] text-secondary text-left pt-1">
               {statusText}
             </div>
           </div>
@@ -131,7 +139,7 @@ export default function ModelDownloadScreen({ onComplete }: ModelDownloadScreenP
           <button
             type="button"
             onClick={startDownload}
-            className="mt-2 h-8 px-4 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover transition-colors"
+            className="btn-primary mt-2 h-8 px-4 text-xs"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Retry Download</span>

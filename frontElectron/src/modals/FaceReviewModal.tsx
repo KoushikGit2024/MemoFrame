@@ -167,7 +167,7 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
         <div className="w-full flex items-center justify-between">
           <div>
             {hasMore && (
-              <button type="button" onClick={() => loadFaces(faces.length, true)} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+              <button type="button" onClick={() => loadFaces(faces.length, true)} className="btn-neutral h-8 px-3 text-xs">
                 Load More
               </button>
             )}
@@ -178,10 +178,10 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
                 type="button"
                 disabled={confirmingAll}
                 onClick={handleConfirmAll}
-                className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                className="btn-success h-8 px-3 text-xs"
               >
                 {confirmingAll ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-success-text" />
                 ) : (
                   <Check className="w-3.5 h-3.5" strokeWidth={1.8} />
                 )}
@@ -192,7 +192,7 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
               type="button"
               disabled={confirmingAll || submittingName || assigningFaceId !== null}
               onClick={() => onClose?.(dirtyRef.current)}
-              className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated disabled:opacity-50"
+              className="btn-neutral h-8 px-3 text-xs"
             >
               Close
             </button>
@@ -201,9 +201,9 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
       }
     >
       {editingFace && (
-        <div className="p-3 bg-elevated border border-accent rounded-xs flex flex-col gap-2 shrink-0">
+        <div className="p-3 bg-violet-bg/40 border border-violet/60 rounded-xs flex flex-col gap-2 shrink-0">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-primary">
+            <span className="text-xs font-semibold text-violet">
               {editMode === 'name' ? `Name Face #${editingFace.id}` : `Assign Face #${editingFace.id} to Person`}
             </span>
             <button type="button" onClick={() => setEditingFace(null)} className="text-xs text-secondary hover:text-primary">Cancel</button>
@@ -218,13 +218,13 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
                 onChange={(e) => setNameInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleNameSubmit(); }}
                 placeholder="Enter person name..."
-                className="flex-1 h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent disabled:opacity-50"
+                className="flex-1 h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 disabled:opacity-50"
               />
               <button
                 type="button"
                 disabled={submittingName || !nameInput.trim()}
                 onClick={handleNameSubmit}
-                className="h-8 px-3 inline-flex items-center gap-1.5 bg-accent text-accent-text rounded-xs text-xs font-medium disabled:opacity-50 transition-colors hover:bg-accent-hover"
+                className="btn-primary h-8 px-3 text-xs"
               >
                 {submittingName && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />}
                 <span>{submittingName ? 'Saving...' : 'Save'}</span>
@@ -238,7 +238,7 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
                 value={assignQuery}
                 onChange={(e) => setAssignQuery(e.target.value)}
                 placeholder="Search person by name..."
-                className="h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent"
+                className="h-8 px-2.5 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30"
               />
               <div className="max-h-36 overflow-y-auto flex flex-col gap-1">
                 {assignablePersons.map((p) => (
@@ -246,7 +246,7 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
                     key={p.id}
                     type="button"
                     onClick={() => handleAssign(editingFace.id, p.id)}
-                    className="px-2.5 py-1.5 rounded-xs text-left text-xs text-primary hover:bg-card flex items-center justify-between"
+                    className="px-2.5 py-1.5 rounded-xs text-left text-xs text-primary hover:bg-card hover:text-violet flex items-center justify-between transition-colors"
                   >
                     <span>{p.name}</span>
                     <span className="font-mono text-[11px] text-secondary">#{p.id} · {p.image_count || 0} photos</span>
@@ -262,26 +262,54 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
         <div className="py-12 text-center text-xs text-secondary">No faces here.</div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(124px,1fr))] gap-2.5">
-          {faces.map((f) => (
-            <div key={f.id} className="bg-elevated border border-subtle rounded-xs p-2 flex flex-col items-center gap-1.5">
-              <FaceThumb face={f} />
-              <div className="text-[11px] font-mono text-secondary flex items-center gap-1">
-                <span>{Math.round(Number(f.confidence || 0) * 100)}%</span>
-                {Boolean(f.locked) && <Check className="w-3 h-3 text-success" strokeWidth={2} />}
-              </div>
-              <button type="button" onClick={() => { setEditingFace(f); setEditMode('name'); setNameInput(''); }} className="w-full h-6 rounded-xs border border-hairline bg-card text-[11px] text-primary hover:border-accent">
-                Name...
-              </button>
-              <button type="button" onClick={() => { setEditingFace(f); setEditMode('assign'); setAssignQuery(''); }} className="w-full h-6 rounded-xs border border-hairline bg-card text-[11px] text-primary hover:border-accent">
-                {personId !== null ? 'Move to...' : 'Assign...'}
-              </button>
-              {personId !== null && (
-                <button type="button" onClick={() => handleAssign(f.id, null)} className="w-full h-6 rounded-xs border border-transparent text-[11px] text-danger hover:bg-danger-bg">
-                  Remove
+          {faces.map((f) => {
+            const isConfirmed = Boolean(f.locked);
+            return (
+              <div
+                key={f.id}
+                className={`bg-elevated border rounded-xs p-2 flex flex-col items-center gap-1.5 transition-colors ${
+                  isConfirmed
+                    ? 'border-success/50 bg-success-bg/25'
+                    : personId === null
+                    ? 'border-amber/35 border-dashed'
+                    : 'border-subtle'
+                }`}
+              >
+                <FaceThumb face={f} />
+                <div className="text-[11px] font-mono text-secondary flex items-center gap-1">
+                  <span>{Math.round(Number(f.confidence || 0) * 100)}%</span>
+                  {isConfirmed && (
+                    <span title="Manually confirmed" className="inline-flex items-center text-success">
+                      <Check className="w-3 h-3" strokeWidth={2.2} />
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setEditingFace(f); setEditMode('name'); setNameInput(''); }}
+                  className="w-full h-6 rounded-xs border border-hairline bg-card text-[11px] text-primary hover:border-violet hover:text-violet transition-colors"
+                >
+                  Name...
                 </button>
-              )}
-            </div>
-          ))}
+                <button
+                  type="button"
+                  onClick={() => { setEditingFace(f); setEditMode('assign'); setAssignQuery(''); }}
+                  className="w-full h-6 rounded-xs border border-hairline bg-card text-[11px] text-primary hover:border-violet hover:text-violet transition-colors"
+                >
+                  {personId !== null ? 'Move to...' : 'Assign...'}
+                </button>
+                {personId !== null && (
+                  <button
+                    type="button"
+                    onClick={() => handleAssign(f.id, null)}
+                    className="w-full h-6 rounded-xs border border-transparent text-[11px] text-danger hover:bg-danger-bg transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </ModalShell>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, FileText, FolderOpen, Loader2, ShieldCheck, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, FolderOpen, Loader2, Moon, Palette, ShieldCheck, Sun, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { revealFile, rpc } from '../lib/api';
 import { THEME_FAMILIES, THEME_MAP } from '../lib/themes';
@@ -7,12 +7,12 @@ import type { DoctorReport, WorkspaceStats } from '../types/memoframe';
 import { SuspiciousDatesModal } from '../modals/DateModals';
 import { FailedPhotosModal, ResetWorkspaceModal } from '../modals/UtilityModals';
 
-const STAT_DEFS: ReadonlyArray<[keyof WorkspaceStats, string]> = [
-  ['total_images', 'Total Photos'],
-  ['total_faces', 'Faces Detected'],
-  ['duplicate_clusters', 'Duplicate Clusters'],
-  ['groups', 'Event Groups'],
-  ['videos', 'Videos Indexed'],
+const STAT_DEFS: ReadonlyArray<[keyof WorkspaceStats, string, string]> = [
+  ['total_images', 'Total Photos', 'border-l-accent-secondary'],
+  ['total_faces', 'Faces Detected', 'border-l-violet'],
+  ['duplicate_clusters', 'Duplicate Clusters', 'border-l-amber'],
+  ['groups', 'Event Groups', 'border-l-accent'],
+  ['videos', 'Videos Indexed', 'border-l-success'],
 ];
 
 export default function SettingsView() {
@@ -158,70 +158,63 @@ export default function SettingsView() {
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         <div className="max-w-[860px] flex flex-col gap-3.5 pb-6">
-          <section className="bg-card border border-subtle rounded-sm p-4 flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div>
-                <h2 className="text-sm font-semibold text-primary">Appearance &amp; Color Palette</h2>
-                <p className="text-xs text-secondary">Every palette includes a custom tailored Light Mode and Dark Mode.</p>
+          {/* Appearance & Color Palette - Compact & Minimal */}
+          <section className="bg-card border border-subtle rounded-sm p-3.5 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Palette className="w-4 h-4 text-accent shrink-0" strokeWidth={1.8} />
+                <span className="text-xs font-semibold text-primary">Studio Color Palette</span>
+                <span className="text-xs text-secondary">•</span>
+                <span className="text-xs text-secondary">
+                  Current: <strong className="text-primary font-medium">{theme}</strong>
+                </span>
               </div>
+
+              {/* Quick Global Light/Dark Toggle */}
               <button
                 type="button"
                 onClick={toggleLightDark}
-                className="h-8 px-3 rounded-xs border border-hairline bg-elevated text-xs font-medium text-primary hover:border-accent transition-colors"
+                className="h-7 px-2.5 rounded-xs border border-subtle bg-elevated text-xs font-medium text-primary flex items-center gap-1.5 hover:border-hairline transition-colors"
               >
-                {THEME_MAP[theme]?.isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                {THEME_MAP[theme]?.isDark ? (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber" strokeWidth={1.8} />
+                    <span>Switch to Light</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-violet" strokeWidth={1.8} />
+                    <span>Switch to Dark</span>
+                  </>
+                )}
               </button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+
+            {/* Compact Family Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
               {THEME_FAMILIES.map((family) => {
-                const isFamilyActive = theme === family.darkTheme || theme === family.lightTheme;
-                const darkMeta = THEME_MAP[family.darkTheme];
-                const lightMeta = THEME_MAP[family.lightTheme];
+                const isDarkActive = theme === family.darkTheme;
+                const isLightActive = theme === family.lightTheme;
+                const isFamilyActive = isDarkActive || isLightActive;
+                const currentIsDark = THEME_MAP[theme]?.isDark ?? true;
 
                 return (
-                  <div
+                  <button
                     key={family.id}
-                    className={`p-3 rounded-xs border flex flex-col gap-2.5 transition-all ${
+                    type="button"
+                    onClick={() => applyTheme(currentIsDark ? family.darkTheme : family.lightTheme)}
+                    className={`h-9 px-2.5 rounded-xs border flex items-center justify-between text-xs font-medium transition-all ${
                       isFamilyActive
-                        ? 'border-accent bg-accent-light/50 ring-1 ring-accent'
-                        : 'border-subtle bg-elevated/60 hover:border-hairline'
+                        ? 'border-accent bg-accent-light text-primary ring-1 ring-accent/30'
+                        : 'border-subtle bg-elevated/50 text-secondary hover:text-primary hover:border-hairline hover:bg-elevated'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-primary">{family.label}</span>
-                      <span
-                        className="w-3.5 h-3.5 rounded-full border border-hairline shadow-sm"
-                        style={{ backgroundColor: family.previewAccent }}
-                      />
+                    <span className="truncate">{family.label}</span>
+                    <div className="flex items-center gap-1 shrink-0 ml-1.5">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: family.previewAccent }} />
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: family.previewSecondary }} />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-1.5 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => applyTheme(family.darkTheme)}
-                        className={`h-7 px-2 rounded-xs border text-[11px] font-medium flex items-center justify-center gap-1 transition-colors ${
-                          theme === family.darkTheme
-                            ? 'bg-accent text-accent-text border-accent font-semibold'
-                            : 'bg-card border-hairline text-secondary hover:text-primary'
-                        }`}
-                      >
-                        <span className="w-2 h-2 rounded-[1px]" style={{ backgroundColor: darkMeta?.bg || '#111' }} />
-                        <span>Dark</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => applyTheme(family.lightTheme)}
-                        className={`h-7 px-2 rounded-xs border text-[11px] font-medium flex items-center justify-center gap-1 transition-colors ${
-                          theme === family.lightTheme
-                            ? 'bg-accent text-accent-text border-accent font-semibold'
-                            : 'bg-card border-hairline text-secondary hover:text-primary'
-                        }`}
-                      >
-                        <span className="w-2 h-2 rounded-[1px] border border-subtle" style={{ backgroundColor: lightMeta?.bg || '#fff' }} />
-                        <span>Light</span>
-                      </button>
-                    </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -233,8 +226,8 @@ export default function SettingsView() {
               <p className="text-xs text-secondary">Live overview of indexed media, detected faces, duplicates, and events.</p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-              {STAT_DEFS.map(([k, label]) => (
-                <div key={k} className="bg-elevated border border-subtle rounded-xs px-3 py-2.5">
+              {STAT_DEFS.map(([k, label, accentBorder]) => (
+                <div key={k} className={`bg-elevated border border-subtle border-l-2 ${accentBorder} rounded-xs px-3 py-2.5`}>
                   <div className="font-mono text-lg font-semibold text-primary tabular-nums">{stats[k] ?? 0}</div>
                   <div className="text-[11px] text-secondary mt-0.5">{label}</div>
                 </div>
@@ -255,7 +248,7 @@ export default function SettingsView() {
                 type="button"
                 disabled={!connected || Boolean(busyLabel)}
                 onClick={handleDoctor}
-                className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover disabled:opacity-45 transition-colors"
+                className="btn-primary h-8 px-3 text-xs"
               >
                 {busyLabel === 'Running diagnostic health check' ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
@@ -268,35 +261,35 @@ export default function SettingsView() {
                 type="button"
                 disabled={!connected || Boolean(busyLabel)}
                 onClick={handleClearCache}
-                className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent disabled:opacity-45 transition-colors"
+                className="btn-neutral h-8 px-3 text-xs hover:border-amber/60"
               >
-                {busyLabel === 'Cleaning stale thumbnail cache' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                {busyLabel === 'Cleaning thumbnail cache' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber" />
                 ) : (
-                  <Trash2 className="w-3.5 h-3.5" strokeWidth={1.6} />
+                  <Trash2 className="w-3.5 h-3.5 text-amber" strokeWidth={1.6} />
                 )}
-                <span>{busyLabel === 'Cleaning stale thumbnail cache' ? 'Cleaning...' : 'Clean Stale Cache'}</span>
+                <span>{busyLabel === 'Cleaning thumbnail cache' ? 'Cleaning...' : 'Clean Stale Cache'}</span>
               </button>
-              <button type="button" onClick={() => revealFile(config.log_path)} className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent">
-                <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <button type="button" onClick={() => revealFile(config.log_path)} className="btn-neutral h-8 px-3 text-xs hover:border-accent-secondary/60">
+                <FolderOpen className="w-3.5 h-3.5 text-accent-secondary" strokeWidth={1.6} />
                 <span>Show Log File</span>
               </button>
               <button
                 type="button"
                 disabled={!connected || Boolean(busyLabel)}
                 onClick={handleExportDiag}
-                className="h-8 px-3 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent disabled:opacity-45 transition-colors"
+                className="btn-neutral h-8 px-3 text-xs hover:border-accent-secondary/60"
               >
-                {busyLabel === 'Exporting diagnostic archive' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                {busyLabel === 'Exporting diagnostics' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary" />
                 ) : (
-                  <FileText className="w-3.5 h-3.5" strokeWidth={1.6} />
+                  <FileText className="w-3.5 h-3.5 text-accent-secondary" strokeWidth={1.6} />
                 )}
-                <span>{busyLabel === 'Exporting diagnostic archive' ? 'Exporting...' : 'Export Diagnostics'}</span>
+                <span>{busyLabel === 'Exporting diagnostics' ? 'Exporting...' : 'Export Diagnostics'}</span>
               </button>
             </div>
             {doctor && (
-              <div className={`p-2.5 rounded-xs border text-xs ${doctorIssues.length === 0 ? 'bg-success-bg border-success text-success' : 'bg-danger-bg border-danger text-danger'}`}>
+              <div className={`p-2.5 rounded-xs border text-xs ${doctorIssues.length === 0 ? 'bg-success-bg border-success/55 text-success' : 'bg-danger-bg border-danger/55 text-danger'}`}>
                 {doctorIssues.length === 0 ? (
                   <span className="inline-flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.7} />
@@ -319,15 +312,15 @@ export default function SettingsView() {
               <p className="text-xs text-secondary">Requires model files placed inside workspace/models/tags/.</p>
             </div>
             <label className="inline-flex items-center gap-2 text-xs text-primary cursor-pointer">
-              <input type="checkbox" checked={Boolean(config.tagging_enabled)} onChange={(e) => handleFlagToggle('tagging_enabled', e.target.checked)} className="accent-accent" />
+              <input type="checkbox" checked={Boolean(config.tagging_enabled)} onChange={(e) => handleFlagToggle('tagging_enabled', e.target.checked)} className="accent-accent-secondary" />
               <span>Enable scene tagging</span>
             </label>
             <label className="inline-flex items-center gap-2 text-xs text-primary cursor-pointer">
-              <input type="checkbox" checked={Boolean(config.store_embeddings)} onChange={(e) => handleFlagToggle('store_embeddings', e.target.checked)} className="accent-accent" />
+              <input type="checkbox" checked={Boolean(config.store_embeddings)} onChange={(e) => handleFlagToggle('store_embeddings', e.target.checked)} className="accent-accent-secondary" />
               <span>Store embeddings (required for Find Similar)</span>
             </label>
             <div>
-              <button type="button" disabled={!connected || Boolean(busyLabel)} onClick={handleTagExisting} className="h-8 px-3 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent disabled:opacity-45">
+              <button type="button" disabled={!connected || Boolean(busyLabel)} onClick={handleTagExisting} className="btn-tertiary h-8 px-3 text-xs">
                 Tag Existing Photos
               </button>
             </div>
@@ -348,7 +341,7 @@ export default function SettingsView() {
                 ['Repair & Optimize DB', handleRepair],
                 ['Failed Photos...', () => setShowFailed(true)],
               ] as const).map(([label, handler]) => (
-                <button key={label} type="button" disabled={!connected || Boolean(busyLabel)} onClick={handler} className="h-8 px-2.5 rounded-xs border border-hairline bg-elevated text-xs text-primary hover:border-accent disabled:opacity-45 truncate">
+                <button key={label} type="button" disabled={!connected || Boolean(busyLabel)} onClick={handler} className="btn-neutral h-8 px-2.5 text-xs truncate hover:border-accent-secondary/60">
                   {label}
                 </button>
               ))}
@@ -356,12 +349,12 @@ export default function SettingsView() {
             {(busyLabel || maintNote) && (
               <div className={`text-xs font-mono rounded-xs px-3 py-2 flex items-center gap-2 transition-all ${
                 busyLabel
-                  ? 'bg-accent-light/60 border border-accent text-accent animate-pulse'
+                  ? 'bg-accent-secondary-light border border-accent-secondary/50 text-accent-secondary'
                   : 'bg-input border border-subtle text-secondary'
               }`}>
                 {busyLabel ? (
                   <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary" />
                     <span>{busyLabel}...</span>
                   </>
                 ) : (
@@ -371,7 +364,7 @@ export default function SettingsView() {
             )}
           </section>
 
-          <section className="bg-card border border-danger/50 rounded-sm p-4 flex items-center justify-between gap-3 flex-wrap">
+          <section className="bg-card border border-danger/45 rounded-sm p-4 flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-sm font-semibold text-danger inline-flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4" strokeWidth={1.7} />
@@ -379,7 +372,7 @@ export default function SettingsView() {
               </h2>
               <p className="text-xs text-secondary mt-0.5">Clear all indexed photos, faces, duplicates, and events. Original files on disk are never touched.</p>
             </div>
-            <button type="button" disabled={!connected || Boolean(busyLabel)} onClick={() => setShowReset(true)} className="h-8 px-3 rounded-xs border border-danger bg-danger-bg text-danger text-xs font-medium hover:bg-danger hover:text-white disabled:opacity-45">
+            <button type="button" disabled={!connected || Boolean(busyLabel)} onClick={() => setShowReset(true)} className="btn-danger h-8 px-3 text-xs">
               Reset Workspace Data...
             </button>
           </section>

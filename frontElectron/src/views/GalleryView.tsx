@@ -208,18 +208,26 @@ export default function GalleryView() {
     <div className="flex-1 min-h-0 flex flex-col px-5 pt-4 pb-3 gap-3 overflow-hidden">
       <div className="bg-card border border-subtle rounded-sm p-2.5 flex flex-col gap-2 shrink-0">
         <div className="flex items-center flex-wrap gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-3.5 h-3.5 text-secondary absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.6} />
+          <div className="group relative flex-1 min-w-[200px]">
+            <Search
+              className="w-3.5 h-3.5 text-secondary group-focus-within:text-accent-secondary absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors"
+              strokeWidth={1.6}
+            />
             <input
               ref={searchInputRef}
               type="text"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder="Search filename, person, place, date... (Ctrl+K)"
-              className="w-full h-8 pl-8 pr-7 bg-input border border-hairline rounded-xs text-xs text-primary placeholder:text-secondary focus:outline-none focus:border-accent"
+              className="w-full h-8 pl-8 pr-7 bg-input border border-hairline rounded-xs text-xs text-primary placeholder:text-secondary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30 transition-colors"
             />
             {searchText && (
-              <button type="button" onClick={() => setSearchText('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-secondary hover:text-primary">
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setSearchText('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-secondary hover:text-accent-secondary transition-colors"
+              >
                 <X className="w-3.5 h-3.5" strokeWidth={1.6} />
               </button>
             )}
@@ -230,27 +238,39 @@ export default function GalleryView() {
             onClick={() => setFaceZoom((z) => !z)}
             title="Crop each card to the largest detected face"
             className={`h-8 px-2.5 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium transition-colors ${
-              faceZoom ? 'bg-accent-light border-accent text-primary' : 'bg-card border-hairline text-secondary hover:text-primary hover:bg-elevated'
+              faceZoom
+                ? 'bg-violet-bg border-violet text-violet font-semibold'
+                : 'bg-card border-hairline text-secondary hover:text-primary hover:border-violet/50 hover:bg-elevated'
             }`}
           >
-            <ScanFace className="w-3.5 h-3.5" strokeWidth={1.6} />
+            <ScanFace className={`w-3.5 h-3.5 ${faceZoom ? 'text-violet' : ''}`} strokeWidth={1.6} />
             <span>Face Zoom</span>
           </button>
 
-          <div className="inline-flex bg-input border border-hairline rounded-xs p-0.5 gap-0.5">
-            {LAYOUT_BUTTONS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setLayoutMode(id)}
-                className={`h-6 px-2 inline-flex items-center gap-1 rounded-[2px] text-xs font-medium transition-colors ${
-                  layoutMode === id ? 'bg-elevated text-primary border border-hairline' : 'text-secondary hover:text-primary border border-transparent'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" strokeWidth={1.6} />
-                <span>{label}</span>
-              </button>
-            ))}
+          <div
+            role="group"
+            aria-label="Gallery layout"
+            className="inline-flex bg-input border border-hairline rounded-xs p-0.5 gap-0.5"
+          >
+            {LAYOUT_BUTTONS.map(({ id, label, icon: Icon }) => {
+              const active = layoutMode === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setLayoutMode(id)}
+                  className={`h-6 px-2 inline-flex items-center gap-1 rounded-[2px] text-xs transition-colors ${
+                    active
+                      ? 'bg-accent-secondary-light text-accent-secondary border border-accent-secondary/55 font-semibold'
+                      : 'text-secondary hover:text-primary hover:bg-elevated/60 border border-transparent font-medium'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" strokeWidth={active ? 1.8 : 1.6} />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -263,14 +283,18 @@ export default function GalleryView() {
               max={20}
               value={minFaces}
               onChange={(e) => setMinFaces(Math.max(0, Math.min(20, Number(e.target.value) || 0)))}
-              className="w-14 h-7 px-2 bg-input border border-hairline rounded-xs text-xs font-mono text-primary focus:outline-none focus:border-accent"
+              className={`w-14 h-7 px-2 bg-input border rounded-xs text-xs font-mono text-primary focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 ${
+                minFaces > 0 ? 'border-violet/70 bg-violet-bg/40' : 'border-hairline'
+              }`}
             />
           </label>
 
           <select
             value={dupFilter}
             onChange={(e) => setDupFilter(e.target.value as 'all' | 'unique' | 'duplicates' | 'hidden')}
-            className="h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent"
+            className={`h-7 px-2 bg-input border rounded-xs text-xs text-primary focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber/30 ${
+              dupFilter !== 'all' ? 'border-amber/70 text-amber' : 'border-hairline'
+            }`}
           >
             <option value="all">All Photos</option>
             <option value="unique">Unique Only</option>
@@ -278,30 +302,58 @@ export default function GalleryView() {
             <option value="hidden">Hidden Only</option>
           </select>
 
-          <select value={sortKey} onChange={(e) => setSortKey(e.target.value)} className="h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent">
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value)}
+            className="h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30"
+          >
             {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
 
           {tags.length > 0 && (
-            <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} className="h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent">
+            <select
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              className={`h-7 px-2 bg-input border rounded-xs text-xs text-primary focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 ${
+                tagFilter ? 'border-violet/70 text-violet' : 'border-hairline'
+              }`}
+            >
               <option value="">Any Tag</option>
               {tags.map((t) => <option key={t.label} value={t.label}>{t.label} ({t.count ?? 0})</option>)}
             </select>
           )}
 
           <div className="relative">
-            <button type="button" onClick={openSavedMenu} className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
-              <Bookmark className="w-3.5 h-3.5 text-secondary" strokeWidth={1.6} />
+            <button
+              type="button"
+              onClick={openSavedMenu}
+              className={`h-7 px-2.5 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium transition-colors ${
+                savedMenuOpen
+                  ? 'border-amber bg-amber text-amber-text'
+                  : 'border-amber/45 bg-amber-bg text-amber hover:border-amber'
+              }`}
+            >
+              <Bookmark className="w-3.5 h-3.5" strokeWidth={1.6} />
               <span>Saved</span>
             </button>
             {savedMenuOpen && (
-              <div className="absolute left-0 top-8 z-30 w-64 bg-card border border-hairline rounded-sm p-2 flex flex-col gap-1.5">
+              <div className="absolute left-0 top-8 z-30 w-64 bg-card border border-hairline rounded-sm p-2 flex flex-col gap-1.5 shadow-lg">
                 {savedSearches.map((s) => (
                   <div key={s.name} className="flex items-center justify-between gap-1">
-                    <button type="button" onClick={() => applySavedFilters(s.filters)} className="flex-1 text-left px-2 py-1 text-xs text-primary hover:bg-elevated rounded-xs truncate">
-                      {s.name}
+                    <button
+                      type="button"
+                      onClick={() => applySavedFilters(s.filters)}
+                      className="flex-1 text-left px-2 py-1 text-xs text-primary hover:bg-elevated rounded-xs truncate inline-flex items-center gap-1.5"
+                    >
+                      <Bookmark className="w-3 h-3 text-amber shrink-0" strokeWidth={1.6} />
+                      <span className="truncate">{s.name}</span>
                     </button>
-                    <button type="button" title="Delete saved search" onClick={() => handleDeleteSaved(s.name)} className="p-1 text-secondary hover:text-danger">
+                    <button
+                      type="button"
+                      title="Delete saved search"
+                      onClick={() => handleDeleteSaved(s.name)}
+                      className="p-1 text-secondary hover:text-danger transition-colors"
+                    >
                       <Trash2 className="w-3.5 h-3.5" strokeWidth={1.6} />
                     </button>
                   </div>
@@ -314,13 +366,17 @@ export default function GalleryView() {
                     onChange={(e) => setSavingName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCurrent(); }}
                     placeholder="Save current as..."
-                    className="flex-1 h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent"
+                    className="flex-1 h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-amber"
                   />
-                  <button type="button" onClick={handleSaveCurrent} className="h-7 px-2 bg-accent text-accent-text rounded-xs text-xs font-medium hover:bg-accent-hover">
+                  <button type="button" onClick={handleSaveCurrent} className="btn-warning h-7 px-2 text-xs">
                     Save
                   </button>
                 </div>
-                <button type="button" onClick={() => applySavedFilters({})} className="text-left px-2 py-1 text-xs text-secondary hover:text-primary hover:bg-elevated rounded-xs">
+                <button
+                  type="button"
+                  onClick={() => applySavedFilters({})}
+                  className="text-left px-2 py-1 text-xs text-secondary hover:text-primary hover:bg-elevated rounded-xs transition-colors"
+                >
                   Reset all filters
                 </button>
               </div>
@@ -328,17 +384,21 @@ export default function GalleryView() {
           </div>
 
           {extraChipEntries.map(([k, v]) => (
-            <span key={k} className="h-6 px-2 inline-flex items-center gap-1.5 rounded-xs bg-accent-light border border-accent text-xs text-primary">
+            <span
+              key={k}
+              className="h-6 px-2 inline-flex items-center gap-1.5 rounded-xs bg-accent-light border border-accent/50 text-xs text-accent font-medium"
+            >
               <span>{k === 'group_id' ? String(galleryExtraFilters._group_label || `Event #${v}`) : `${k}: ${String(v)}`}</span>
               <button
                 type="button"
+                aria-label="Remove filter"
                 onClick={() => {
                   const next = { ...galleryExtraFilters };
                   delete next[k];
                   if (k === 'group_id') delete next._group_label;
                   setGalleryExtraFilters(next);
                 }}
-                className="text-primary hover:text-accent"
+                className="text-accent hover:text-primary transition-colors"
               >
                 <X className="w-3 h-3" strokeWidth={1.8} />
               </button>
@@ -378,8 +438,8 @@ export default function GalleryView() {
         <span className="text-xs text-secondary font-mono tabular-nums inline-flex items-center gap-1.5">
           {loading ? (
             <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
-              <span className="text-accent font-medium animate-pulse">Loading photos...</span>
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary" />
+              <span className="text-accent-secondary font-medium">Loading photos...</span>
             </>
           ) : items.length ? (
             `Showing ${offset + 1}-${offset + items.length} of ${total.toLocaleString()} photos`
@@ -388,12 +448,22 @@ export default function GalleryView() {
           )}
         </span>
         <div className="flex items-center gap-1.5">
-          <button type="button" disabled={page <= 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="h-7 px-2 inline-flex items-center gap-1 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated disabled:opacity-40">
+          <button
+            type="button"
+            disabled={page <= 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="btn-neutral h-7 px-2 text-xs"
+          >
             <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.6} />
             <span>Prev</span>
           </button>
           <span className="text-xs font-mono text-secondary px-2 tabular-nums">Page {page + 1} / {pages}</span>
-          <button type="button" disabled={page + 1 >= pages} onClick={() => setPage((p) => Math.min(pages - 1, p + 1))} className="h-7 px-2 inline-flex items-center gap-1 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated disabled:opacity-40">
+          <button
+            type="button"
+            disabled={page + 1 >= pages}
+            onClick={() => setPage((p) => Math.min(pages - 1, p + 1))}
+            className="btn-neutral h-7 px-2 text-xs"
+          >
             <span>Next</span>
             <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.6} />
           </button>

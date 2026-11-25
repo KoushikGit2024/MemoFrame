@@ -11,7 +11,7 @@ export default function StatusBar() {
           type="button"
           disabled={scan.running || !connected}
           onClick={startScanFolder}
-          className="h-6 px-2.5 inline-flex items-center gap-1.5 rounded-xs border border-hairline bg-card text-primary text-[11.5px] font-medium hover:bg-elevated disabled:opacity-45 disabled:cursor-not-allowed"
+          className="btn-secondary h-6 px-2.5 text-[11.5px]"
         >
           <FolderSearch className="w-3.5 h-3.5" strokeWidth={1.6} />
           <span>Scan Folder</span>
@@ -22,7 +22,7 @@ export default function StatusBar() {
             <button
               type="button"
               onClick={togglePauseScan}
-              className="h-6 px-2 inline-flex items-center gap-1 rounded-xs border border-hairline bg-card text-primary text-[11.5px] hover:bg-elevated"
+              className={`${scan.paused ? 'btn-warning' : 'btn-neutral'} h-6 px-2 text-[11.5px]`}
             >
               {scan.paused ? <Play className="w-3 h-3" strokeWidth={1.6} /> : <Pause className="w-3 h-3" strokeWidth={1.6} />}
               <span>{scan.paused ? 'Resume' : 'Pause'}</span>
@@ -30,14 +30,19 @@ export default function StatusBar() {
             <button
               type="button"
               onClick={cancelScan}
-              className="h-6 px-2 inline-flex items-center gap-1 rounded-xs border border-danger bg-danger-bg text-danger text-[11.5px] hover:bg-danger hover:text-white"
+              className="btn-danger h-6 px-2 text-[11.5px]"
             >
               <X className="w-3 h-3" strokeWidth={1.6} />
               <span>Cancel</span>
             </button>
             <div className="flex items-center gap-2">
               <div className="w-36 h-1.5 bg-elevated border border-subtle rounded-[1px] overflow-hidden">
-                <div className="h-full bg-accent transition-all duration-150" style={{ width: `${scan.percent}%` }} />
+                <div
+                  className={`h-full transition-all duration-150 ${
+                    scan.percent >= 100 ? 'bg-success' : scan.paused ? 'bg-amber' : 'bg-accent-secondary'
+                  }`}
+                  style={{ width: `${scan.percent}%` }}
+                />
               </div>
               <span className="font-mono text-[11px] text-secondary tabular-nums">{scan.percent}%</span>
             </div>

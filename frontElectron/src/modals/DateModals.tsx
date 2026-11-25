@@ -37,10 +37,10 @@ export function DateOverrideModal({ currentIso, onClose, onSave }: DateOverrideM
       onClose={onClose}
       footer={
         <>
-          <button type="button" onClick={onClose} className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated">
+          <button type="button" onClick={onClose} className="btn-neutral h-8 px-3 text-xs">
             Cancel
           </button>
-          <button type="button" onClick={submit} className="h-8 px-3 rounded-xs bg-accent text-accent-text text-xs font-medium hover:bg-accent-hover">
+          <button type="button" onClick={submit} className="btn-primary h-8 px-3 text-xs">
             Apply Date
           </button>
         </>
@@ -51,7 +51,7 @@ export function DateOverrideModal({ currentIso, onClose, onSave }: DateOverrideM
         step="1"
         value={val}
         onChange={(e) => setVal(e.target.value)}
-        className="h-9 px-3 bg-input border border-hairline rounded-xs text-sm font-mono text-primary focus:outline-none focus:border-accent"
+        className="h-9 px-3 bg-input border border-hairline rounded-xs text-sm font-mono text-primary focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber/30"
       />
     </ModalShell>
   );
@@ -132,7 +132,7 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
                 type="button"
                 disabled={selectedIds.size === 0 || busyAction !== null}
                 onClick={() => setShowPicker(true)}
-                className="h-8 px-3 rounded-xs bg-accent text-accent-text text-xs font-medium disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors"
+                className="btn-primary h-8 px-3 text-xs"
               >
                 {busyAction === 'apply' && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />}
                 <span>{busyAction === 'apply' ? 'Setting...' : `Set Date (${selectedIds.size})`}</span>
@@ -141,7 +141,7 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
                 type="button"
                 disabled={selectedIds.size === 0 || busyAction !== null}
                 onClick={clearSelected}
-                className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary disabled:opacity-40 inline-flex items-center gap-1.5 transition-colors"
+                className="btn-neutral h-8 px-3 text-xs"
               >
                 {busyAction === 'clear' && <Loader2 className="w-3.5 h-3.5 animate-spin text-secondary" />}
                 <span>{busyAction === 'clear' ? 'Clearing...' : 'Clear Correction'}</span>
@@ -151,7 +151,7 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
               type="button"
               disabled={busyAction !== null}
               onClick={() => onClose?.(changed)}
-              className="h-8 px-3 rounded-xs border border-hairline bg-card text-xs text-primary hover:bg-elevated"
+              className="btn-neutral h-8 px-3 text-xs"
             >
               Close
             </button>
@@ -161,7 +161,7 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
         <div className="max-h-[420px] overflow-auto border border-subtle rounded-xs">
           <table className="w-full border-collapse text-xs">
             <thead>
-              <tr className="bg-elevated border-b border-hairline text-[11px] uppercase text-secondary">
+              <tr className="sticky top-0 z-10 bg-elevated border-b border-hairline text-[11px] uppercase text-secondary">
                 <th className="py-2 px-2.5 w-8" />
                 <th className="py-2 px-2.5 text-left">Path</th>
                 <th className="py-2 px-2.5 text-left w-40">Recorded</th>
@@ -170,17 +170,26 @@ export function SuspiciousDatesModal({ onClose }: { onClose?: (changed: boolean)
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} onClick={() => toggleRow(r.id)} className="border-b border-subtle hover:bg-elevated cursor-pointer">
-                  <td className="py-1.5 px-2.5 text-center">
-                    <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => {}} className="accent-accent" />
-                  </td>
-                  <td className="py-1.5 px-2.5 font-mono text-[11px] max-w-[340px] truncate" title={r.path}>{r.path}</td>
-                  <td className="py-1.5 px-2.5 font-mono text-secondary">{r.exif_ts || '—'}</td>
-                  <td className="py-1.5 px-2.5 text-danger">{r.date_flag || '—'}</td>
-                  <td className="py-1.5 px-2.5 font-mono text-success">{r.override_ts || ''}</td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const selected = selectedIds.has(r.id);
+                return (
+                  <tr
+                    key={r.id}
+                    onClick={() => toggleRow(r.id)}
+                    className={`border-b border-subtle cursor-pointer transition-colors ${
+                      selected ? 'bg-amber-bg/40' : 'hover:bg-elevated'
+                    }`}
+                  >
+                    <td className="py-1.5 px-2.5 text-center">
+                      <input type="checkbox" checked={selected} onChange={() => {}} className="accent-amber" />
+                    </td>
+                    <td className="py-1.5 px-2.5 font-mono text-[11px] max-w-[340px] truncate" title={r.path}>{r.path}</td>
+                    <td className="py-1.5 px-2.5 font-mono text-secondary">{r.exif_ts || '—'}</td>
+                    <td className="py-1.5 px-2.5 text-danger">{r.date_flag || '—'}</td>
+                    <td className="py-1.5 px-2.5 font-mono text-success">{r.override_ts || ''}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
