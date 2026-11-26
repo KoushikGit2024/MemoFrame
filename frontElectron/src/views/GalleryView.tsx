@@ -64,6 +64,7 @@ export default function GalleryView() {
   const [dupFilter, setDupFilter] = useState<"all" | "unique" | "duplicates" | "hidden">("all");
   const [sortKey, setSortKey] = useState("date_desc");
   const [tagFilter, setTagFilter] = useState("");
+  const [unusedFacesOnly, setUnusedFacesOnly] = useState(false);
   const [faceZoom, setFaceZoom] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
   const [page, setPage] = useState(0);
@@ -107,12 +108,21 @@ export default function GalleryView() {
     if (debouncedSearch) f.text = debouncedSearch;
     if (minFaces > 0) f.min_faces = minFaces;
     if (selectedPersonId !== null) f.person_id = selectedPersonId;
+    if (unusedFacesOnly) f.unassigned_faces = true;
     if (tagFilter) f.tag = tagFilter;
     if (dupFilter === "unique") f.duplicate = "none";
     else if (dupFilter === "duplicates") f.duplicate = "any";
     else if (dupFilter === "hidden") f.mark = "hidden";
     return f;
-  }, [galleryExtraFilters, debouncedSearch, minFaces, selectedPersonId, tagFilter, dupFilter]);
+  }, [
+    galleryExtraFilters,
+    debouncedSearch,
+    minFaces,
+    selectedPersonId,
+    unusedFacesOnly,
+    tagFilter,
+    dupFilter,
+  ]);
 
   const filtersKey = useMemo(
     () =>
@@ -120,11 +130,20 @@ export default function GalleryView() {
         debouncedSearch,
         minFaces,
         selectedPersonId,
+        unusedFacesOnly,
         tagFilter,
         dupFilter,
         galleryExtraFilters,
       }),
-    [debouncedSearch, minFaces, selectedPersonId, tagFilter, dupFilter, galleryExtraFilters]
+    [
+      debouncedSearch,
+      minFaces,
+      selectedPersonId,
+      unusedFacesOnly,
+      tagFilter,
+      dupFilter,
+      galleryExtraFilters,
+    ]
   );
 
   useEffect(() => {
@@ -272,6 +291,44 @@ export default function GalleryView() {
                 <X className="w-3.5 h-3.5" strokeWidth={1.6} />
               </button>
             )}
+          </div>
+
+          <div
+            role="tablist"
+            aria-label="Gallery view mode"
+            className="inline-flex bg-input border border-hairline rounded-xs p-0.5 gap-0.5"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!unusedFacesOnly}
+              onClick={() => setUnusedFacesOnly(false)}
+              className={`h-6 px-2.5 inline-flex items-center gap-1 rounded-[2px] text-xs transition-colors cursor-pointer ${
+                !unusedFacesOnly
+                  ? "bg-accent-secondary-light text-accent-secondary border border-accent-secondary/55 font-semibold"
+                  : "text-secondary hover:text-primary hover:bg-elevated/60 border border-transparent font-medium"
+              }`}
+            >
+              <span>All Photos</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={unusedFacesOnly}
+              onClick={() => {
+                setUnusedFacesOnly(true);
+                setSelectedPersonId(null);
+              }}
+              title="Show photos with unassigned / unidentified faces"
+              className={`h-6 px-2.5 inline-flex items-center gap-1 rounded-[2px] text-xs transition-colors cursor-pointer ${
+                unusedFacesOnly
+                  ? "bg-violet-bg text-violet border border-violet/60 font-semibold"
+                  : "text-secondary hover:text-primary hover:bg-elevated/60 border border-transparent font-medium"
+              }`}
+            >
+              <ScanFace className="w-3.5 h-3.5" strokeWidth={unusedFacesOnly ? 1.8 : 1.6} />
+              <span>Unused Faces</span>
+            </button>
           </div>
 
           <button

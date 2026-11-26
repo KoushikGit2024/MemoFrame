@@ -124,6 +124,8 @@ class SearchDbMixin:
                 "EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id AND fc.person_id = ?)",
                 f["person_id"],
             )
+        if f.get("unassigned_faces"):
+            add("EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id AND fc.person_id IS NULL)")
         if f.get("in_burst") is not None:
             add("i.burst_id IS NOT NULL" if f["in_burst"] else "i.burst_id IS NULL")
         dup = f.get("duplicate")
