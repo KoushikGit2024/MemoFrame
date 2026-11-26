@@ -88,8 +88,42 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
 
     def system_tag_existing(_params: dict[str, Any]) -> dict[str, Any]:
         eng = ctx.require_engine()
-        with ctx.lock:
-            return dict(eng.tag_existing() or {})
+        if ctx.scan_thread is not None and ctx.scan_thread.is_alive():
+            raise BridgeError("SCAN_IN_PROGRESS", "A scan or tagging job is already running.")
+
+        def on_event(ev: Any) -> None:
+            done = int(getattr(ev, "done", 0) or 0)
+            total = int(getattr(ev, "total", 0) or 0)
+            current = str(getattr(ev, "current", "") or "")
+            pct = min(99, int((done / total) * 100)) if total > 0 else 0
+            label = f"Tagging scenes ({done}/{total})" + (f" · {current}" if current else "")
+            ctx.emit_event(
+                "scan.progress",
+                {
+                    "percent": pct,
+                    "label": label,
+                    "stage": "tag",
+                    "done": done,
+                    "total": total,
+                    "raw": {"stage": "tag", "done": done, "total": total, "current": current},
+                },
+            )
+
+        def worker() -> None:
+            prev_cb = getattr(eng, "on_event", None)
+            try:
+                eng.on_event = on_event
+                with ctx.lock:
+                    res = dict(eng.tag_existing() or {})
+                ctx.emit_event("scan.finished", {"tagged": res.get("tagged", 0)})
+            except Exception as exc:
+                ctx.emit_event("scan.error", {"message": str(exc)})
+            finally:
+                eng.on_event = prev_cb
+
+        ctx.scan_thread = threading.Thread(target=worker, name="MemoFrameTagExisting", daemon=True)
+        ctx.scan_thread.start()
+        return {"started": True}
 
     def system_check_files(_params: dict[str, Any]) -> dict[str, Any]:
         eng = ctx.require_engine()

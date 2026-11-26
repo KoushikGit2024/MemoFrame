@@ -131,11 +131,11 @@ class Settings:
     place_max_km: float = 50.0
     group_screenshots: bool = False  # include screenshots/documents in events
 
-    # --- Phase F (scene tags; off by default) ----------------------------
-    tagging_enabled: bool = False
+    # --- Phase F (scene tags; enabled by default) -------------------------
+    tagging_enabled: bool = True
     tags_top_k: int = 5
     tags_min_score: float = 0.15
-    store_embeddings: bool = False  # needed for "find similar"
+    store_embeddings: bool = True  # needed for "find similar"
     tag_model_file: str = "scene_model.onnx"
     tag_labels_file: str = "scene_labels.txt"
 

@@ -33,7 +33,6 @@ export default function SettingsView() {
     applyTheme,
     toggleLightDark,
     config,
-    setConfig,
     dataVersion,
     invalidate,
     notify,
@@ -94,30 +93,6 @@ export default function SettingsView() {
       notify(`Reclaimed ~${res.freed_mb || 0} MB of cache.`, "success");
       refreshStats();
     });
-
-  const handleFlagToggle = async (
-    field: "tagging_enabled" | "store_embeddings",
-    checked: boolean
-  ) => {
-    const prev = { ...config };
-    const next = { ...config, [field]: checked };
-    setConfig(next);
-    try {
-      await rpc("system.update_config", {
-        tagging_enabled: next.tagging_enabled,
-        store_embeddings: next.store_embeddings,
-      });
-      const msg =
-        field === "tagging_enabled"
-          ? `Scene tagging ${checked ? "enabled" : "disabled"}. Restart MemoFrame for model changes to take effect.`
-          : `Store embeddings ${checked ? "enabled" : "disabled"}. Restart MemoFrame for model changes to take effect.`;
-      setTagNote(msg);
-      notify(msg, "success");
-    } catch (err) {
-      setConfig(prev);
-      notify(err instanceof Error ? err.message : String(err), "error");
-    }
-  };
 
   const handleVerifyFiles = () =>
     runTask("Checking indexed files", async () => {
@@ -405,27 +380,9 @@ export default function SettingsView() {
                 Scene Tags &amp; Similar Photos
               </h2>
               <p className="text-xs text-secondary">
-                Requires model files placed inside workspace/models/tags/.
+                Scene tagging and similarity embeddings run automatically during library scans.
               </p>
             </div>
-            <label className="inline-flex items-center gap-2 text-xs text-primary cursor-pointer">
-              <input
-                type="checkbox"
-                checked={Boolean(config.tagging_enabled)}
-                onChange={e => handleFlagToggle("tagging_enabled", e.target.checked)}
-                className="accent-accent-secondary"
-              />
-              <span>Enable scene tagging</span>
-            </label>
-            <label className="inline-flex items-center gap-2 text-xs text-primary cursor-pointer">
-              <input
-                type="checkbox"
-                checked={Boolean(config.store_embeddings)}
-                onChange={e => handleFlagToggle("store_embeddings", e.target.checked)}
-                className="accent-accent-secondary"
-              />
-              <span>Store embeddings (required for Find Similar)</span>
-            </label>
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 type="button"
