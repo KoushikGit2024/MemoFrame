@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, GitMerge, Loader2, RefreshCw, ScanFace, Search, Users } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { rpc } from "../lib/api";
@@ -12,6 +12,100 @@ import MergePeopleModal from "../modals/MergePeopleModal";
 
 const UNIDENTIFIED_RE = /^(person\s+\d+|unknown)$/i;
 
+interface PersonCardProps {
+  person: PersonRecord;
+  isSelected: boolean;
+  onOpen: (id: number) => void;
+  onRename: (person: PersonRecord) => void;
+  onReview: (id: number) => void;
+}
+
+const PersonCard = React.memo(function PersonCard({
+  person: p,
+  isSelected,
+  onOpen,
+  onRename,
+  onReview,
+}: PersonCardProps) {
+  const isUnidentified = !p.name || UNIDENTIFIED_RE.test(p.name.trim());
+  return (
+    <div
+      className={`bg-card border rounded-sm p-3 flex flex-col gap-3 transition-colors ${
+        isSelected
+          ? "border-violet bg-violet-bg/30"
+          : isUnidentified
+            ? "border-subtle border-dashed hover:border-amber/60"
+            : "border-subtle hover:border-violet/60"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => onOpen(p.id)}
+        className="flex items-center gap-3 text-left min-w-0"
+      >
+        <PersonAvatar
+          person={p}
+          size="md"
+          accent={isSelected ? "violet" : isUnidentified ? "amber" : "violet"}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span
+              className={`text-[13px] font-semibold truncate ${isSelected ? "text-violet" : "text-primary"}`}
+            >
+              {p.name}
+            </span>
+            {!isUnidentified && (
+              <CheckCircle2
+                className="w-3.5 h-3.5 text-success shrink-0"
+                strokeWidth={1.8}
+                aria-label="Identified person"
+              />
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs font-mono text-secondary tabular-nums">
+              {p.image_count || 0} photos
+            </span>
+            {isSelected ? (
+              <span className="px-1.5 py-px rounded-xs bg-violet-bg border border-violet/45 text-[10px] font-medium text-violet">
+                Selected
+              </span>
+            ) : isUnidentified ? (
+              <span className="px-1.5 py-px rounded-xs bg-amber-bg border border-amber/35 text-[10px] font-medium text-amber">
+                Unidentified
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </button>
+      <div className="grid grid-cols-3 gap-1.5">
+        <button
+          type="button"
+          onClick={() => onRename(p)}
+          className="h-7 rounded-xs border border-transparent text-xs text-secondary hover:text-violet hover:bg-violet-bg/60 transition-colors"
+        >
+          Rename
+        </button>
+        <button
+          type="button"
+          onClick={() => onReview(p.id)}
+          className="h-7 rounded-xs border border-transparent text-xs text-secondary hover:text-primary hover:bg-elevated transition-colors"
+        >
+          Review
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpen(p.id)}
+          className="h-7 rounded-xs border border-violet/40 bg-violet-bg text-xs font-medium text-violet hover:bg-violet hover:text-violet-text transition-colors"
+        >
+          View
+        </button>
+      </div>
+    </div>
+  );
+});
+
 export default function PeopleView() {
   const {
     connected,
@@ -24,6 +118,13 @@ export default function PeopleView() {
   } = useApp();
   const [persons, setPersons] = useState<PersonRecord[]>([]);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const isFiltering = query !== debouncedQuery;
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedQuery(query), 150);
+    return () => window.clearTimeout(id);
+  }, [query]);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [reviewPersonId, setReviewPersonId] = useState<number | null | undefined>(undefined);
   const [renaming, setRenaming] = useState<PersonRecord | null>(null);
@@ -45,13 +146,13 @@ export default function PeopleView() {
   }, [loadPersons, dataVersion]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     return persons.filter(p =>
       String(p.name || "")
         .toLowerCase()
         .includes(q)
     );
-  }, [persons, query]);
+  }, [persons, debouncedQuery]);
 
   const submitRename = async () => {
     if (!renaming || !renameText.trim() || renamingBusy) return;
@@ -72,6 +173,15 @@ export default function PeopleView() {
       setRenamingBusy(false);
     }
   };
+
+  const handleRenameClick = useCallback((p: PersonRecord) => {
+    setRenaming(p);
+    setRenameText(p.name || "");
+  }, []);
+
+  const handleReviewClick = useCallback((id: number) => {
+    setReviewPersonId(id);
+  }, []);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col px-5 pt-4 pb-3 gap-3 overflow-hidden">
@@ -95,8 +205,11 @@ export default function PeopleView() {
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Filter by name..."
-              className="h-8 w-48 pl-8 pr-2.5 bg-input border border-hairline rounded-xs text-xs text-primary placeholder:text-secondary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30 transition-colors"
+              className="h-8 w-48 pl-8 pr-7 bg-input border border-hairline rounded-xs text-xs text-primary placeholder:text-secondary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30 transition-colors"
             />
+            {isFiltering && (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            )}
           </div>
           <button
             type="button"
@@ -135,91 +248,16 @@ export default function PeopleView() {
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto pr-1">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(256px,1fr))] gap-3">
-            {filtered.map(p => {
-              const isSelected = selectedPersonId === p.id;
-              const isUnidentified = !p.name || UNIDENTIFIED_RE.test(p.name.trim());
-
-              return (
-                <div
-                  key={p.id}
-                  className={`bg-card border rounded-sm p-3 flex flex-col gap-3 transition-colors ${
-                    isSelected
-                      ? "border-violet bg-violet-bg/30"
-                      : isUnidentified
-                        ? "border-subtle border-dashed hover:border-amber/60"
-                        : "border-subtle hover:border-violet/60"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => openPersonInGallery(p.id)}
-                    className="flex items-center gap-3 text-left min-w-0"
-                  >
-                    <PersonAvatar
-                      person={p}
-                      size="md"
-                      accent={isSelected ? "violet" : isUnidentified ? "amber" : "violet"}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span
-                          className={`text-[13px] font-semibold truncate ${isSelected ? "text-violet" : "text-primary"}`}
-                        >
-                          {p.name}
-                        </span>
-                        {!isUnidentified && (
-                          <CheckCircle2
-                            className="w-3.5 h-3.5 text-success shrink-0"
-                            strokeWidth={1.8}
-                            aria-label="Identified person"
-                          />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs font-mono text-secondary tabular-nums">
-                          {p.image_count || 0} photos
-                        </span>
-                        {isSelected ? (
-                          <span className="px-1.5 py-px rounded-xs bg-violet-bg border border-violet/45 text-[10px] font-medium text-violet">
-                            Selected
-                          </span>
-                        ) : isUnidentified ? (
-                          <span className="px-1.5 py-px rounded-xs bg-amber-bg border border-amber/35 text-[10px] font-medium text-amber">
-                            Unidentified
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </button>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRenaming(p);
-                        setRenameText(p.name || "");
-                      }}
-                      className="h-7 rounded-xs border border-transparent text-xs text-secondary hover:text-violet hover:bg-violet-bg/60 transition-colors"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReviewPersonId(p.id)}
-                      className="h-7 rounded-xs border border-transparent text-xs text-secondary hover:text-primary hover:bg-elevated transition-colors"
-                    >
-                      Review
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openPersonInGallery(p.id)}
-                      className="h-7 rounded-xs border border-violet/40 bg-violet-bg text-xs font-medium text-violet hover:bg-violet hover:text-violet-text transition-colors"
-                    >
-                      View
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {filtered.map(p => (
+              <PersonCard
+                key={p.id}
+                person={p}
+                isSelected={selectedPersonId === p.id}
+                onOpen={openPersonInGallery}
+                onRename={handleRenameClick}
+                onReview={handleReviewClick}
+              />
+            ))}
           </div>
         </div>
       )}

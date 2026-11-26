@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
-  FileText,
   FolderOpen,
   Loader2,
   Moon,
@@ -12,9 +11,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
-import { revealFile, rpc } from "../lib/api";
+import { openFile, revealFile, rpc } from "../lib/api";
 import { THEME_FAMILIES, THEME_MAP } from "../lib/themes";
 import type { DoctorReport, WorkspaceStats } from "../types/memoframe";
+import ModalShell from "../components/ModalShell";
 import { SuspiciousDatesModal } from "../modals/DateModals";
 import { FailedPhotosModal, ResetWorkspaceModal } from "../modals/UtilityModals";
 
@@ -46,6 +46,13 @@ export default function SettingsView() {
   const [showDates, setShowDates] = useState(false);
   const [showFailed, setShowFailed] = useState(false);
   const [showReset, setShowReset] = useState(false);
+  const [tagNote, setTagNote] = useState("");
+  const [pendingMaint, setPendingMaint] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const refreshStats = useCallback(() => {
     if (!connected) return;
@@ -88,15 +95,6 @@ export default function SettingsView() {
       refreshStats();
     });
 
-  const handleExportDiag = () =>
-    runTask("Exporting diagnostics", async () => {
-      const res = await rpc<{ path?: string | null }>("system.export_diagnostics");
-      if (res?.path) {
-        setMaintNote(`Diagnostics saved to ${res.path}`);
-        notify("Diagnostics exported.", "success");
-      }
-    });
-
   const handleFlagToggle = async (
     field: "tagging_enabled" | "store_embeddings",
     checked: boolean
@@ -109,9 +107,12 @@ export default function SettingsView() {
         tagging_enabled: next.tagging_enabled,
         store_embeddings: next.store_embeddings,
       });
-      setMaintNote(
-        "Saved. Restart MemoFrame for model changes to take effect (workspace/models/tags/)."
-      );
+      const msg =
+        field === "tagging_enabled"
+          ? `Scene tagging ${checked ? "enabled" : "disabled"}. Restart MemoFrame for model changes to take effect.`
+          : `Store embeddings ${checked ? "enabled" : "disabled"}. Restart MemoFrame for model changes to take effect.`;
+      setTagNote(msg);
+      notify(msg, "success");
     } catch (err) {
       setConfig(prev);
       notify(err instanceof Error ? err.message : String(err), "error");
@@ -189,8 +190,11 @@ export default function SettingsView() {
 
   const handleTagExisting = () =>
     runTask("Tagging existing photos", async () => {
+      setTagNote("Tagging existing photos...");
       const res = await rpc<{ tagged?: number }>("system.tag_existing");
-      setMaintNote(`Tagged ${res.tagged || 0} photo(s).`);
+      const msg = `Tagged ${res.tagged || 0} photo(s).`;
+      setTagNote(msg);
+      notify(msg, "success");
       invalidate();
     });
 
@@ -218,7 +222,7 @@ export default function SettingsView() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-        <div className="max-w-[860px] flex flex-col gap-3.5 pb-6">
+        <div className="w-full max-w-4xl mx-auto flex flex-col gap-4 pb-6">
           {/* Appearance & Color Palette - Compact & Minimal */}
           <section className="bg-card border border-subtle rounded-sm p-3.5 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -252,7 +256,7 @@ export default function SettingsView() {
             </div>
 
             {/* Compact Family Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {THEME_FAMILIES.map(family => {
                 const isDarkActive = theme === family.darkTheme;
                 const isLightActive = theme === family.lightTheme;
@@ -264,7 +268,7 @@ export default function SettingsView() {
                     key={family.id}
                     type="button"
                     onClick={() => applyTheme(currentIsDark ? family.darkTheme : family.lightTheme)}
-                    className={`h-9 px-2.5 rounded-xs border flex items-center justify-between text-xs font-medium transition-all ${
+                    className={`h-9 px-2.5 rounded-xs border flex items-center justify-between text-xs font-medium transition-all duration-150 active:scale-[0.98] ${
                       isFamilyActive
                         ? "border-accent bg-accent-light text-primary ring-1 ring-accent/30"
                         : "border-subtle bg-elevated/50 text-secondary hover:text-primary hover:border-hairline hover:bg-elevated"
@@ -294,11 +298,11 @@ export default function SettingsView() {
                 Live overview of indexed media, detected faces, duplicates, and events.
               </p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
               {STAT_DEFS.map(([k, label, accentBorder]) => (
                 <div
                   key={k}
-                  className={`bg-elevated border border-subtle border-l-2 ${accentBorder} rounded-xs px-3 py-2.5`}
+                  className={`bg-elevated border border-subtle border-l-2 ${accentBorder} rounded-xs px-3 py-2.5 transition-colors duration-150 hover:border-hairline`}
                 >
                   <div className="font-mono text-lg font-semibold text-primary tabular-nums">
                     {stats[k] ?? 0}
@@ -322,12 +326,12 @@ export default function SettingsView() {
                 cache.
               </p>
             </div>
-            <div className="flex items-center flex-wrap gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
               <button
                 type="button"
                 disabled={!connected || Boolean(busyLabel)}
                 onClick={handleDoctor}
-                className="btn-primary h-8 px-3 text-xs"
+                className="btn-primary h-9 px-3 text-xs rounded-xs inline-flex items-center justify-center gap-1.5 border border-accent bg-accent text-accent-text font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
               >
                 {busyLabel === "Running diagnostic health check" ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-text" />
@@ -344,7 +348,7 @@ export default function SettingsView() {
                 type="button"
                 disabled={!connected || Boolean(busyLabel)}
                 onClick={handleClearCache}
-                className="btn-neutral h-8 px-3 text-xs hover:border-amber/60"
+                className="btn-neutral h-9 px-3 text-xs rounded-xs inline-flex items-center justify-center gap-1.5 border border-hairline bg-elevated text-primary hover:border-amber/60 hover:bg-card transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
               >
                 {busyLabel === "Cleaning thumbnail cache" ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-amber" />
@@ -357,26 +361,19 @@ export default function SettingsView() {
               </button>
               <button
                 type="button"
-                onClick={() => revealFile(config.log_path)}
-                className="btn-neutral h-8 px-3 text-xs hover:border-accent-secondary/60"
+                onClick={() => openFile(config.log_path)}
+                className="btn-neutral h-9 px-3 text-xs rounded-xs inline-flex items-center justify-center gap-1.5 border border-hairline bg-elevated text-primary hover:border-accent-secondary/60 hover:bg-card transition-all duration-150 active:scale-[0.98]"
               >
                 <FolderOpen className="w-3.5 h-3.5 text-accent-secondary" strokeWidth={1.6} />
-                <span>Show Log File</span>
+                <span>Open Log File</span>
               </button>
               <button
                 type="button"
-                disabled={!connected || Boolean(busyLabel)}
-                onClick={handleExportDiag}
-                className="btn-neutral h-8 px-3 text-xs hover:border-accent-secondary/60"
+                onClick={() => revealFile(config.log_path)}
+                className="btn-neutral h-9 px-3 text-xs rounded-xs inline-flex items-center justify-center gap-1.5 border border-hairline bg-elevated text-primary hover:border-accent-secondary/60 hover:bg-card transition-all duration-150 active:scale-[0.98]"
               >
-                {busyLabel === "Exporting diagnostics" ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary" />
-                ) : (
-                  <FileText className="w-3.5 h-3.5 text-accent-secondary" strokeWidth={1.6} />
-                )}
-                <span>
-                  {busyLabel === "Exporting diagnostics" ? "Exporting..." : "Export Diagnostics"}
-                </span>
+                <FolderOpen className="w-3.5 h-3.5 text-accent-secondary" strokeWidth={1.6} />
+                <span>Reveal Log Folder</span>
               </button>
             </div>
             {doctor && (
@@ -429,15 +426,23 @@ export default function SettingsView() {
               />
               <span>Store embeddings (required for Find Similar)</span>
             </label>
-            <div>
+            <div className="flex items-center gap-3 flex-wrap">
               <button
                 type="button"
                 disabled={!connected || Boolean(busyLabel)}
                 onClick={handleTagExisting}
-                className="btn-tertiary h-8 px-3 text-xs"
+                className="btn-tertiary h-9 px-3.5 text-xs rounded-xs inline-flex items-center justify-center gap-1.5 border border-hairline bg-elevated text-primary hover:border-accent-secondary/60 hover:bg-card transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
               >
-                Tag Existing Photos
+                {busyLabel === "Tagging existing photos" && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                )}
+                <span>
+                  {busyLabel === "Tagging existing photos" ? "Tagging..." : "Tag Existing Photos"}
+                </span>
               </button>
+              {tagNote && (
+                <span className="text-xs font-mono text-secondary">{tagNote}</span>
+              )}
             </div>
           </section>
 
@@ -451,24 +456,63 @@ export default function SettingsView() {
                 anomalies.
               </p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {(
                 [
-                  ["Verify Files", handleVerifyFiles],
-                  ["Prune Missing Records", handlePruneMissing],
-                  ["Detect Moved Files", handleDetectMoves],
-                  ["Suspicious Dates...", () => setShowDates(true)],
-                  ["Rebuild Groups & Index", handleRebuild],
-                  ["Repair & Optimize DB", handleRepair],
-                  ["Failed Photos...", () => setShowFailed(true)],
+                  [
+                    "Verify Files",
+                    "Checks all indexed file paths on disk and reports present, missing, or offline-drive files without modifying anything.",
+                    "Run Verification",
+                    handleVerifyFiles,
+                  ],
+                  [
+                    "Prune Missing Records",
+                    "Scans for indexed records whose source files no longer exist on disk and removes them from the database. Original files are never touched.",
+                    "Check & Prune",
+                    handlePruneMissing,
+                  ],
+                  [
+                    "Detect Moved Files",
+                    "Matches newly scanned files with missing records by content hash so your favourites and keep marks follow moved or renamed photos.",
+                    "Detect Moves",
+                    handleDetectMoves,
+                  ],
+                  ["Suspicious Dates...", "", "", () => setShowDates(true)],
+                  [
+                    "Rebuild Groups & Index",
+                    "Recomputes event groups, duplicate clusters, and person clusters from the current database.",
+                    "Rebuild Index",
+                    handleRebuild,
+                  ],
+                  [
+                    "Repair & Optimize DB",
+                    "Fixes face counts, removes orphan face rows, requeues incomplete items, and runs SQLite optimization.",
+                    "Repair & Optimize",
+                    handleRepair,
+                  ],
+                  ["Failed Photos...", "", "", () => setShowFailed(true)],
                 ] as const
-              ).map(([label, handler]) => (
+              ).map(([label, desc, confirmLabel, handler]) => (
                 <button
                   key={label}
                   type="button"
                   disabled={!connected || Boolean(busyLabel)}
-                  onClick={handler}
-                  className="btn-neutral h-8 px-2.5 text-xs truncate hover:border-accent-secondary/60"
+                  onClick={() => {
+                    if (!desc) {
+                      handler();
+                    } else {
+                      setPendingMaint({
+                        title: label,
+                        description: desc,
+                        confirmLabel,
+                        onConfirm: () => {
+                          setPendingMaint(null);
+                          handler();
+                        },
+                      });
+                    }
+                  }}
+                  className="btn-neutral h-9 px-3 text-xs rounded-xs inline-flex items-center justify-center border border-hairline bg-elevated text-primary hover:border-accent-secondary/60 hover:bg-card transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
                 >
                   {label}
                 </button>
@@ -528,6 +572,33 @@ export default function SettingsView() {
       {showFailed && <FailedPhotosModal onClose={() => setShowFailed(false)} />}
       {showReset && (
         <ResetWorkspaceModal onClose={() => setShowReset(false)} onConfirm={handleResetConfirm} />
+      )}
+      {pendingMaint && (
+        <ModalShell
+          title={pendingMaint.title}
+          onClose={() => setPendingMaint(null)}
+          className="w-[440px] max-w-[92vw]"
+        >
+          <div className="flex flex-col gap-4">
+            <p className="text-xs text-secondary leading-relaxed">{pendingMaint.description}</p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingMaint(null)}
+                className="btn-neutral h-8 px-3 text-xs rounded-xs border border-hairline bg-elevated text-primary hover:bg-card"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={pendingMaint.onConfirm}
+                className="btn-primary h-8 px-3.5 text-xs rounded-xs border border-accent bg-accent text-accent-text font-medium"
+              >
+                {pendingMaint.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </ModalShell>
       )}
     </div>
   );

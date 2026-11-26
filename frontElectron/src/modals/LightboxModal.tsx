@@ -48,12 +48,23 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
 
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const dragRef = useRef({ active: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0 });
+  const dragRef = useRef({
+    active: false,
+    moved: false,
+    startX: 0,
+    startY: 0,
+    origX: 0,
+    origY: 0,
+    lastX: 0,
+    lastY: 0,
+  });
+  const transformContainerRef = useRef<HTMLDivElement>(null);
   const dirtyRef = useRef(false);
 
   const [activeFace, setActiveFace] = useState<FaceRecord | null>(null);
   const [faceNameInput, setFaceNameInput] = useState("");
   const [persons, setPersons] = useState<PersonRecord[]>([]);
+  const personsCacheRef = useRef<PersonRecord[] | null>(null);
   const [showDateModal, setShowDateModal] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
   const [showLive, setShowLive] = useState(false);
@@ -92,15 +103,27 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
 
   const loadDetail = useCallback(async () => {
     try {
-      const d = await rpc<PhotoDetailResponse>("photos.detail", { image_id: initialPhoto.id });
+      const initialPath = initialPhoto.path;
+      const shouldPreDecode = Boolean(initialPath && needsBackendDecode(initialPath));
+      const [d, preDecoded] = await Promise.all([
+        rpc<PhotoDetailResponse>("photos.detail", { image_id: initialPhoto.id }),
+        shouldPreDecode && initialPath
+          ? rpc<{ data_url?: string | null }>("photos.decode", {
+              path: initialPath,
+              max_side: 2400,
+            })
+          : Promise.resolve(null),
+      ]);
       if (d?.photo) setPhoto(prev => ({ ...prev, ...d.photo }));
       setFaces(d?.faces || []);
       setTags(d?.tags || []);
       setMarks(d?.marks || []);
       setLiveVideo(d?.live_video || null);
 
-      const fullPath = d?.photo?.path || initialPhoto.path;
-      if (fullPath && needsBackendDecode(fullPath)) {
+      const fullPath = d?.photo?.path || initialPath;
+      if (preDecoded?.data_url) {
+        setImgSrc(preDecoded.data_url);
+      } else if (fullPath && needsBackendDecode(fullPath)) {
         const decoded = await rpc<{ data_url?: string | null }>("photos.decode", {
           path: fullPath,
           max_side: 2400,
@@ -123,8 +146,11 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
     onClose?.();
   };
 
-  const stepZoom = (factor: number) =>
-    setZoom(z => Math.max(0.25, Math.min(8, Number((z * factor).toFixed(3)))));
+  const stepZoom = useCallback(
+    (factor: number) =>
+      setZoom(z => Math.max(0.25, Math.min(8, Number((z * factor).toFixed(3))))),
+    []
+  );
   const resetView = () => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
@@ -139,6 +165,8 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
       startY: e.clientY,
       origX: pan.x,
       origY: pan.y,
+      lastX: pan.x,
+      lastY: pan.y,
     };
   };
 
@@ -146,12 +174,27 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
     if (!dragRef.current.active) return;
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
-    if (Math.hypot(dx, dy) > 4) dragRef.current.moved = true;
-    setPan({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy });
+    if (!dragRef.current.moved && Math.hypot(dx, dy) <= 4) return;
+    dragRef.current.moved = true;
+    const nextX = dragRef.current.origX + dx;
+    const nextY = dragRef.current.origY + dy;
+    dragRef.current.lastX = nextX;
+    dragRef.current.lastY = nextY;
+    if (transformContainerRef.current) {
+      transformContainerRef.current.style.transition = "none";
+      transformContainerRef.current.style.transform = `translate(${nextX}px, ${nextY}px) scale(${zoom})`;
+    }
   };
 
   const onPointerUp = () => {
+    if (!dragRef.current.active) return;
     dragRef.current.active = false;
+    if (transformContainerRef.current) {
+      transformContainerRef.current.style.transition = "";
+    }
+    if (dragRef.current.moved) {
+      setPan({ x: dragRef.current.lastX, y: dragRef.current.lastY });
+    }
   };
 
   const onFaceClick = (e: MouseEvent<HTMLDivElement>, face: FaceRecord) => {
@@ -160,9 +203,17 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
     setActiveFace(face);
     setFaceNameInput(face.person_name || "");
     zoomToFace(face);
-    rpc<PersonRecord[]>("persons.list")
-      .then(res => setPersons(res || []))
-      .catch(() => {});
+    if (personsCacheRef.current) {
+      setPersons(personsCacheRef.current);
+    } else {
+      rpc<PersonRecord[]>("persons.list")
+        .then(res => {
+          const list = res || [];
+          personsCacheRef.current = list;
+          setPersons(list);
+        })
+        .catch(() => {});
+    }
   };
 
   const handleNameFace = async () => {
@@ -170,6 +221,7 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
     setSavingFaceName(true);
     try {
       await rpc("faces.name", { face_id: activeFace.id, name: faceNameInput.trim() });
+      personsCacheRef.current = null;
       dirtyRef.current = true;
       setActiveFace(null);
       notify("Face named.", "success");
@@ -186,6 +238,7 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
     setAssigningFace(true);
     try {
       await rpc("faces.assign", { face_id: activeFace.id, person_id: personId });
+      personsCacheRef.current = null;
       dirtyRef.current = true;
       setActiveFace(null);
       notify(personId === null ? "Removed face from person." : "Face assigned.", "success");
@@ -449,6 +502,7 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
               className="flex-1 min-h-0 relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing p-2"
             >
               <div
+                ref={transformContainerRef}
                 style={{
                   transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   width: renderedDims ? `${renderedDims.width}px` : "auto",

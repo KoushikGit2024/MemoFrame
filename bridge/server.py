@@ -120,7 +120,10 @@ class BridgeServer:
     def serve(self, in_stream: TextIO | None = None) -> None:
         stream = in_stream or sys.stdin
         self.emit_event("bridge.ready", {"connected": self.ctx.engine is not None})
-        pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="MemoFrameRPC")
+        pool = ThreadPoolExecutor(
+            max_workers=min(16, (os.cpu_count() or 2) * 2),
+            thread_name_prefix="MemoFrameRPC",
+        )
         try:
             for raw in stream:
                 line = raw.strip()

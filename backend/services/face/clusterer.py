@@ -129,23 +129,18 @@ def cluster_face_embeddings(
     if not face_records:
         return {}
 
-    vectors = []
-    valid_face_ids = []
-
-    for fid, emb_bytes in face_records:
-        if not emb_bytes or len(emb_bytes) != 512:
-            continue
-        vec = np.frombuffer(emb_bytes, dtype=np.float32)
-        norm = np.linalg.norm(vec)
-        if norm > 0:
-            vec = vec / norm
-        vectors.append(vec)
-        valid_face_ids.append(fid)
-
-    if not vectors:
+    valid = [
+        (fid, np.frombuffer(emb_bytes, dtype=np.float32))
+        for fid, emb_bytes in face_records
+        if emb_bytes and len(emb_bytes) == 512
+    ]
+    if not valid:
         return {}
 
-    X = np.array(vectors, dtype=np.float32)
+    valid_face_ids = [fid for fid, _ in valid]
+    X = np.stack([v for _, v in valid], axis=0).astype(np.float32)
+    norms = np.linalg.norm(X, axis=1, keepdims=True)
+    X = np.where(norms > 0, X / norms, X)
 
     # DBSCAN with cosine metric
     clustering = DBSCAN(eps=eps, min_samples=min_samples, metric="cosine")

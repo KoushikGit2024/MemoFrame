@@ -62,7 +62,9 @@ class FaceDetector(ABC):
         raw: list[RawBox] = []
         for y0 in _starts(h, tile, step):
             for x0 in _starts(w, tile, step):
-                crop = np.ascontiguousarray(bgr[y0 : y0 + tile, x0 : x0 + tile])
+                crop = bgr[y0 : y0 + tile, x0 : x0 + tile]
+                if not crop.flags["C_CONTIGUOUS"]:
+                    crop = np.ascontiguousarray(crop)
                 for x, y, bw, bh, s, *extra in self._detect_bgr(crop):
                     lm = (
                         tuple(v + (x0 if i % 2 == 0 else y0) for i, v in enumerate(extra[0]))
@@ -282,15 +284,25 @@ def _starts(n: int, tile: int, step: int) -> list[int]:
 
 def merge_faces(faces: list[FaceBox], overlap: float = 0.6) -> list[FaceBox]:
     """Drop lower-confidence boxes that overlap a kept box (intersection / smaller area)."""
+    if len(faces) <= 1:
+        return list(faces)
+    ordered = sorted(faces, key=lambda b: -b.confidence)
+    x1 = np.array([b.x for b in ordered], dtype=np.float32)
+    y1 = np.array([b.y for b in ordered], dtype=np.float32)
+    x2 = np.array([b.x + b.w for b in ordered], dtype=np.float32)
+    y2 = np.array([b.y + b.h for b in ordered], dtype=np.float32)
+    areas = np.maximum(1.0, np.array([b.area for b in ordered], dtype=np.float32))
+    suppressed = np.zeros(len(ordered), dtype=bool)
     kept: list[FaceBox] = []
-    for f in sorted(faces, key=lambda b: -b.confidence):
-        dup = False
-        for k in kept:
-            iw = min(f.x + f.w, k.x + k.w) - max(f.x, k.x)
-            ih = min(f.y + f.h, k.y + k.h) - max(f.y, k.y)
-            if iw > 0 and ih > 0 and iw * ih / max(1, min(f.area, k.area)) > overlap:
-                dup = True
-                break
-        if not dup:
-            kept.append(f)
+    for i, f in enumerate(ordered):
+        if suppressed[i]:
+            continue
+        kept.append(f)
+        if i + 1 >= len(ordered):
+            break
+        iw = np.maximum(0.0, np.minimum(x2[i], x2[i + 1 :]) - np.maximum(x1[i], x1[i + 1 :]))
+        ih = np.maximum(0.0, np.minimum(y2[i], y2[i + 1 :]) - np.maximum(y1[i], y1[i + 1 :]))
+        inter = iw * ih
+        min_area = np.minimum(areas[i], areas[i + 1 :])
+        suppressed[i + 1 :] |= (inter / min_area) > overlap
     return sorted(kept, key=lambda b: (b.x, b.y))

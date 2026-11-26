@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ImageOff, ScanFace, Star } from "lucide-react";
 import { mediaUrl } from "../lib/api";
-import { basename, formatDate, formatQuality } from "../lib/utils";
+import { basename, computeFaceZoomStyle, formatDate, formatQuality } from "../lib/utils";
 import type { PhotoRecord } from "../types/memoframe";
 
 interface PhotoCardProps {
@@ -17,23 +17,23 @@ export default React.memo(function PhotoCard({
   photo,
   compact = false,
   faceZoom = false,
-  targetPersonId: _targetPersonId = null,
+  targetPersonId = null,
   onOpen,
   className = "",
 }: PhotoCardProps) {
   // If thumbnail fails or is missing, fall back to photo.path
   const [useFallback, setUseFallback] = useState(false);
   const [imgErr, setImgErr] = useState(false);
+  const [cropLoaded, setCropLoaded] = useState(false);
 
-  // In faceZoom mode, display the crisp backend square face crop directly (Felicity model).
-  // In normal mode, use the lightweight whole-photo thumbnail.
+  const zoomStyle = faceZoom ? computeFaceZoomStyle(photo, targetPersonId) : null;
   const faceCrop = photo.face_crop_path || photo.faces?.[0]?.crop_path;
-  const srcPath =
-    faceZoom && faceCrop
-      ? faceCrop
-      : !useFallback && photo.thumb_path
-        ? photo.thumb_path
-        : photo.path;
+  const srcPath = !useFallback && photo.thumb_path ? photo.thumb_path : photo.path;
+  const cropSrc = faceZoom && faceCrop ? mediaUrl(faceCrop) : "";
+
+  useEffect(() => {
+    setCropLoaded(false);
+  }, [faceZoom, faceCrop]);
 
   const imgSrc = !imgErr && srcPath ? mediaUrl(srcPath) : "";
   const faceCount = photo.faces?.length ?? photo.face_count ?? 0;
@@ -59,17 +59,35 @@ export default React.memo(function PhotoCard({
           onOpen?.(photo);
         }
       }}
+      style={{ contentVisibility: "auto", containIntrinsicSize: "240px" }}
       className={`group bg-card border border-subtle hover:border-accent-secondary/75 rounded-sm overflow-hidden cursor-pointer flex flex-col transition-colors focus-visible:outline-none focus-visible:border-accent-secondary focus-visible:ring-1 focus-visible:ring-accent-secondary/40 ${className}`}
     >
       <div className="relative w-full aspect-[4/3] bg-input overflow-hidden flex items-center justify-center">
         {imgSrc ? (
-          <img
-            src={imgSrc}
-            alt={basename(photo.path)}
-            loading="lazy"
-            onError={handleImageError}
-            className="w-full h-full object-cover"
-          />
+          <>
+            <img
+              src={imgSrc}
+              alt={basename(photo.path)}
+              loading="lazy"
+              decoding="async"
+              onError={handleImageError}
+              style={zoomStyle ?? undefined}
+              className="w-full h-full object-cover transition-transform duration-300 ease-out"
+            />
+            {cropSrc && (
+              <img
+                src={cropSrc}
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+                decoding="async"
+                onLoad={() => setCropLoaded(true)}
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 pointer-events-none ${
+                  cropLoaded ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            )}
+          </>
         ) : (
           <ImageOff className="w-6 h-6 text-secondary opacity-40" strokeWidth={1.5} />
         )}

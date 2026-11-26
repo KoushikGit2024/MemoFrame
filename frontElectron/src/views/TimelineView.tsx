@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, Clock, Loader2, RefreshCw } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { rpc } from "../lib/api";
@@ -13,6 +13,70 @@ interface TimelineResult {
   groups: TimelineGroup[];
   total: number;
 }
+
+interface TimelineGroupRowProps {
+  group: TimelineGroup;
+  onOpenPhoto: (photo: TimelineGroup["photos"] extends (infer P)[] | undefined ? P : never) => void;
+  onOpenGroup: (id: number, name: string) => void;
+}
+
+const TimelineGroupRow = React.memo(function TimelineGroupRow({
+  group: g,
+  onOpenPhoto,
+  onOpenGroup,
+}: TimelineGroupRowProps) {
+  const name = g.name || `Event #${g.id}`;
+  const start = (g.start_ts || "").slice(0, 10);
+  const end = (g.end_ts || "").slice(0, 10);
+  const dateText = !start ? "" : !end || start === end ? start : `${start} to ${end}`;
+  const photos = g.photos || [];
+  const extra = Math.max(0, Number(g.image_count || 0) - photos.length);
+
+  return (
+    <section
+      style={{ contentVisibility: "auto", containIntrinsicSize: "260px" }}
+      className="bg-card border border-subtle rounded-sm p-3.5 flex flex-col gap-3"
+    >
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="text-sm font-semibold text-primary">{name}</h2>
+          {dateText && (
+            <span className="h-5 px-2 inline-flex items-center rounded-xs bg-amber-bg border border-amber/35 font-mono text-[11px] text-amber">
+              {dateText}
+            </span>
+          )}
+          <span className="h-5 px-2 inline-flex items-center rounded-xs bg-accent-light border border-accent/40 font-mono text-[11px] text-accent">
+            {g.image_count || 0} photos
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => onOpenGroup(Number(g.id), name)}
+          className="h-7 px-2.5 inline-flex items-center gap-1 rounded-xs text-xs font-medium text-accent-secondary hover:bg-accent-secondary-light transition-colors"
+        >
+          <span>View all {g.image_count || 0}</span>
+          <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.6} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
+        {photos.map(p => (
+          <PhotoCard key={p.id} photo={p} onOpen={onOpenPhoto} className="w-[196px] shrink-0" />
+        ))}
+        {extra > 0 && (
+          <button
+            type="button"
+            onClick={() => onOpenGroup(Number(g.id), name)}
+            className="w-28 h-[148px] shrink-0 rounded-sm border border-dashed border-hairline bg-elevated/40 hover:border-accent-secondary hover:text-accent-secondary flex flex-col items-center justify-center text-xs text-secondary gap-1 transition-colors"
+          >
+            <span className="font-mono font-semibold text-primary">+{extra}</span>
+            <span>more</span>
+          </button>
+        )}
+      </div>
+    </section>
+  );
+});
 
 export default function TimelineView() {
   const { connected, dataVersion, notify, setLightboxPhoto, openGroupInGallery } = useApp();
@@ -78,64 +142,14 @@ export default function TimelineView() {
         />
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-3">
-          {groups.map(g => {
-            const name = g.name || `Event #${g.id}`;
-            const start = (g.start_ts || "").slice(0, 10);
-            const end = (g.end_ts || "").slice(0, 10);
-            const dateText = !start ? "" : !end || start === end ? start : `${start} to ${end}`;
-            const photos = g.photos || [];
-            const extra = Math.max(0, Number(g.image_count || 0) - photos.length);
-
-            return (
-              <section
-                key={g.id}
-                className="bg-card border border-subtle rounded-sm p-3.5 flex flex-col gap-3"
-              >
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-sm font-semibold text-primary">{name}</h2>
-                    {dateText && (
-                      <span className="h-5 px-2 inline-flex items-center rounded-xs bg-amber-bg border border-amber/35 font-mono text-[11px] text-amber">
-                        {dateText}
-                      </span>
-                    )}
-                    <span className="h-5 px-2 inline-flex items-center rounded-xs bg-accent-light border border-accent/40 font-mono text-[11px] text-accent">
-                      {g.image_count || 0} photos
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => openGroupInGallery(Number(g.id), name)}
-                    className="h-7 px-2.5 inline-flex items-center gap-1 rounded-xs text-xs font-medium text-accent-secondary hover:bg-accent-secondary-light transition-colors"
-                  >
-                    <span>View all {g.image_count || 0}</span>
-                    <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.6} />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
-                  {photos.map(p => (
-                    <PhotoCard
-                      key={p.id}
-                      photo={p}
-                      onOpen={setLightboxPhoto}
-                      className="w-[196px] shrink-0"
-                    />
-                  ))}
-                  {extra > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => openGroupInGallery(Number(g.id), name)}
-                      className="w-28 h-[148px] shrink-0 rounded-sm border border-dashed border-hairline bg-elevated/40 hover:border-accent-secondary hover:text-accent-secondary flex flex-col items-center justify-center text-xs text-secondary gap-1 transition-colors"
-                    >
-                      <span className="font-mono font-semibold text-primary">+{extra}</span>
-                      <span>more</span>
-                    </button>
-                  )}
-                </div>
-              </section>
-            );
-          })}
+          {groups.map(g => (
+            <TimelineGroupRow
+              key={g.id}
+              group={g}
+              onOpenPhoto={setLightboxPhoto}
+              onOpenGroup={openGroupInGallery}
+            />
+          ))}
 
           {remaining > 0 && (
             <button
