@@ -48,6 +48,18 @@ SFACE_URL = (
 )
 SFACE_SHA256 = "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79"
 
+# Scene tagging classifier (MobileNetV2 ONNX + 1000 ImageNet synset labels).
+SCENE_MODEL_FILENAME = "scene_model.onnx"
+SCENE_MODEL_URL = (
+    "https://github.com/onnx/models/raw/main/validated/vision/classification/"
+    "mobilenet/model/mobilenetv2-12.onnx"
+)
+SCENE_LABELS_FILENAME = "scene_labels.txt"
+SCENE_LABELS_URL = (
+    "https://raw.githubusercontent.com/onnx/models/main/validated/vision/"
+    "classification/synset.txt"
+)
+
 
 # Repository Root and Standard Workspace Resolution
 REPO_ROOT: Path = Path(__file__).resolve().parent.parent

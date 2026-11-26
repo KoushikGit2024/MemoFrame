@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from backend.config import (
+    SCENE_LABELS_FILENAME,
+    SCENE_LABELS_URL,
+    SCENE_MODEL_FILENAME,
+    SCENE_MODEL_URL,
     SFACE_FILENAME,
     SFACE_SHA256,
     SFACE_URL,
@@ -209,8 +213,8 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
         eng.control.cancel()
         return {"cancelling": True}
 
-    def _verify_model(path: Path, expected_sha256: str) -> bool:
-        if not path.is_file() or path.stat().st_size < 10_000:
+    def _verify_model(path: Path, expected_sha256: str, min_bytes: int = 10_000) -> bool:
+        if not path.is_file() or path.stat().st_size < min_bytes:
             return False
         if os.environ.get("MEMOFRAME_SKIP_MODEL_HASH") == "1":
             return True
@@ -223,17 +227,26 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
 
     def models_status(_params: dict[str, Any]) -> dict[str, Any]:
         models_dir = ctx.workspace / "models"
+        tags_dir = models_dir / "tags"
         yunet_path = models_dir / YUNET_FILENAME
         sface_path = models_dir / SFACE_FILENAME
+        scene_model_path = tags_dir / SCENE_MODEL_FILENAME
+        scene_labels_path = tags_dir / SCENE_LABELS_FILENAME
 
         yunet_ok = _verify_model(yunet_path, YUNET_SHA256)
         sface_ok = _verify_model(sface_path, SFACE_SHA256)
+        scene_model_ok = _verify_model(scene_model_path, "")
+        scene_labels_ok = _verify_model(scene_labels_path, "", min_bytes=100)
 
         missing = []
         if not yunet_ok:
             missing.append("yunet")
         if not sface_ok:
             missing.append("sface")
+        if not scene_model_ok:
+            missing.append("scene_model")
+        if not scene_labels_ok:
+            missing.append("scene_labels")
 
         return {
             "ready": len(missing) == 0,
@@ -251,6 +264,18 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
                     "present": sface_ok,
                     "size_bytes": sface_path.stat().st_size if sface_path.is_file() else 0,
                 },
+                "scene_model": {
+                    "name": "Scene Tagging (MobileNetV2)",
+                    "filename": SCENE_MODEL_FILENAME,
+                    "present": scene_model_ok,
+                    "size_bytes": scene_model_path.stat().st_size if scene_model_path.is_file() else 0,
+                },
+                "scene_labels": {
+                    "name": "Scene Labels (ImageNet)",
+                    "filename": SCENE_LABELS_FILENAME,
+                    "present": scene_labels_ok,
+                    "size_bytes": scene_labels_path.stat().st_size if scene_labels_path.is_file() else 0,
+                },
             },
         }
 
@@ -260,7 +285,9 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
     def models_download(_params: dict[str, Any]) -> dict[str, Any]:
         nonlocal _download_active
         models_dir = ctx.workspace / "models"
+        tags_dir = models_dir / "tags"
         ensure_dir(models_dir)
+        ensure_dir(tags_dir)
 
         status = models_status({})
         if status["ready"]:
@@ -278,23 +305,43 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
                         (
                             "yunet",
                             "Face Detection (YuNet)",
-                            YUNET_FILENAME,
+                            models_dir / YUNET_FILENAME,
                             YUNET_URL,
                             YUNET_SHA256,
                             232_589,
+                            10_000,
                         ),
                         (
                             "sface",
                             "Face Recognition (SFace)",
-                            SFACE_FILENAME,
+                            models_dir / SFACE_FILENAME,
                             SFACE_URL,
                             SFACE_SHA256,
                             38_696_353,
+                            10_000,
+                        ),
+                        (
+                            "scene_model",
+                            "Scene Tagging (MobileNetV2)",
+                            tags_dir / SCENE_MODEL_FILENAME,
+                            SCENE_MODEL_URL,
+                            "",
+                            13_964_571,
+                            10_000,
+                        ),
+                        (
+                            "scene_labels",
+                            "Scene Labels (ImageNet)",
+                            tags_dir / SCENE_LABELS_FILENAME,
+                            SCENE_LABELS_URL,
+                            "",
+                            31_690,
+                            100,
                         ),
                     ]
-                    for key, display_name, filename, url, sha, est_total in targets:
-                        dest = models_dir / filename
-                        if _verify_model(dest, sha):
+                    for key, display_name, dest, url, sha, est_total, min_bytes in targets:
+                        filename = dest.name
+                        if _verify_model(dest, sha, min_bytes=min_bytes):
                             ctx.emit_event(
                                 "models.progress",
                                 {
@@ -367,7 +414,7 @@ def register_system_handlers(registry: dict[str, Any], ctx: Any) -> None:
                                 pass
                         tmp_dest.replace(dest)
 
-                        if not _verify_model(dest, sha):
+                        if not _verify_model(dest, sha, min_bytes=min_bytes):
                             raise BridgeError(
                                 "VERIFICATION_FAILED", f"Model verification failed for {filename}"
                             )
