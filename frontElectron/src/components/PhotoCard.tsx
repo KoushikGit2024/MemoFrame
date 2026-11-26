@@ -9,6 +9,7 @@ interface PhotoCardProps {
   compact?: boolean;
   faceZoom?: boolean;
   targetPersonId?: number | null;
+  unassignedOnly?: boolean;
   onOpen?: (photo: PhotoRecord) => void;
   className?: string;
 }
@@ -18,6 +19,7 @@ export default React.memo(function PhotoCard({
   compact = false,
   faceZoom = false,
   targetPersonId = null,
+  unassignedOnly = false,
   onOpen,
   className = "",
 }: PhotoCardProps) {
@@ -26,7 +28,7 @@ export default React.memo(function PhotoCard({
   const [imgErr, setImgErr] = useState(false);
   const [cropLoaded, setCropLoaded] = useState(false);
 
-  const zoomStyle = faceZoom ? computeFaceZoomStyle(photo, targetPersonId) : null;
+  const zoomStyle = faceZoom ? computeFaceZoomStyle(photo, targetPersonId, unassignedOnly) : null;
   const faceCrop = photo.face_crop_path || photo.faces?.[0]?.crop_path;
   const srcPath = !useFallback && photo.thumb_path ? photo.thumb_path : photo.path;
   const cropSrc = faceZoom && faceCrop ? mediaUrl(faceCrop) : "";

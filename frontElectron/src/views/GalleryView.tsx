@@ -580,6 +580,7 @@ export default function GalleryView() {
                 compact={layoutMode === "compact"}
                 faceZoom={faceZoom}
                 targetPersonId={selectedPersonId}
+                unassignedOnly={unusedFacesOnly}
                 onOpen={setLightboxPhoto}
               />
             ))}

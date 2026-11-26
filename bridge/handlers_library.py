@@ -77,6 +77,7 @@ def enrich_photos(
     include_thumbs: bool = True,
     target_person_id: int | None = None,
     workspace: Path | None = None,
+    unassigned_only: bool = False,
 ) -> list[dict[str, Any]]:
     """Attach faces (single batch query), thumbnail paths, and pre-generated square face crops to photo records."""
     if not items:
@@ -110,6 +111,12 @@ def enrich_photos(
                 target_face = next(
                     (f for f in img_faces if f.get("person_id") == target_person_id), None
                 )
+            elif unassigned_only:
+                unassigned = [f for f in img_faces if f.get("person_id") is None]
+                if unassigned:
+                    target_face = max(
+                        unassigned, key=lambda f: int(f.get("w", 0)) * int(f.get("h", 0))
+                    )
             if not target_face:
                 target_face = max(img_faces, key=lambda f: int(f.get("w", 0)) * int(f.get("h", 0)))
             if target_face:
@@ -153,6 +160,7 @@ def register_library_handlers(registry: dict[str, Any], ctx: Any) -> None:
                 include_thumbs=True,
                 target_person_id=target_pid,
                 workspace=ctx.workspace,
+                unassigned_only=bool(filters.get("unassigned_faces")),
             )
         return {"items": items, "total": total, "pages": pages, "page": page, "person_gone": gone}
 

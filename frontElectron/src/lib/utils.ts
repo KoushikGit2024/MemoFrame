@@ -114,16 +114,23 @@ export class LatestTask {
 
 export function computeFaceZoomStyle(
   photo?: PhotoRecord | null,
-  targetPersonId?: number | null
+  targetPersonId?: number | null,
+  unassignedOnly?: boolean
 ): CSSProperties | null {
   const faces = photo?.faces;
   if (!faces?.length || !photo?.width || !photo?.height) return null;
 
   // If a specific person is selected/filtered, prioritize that person's face.
+  // If unassignedOnly is set, prioritize the largest unassigned face.
   // Otherwise, zoom to the primary (largest) face.
   let targetFace: FaceRecord | undefined;
   if (targetPersonId !== null && targetPersonId !== undefined) {
     targetFace = faces.find(f => f.person_id === targetPersonId);
+  } else if (unassignedOnly) {
+    const unassigned = faces.filter(f => f.person_id === null || f.person_id === undefined);
+    if (unassigned.length > 0) {
+      targetFace = unassigned.reduce((best, f) => (f.w * f.h > best.w * best.h ? f : best), unassigned[0]);
+    }
   }
   if (!targetFace) {
     targetFace = faces.reduce((best, f) => (f.w * f.h > best.w * best.h ? f : best), faces[0]);
