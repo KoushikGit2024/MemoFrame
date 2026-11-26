@@ -35,7 +35,7 @@ interface LightboxModalProps {
 }
 
 export default function LightboxModal({ photo: initialPhoto, onClose }: LightboxModalProps) {
-  const { invalidate, notify, setLightboxPhoto } = useApp();
+  const { invalidate, notify, setLightboxPhoto, setGalleryExtraFilters, setActiveView } = useApp();
   const [photo, setPhoto] = useState<PhotoRecord>(initialPhoto);
   const [faces, setFaces] = useState<FaceRecord[]>(initialPhoto.faces || []);
   const [tags, setTags] = useState<TagRecord[]>([]);
@@ -604,6 +604,11 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
             onShowLive={() => setShowLive(true)}
             onOpenInDefaultApp={handleOpenInDefaultApp}
             onRevealInFolder={p => revealFile(p)}
+            onFilterByTag={tag => {
+              setGalleryExtraFilters(prev => ({ ...prev, tag }));
+              setActiveView("photos");
+              setLightboxPhoto(null);
+            }}
           />
         </div>
       </ModalShell>

@@ -11,6 +11,7 @@ import {
   ScanFace,
   Search,
   Table2,
+  Tag,
   Trash2,
   X,
 } from "lucide-react";
@@ -363,8 +364,8 @@ export default function GalleryView() {
             <select
               value={tagFilter}
               onChange={e => setTagFilter(e.target.value)}
-              className={`h-7 px-2 bg-input border rounded-xs text-xs text-primary focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 ${
-                tagFilter ? "border-violet/70 text-violet" : "border-hairline"
+              className={`h-7 px-2 bg-input border rounded-xs text-xs text-primary focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber/30 ${
+                tagFilter ? "border-amber/70 text-amber font-medium" : "border-hairline"
               }`}
             >
               <option value="">Any Tag</option>
@@ -442,11 +443,31 @@ export default function GalleryView() {
             )}
           </div>
 
+          {tagFilter && (
+            <span className="h-6 px-2 inline-flex items-center gap-1.5 rounded-xs bg-amber-bg border border-amber/50 text-xs text-amber font-medium">
+              <Tag className="w-3 h-3 shrink-0" strokeWidth={1.8} />
+              <span>tag: {tagFilter}</span>
+              <button
+                type="button"
+                aria-label="Clear tag filter"
+                onClick={() => setTagFilter("")}
+                className="text-amber hover:text-primary transition-colors cursor-pointer"
+              >
+                <X className="w-3 h-3" strokeWidth={1.8} />
+              </button>
+            </span>
+          )}
+
           {extraChipEntries.map(([k, v]) => (
             <span
               key={k}
-              className="h-6 px-2 inline-flex items-center gap-1.5 rounded-xs bg-accent-light border border-accent/50 text-xs text-accent font-medium"
+              className={`h-6 px-2 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium ${
+                k === "tag"
+                  ? "bg-amber-bg border-amber/50 text-amber"
+                  : "bg-accent-light border-accent/50 text-accent"
+              }`}
             >
+              {k === "tag" && <Tag className="w-3 h-3 shrink-0" strokeWidth={1.8} />}
               <span>
                 {k === "group_id"
                   ? String(galleryExtraFilters._group_label || `Event #${v}`)
@@ -461,7 +482,7 @@ export default function GalleryView() {
                   if (k === "group_id") delete next._group_label;
                   setGalleryExtraFilters(next);
                 }}
-                className="text-accent hover:text-primary transition-colors"
+                className={`${k === "tag" ? "text-amber" : "text-accent"} hover:text-primary transition-colors cursor-pointer`}
               >
                 <X className="w-3 h-3" strokeWidth={1.8} />
               </button>

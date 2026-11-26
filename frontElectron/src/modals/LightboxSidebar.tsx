@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Sparkles,
   Star,
+  Tag,
   ZoomIn,
 } from "lucide-react";
 import { formatDate, formatDims, formatQuality } from "../lib/utils";
@@ -40,6 +41,7 @@ export interface LightboxSidebarProps {
   onShowLive: () => void;
   onOpenInDefaultApp: () => void;
   onRevealInFolder: (path: string) => void;
+  onFilterByTag: (tag: string) => void;
 }
 
 export default function LightboxSidebar({
@@ -68,6 +70,7 @@ export default function LightboxSidebar({
   onShowLive,
   onOpenInDefaultApp,
   onRevealInFolder,
+  onFilterByTag,
 }: LightboxSidebarProps) {
   const isFav = marks.includes("favourite");
   const isHidden = marks.includes("hidden");
@@ -81,7 +84,6 @@ export default function LightboxSidebar({
           ["Format", String(photo.format || "Unknown").toUpperCase()],
           ["Faces Detected", String(faces.length)],
           ["Quality Score", formatQuality(photo.quality)],
-          ["Tags", tags.map(t => t.label).join(", ") || "—"],
           ["File Path", photo.path || "—"],
         ].map(([k, v]) => (
           <div key={k}>
@@ -91,6 +93,29 @@ export default function LightboxSidebar({
             <div className="text-xs text-primary break-words mt-0.5 select-text">{v}</div>
           </div>
         ))}
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.06em] text-secondary">
+            Scene Tags
+          </div>
+          {tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {tags.map(t => (
+                <button
+                  key={t.label}
+                  type="button"
+                  onClick={() => onFilterByTag(t.label)}
+                  title={`Filter gallery by "${t.label}"`}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs bg-amber-bg border border-amber/45 text-[11px] font-medium text-amber hover:border-amber hover:bg-amber/20 active:scale-[0.97] transition-all cursor-pointer"
+                >
+                  <Tag className="w-2.5 h-2.5 shrink-0" strokeWidth={1.8} />
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-primary mt-0.5">—</div>
+          )}
+        </div>
       </div>
 
       {activeFace && (
