@@ -194,7 +194,14 @@ def run_checks(settings: Settings, source_dirs: Iterable[Path | str] = ()) -> li
                 "scene tags",
                 "fail" if gone else "ok",
                 f"missing: {', '.join(gone)}" if gone else "model and labels present",
-                f"Put the files in {settings.tag_dir}" if gone else "",
+                (
+                    f"Put {', '.join(gone)} in {settings.tag_dir}. "
+                    "Get a compatible ONNX classifier (e.g. MobileNetV2 from the ONNX Model Zoo) "
+                    "and a matching labels file (one class per line). "
+                    "Or disable scene tagging in Settings \u2192 Scene Tags."
+                )
+                if gone
+                else "",
             )
         )
 
