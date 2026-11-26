@@ -29,6 +29,7 @@ FIND_FILTERS = frozenset(
         "min_quality",
         "burst_id",
         "in_burst",
+        "unassigned_faces",
         "duplicate",
         "mark",
         "no_mark",
