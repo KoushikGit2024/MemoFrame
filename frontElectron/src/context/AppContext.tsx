@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { onBackendEvent, rpc, selectFolder } from "../lib/api";
 import { THEME_FAMILIES, THEME_MAP } from "../lib/themes";
@@ -82,6 +82,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const applyTheme = useCallback((name: string, persist = true) => {
     if (!THEME_MAP[name]) return;
     document.documentElement.setAttribute("data-theme", name);
+    try {
+      localStorage.setItem("memoframe_theme", name);
+    } catch {
+      // ignore storage errors
+    }
     setThemeState(name);
     if (persist) {
       rpc("prefs.set", { key: "theme", value: name }).catch(() => {});
@@ -200,35 +205,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setActiveView("photos");
   }, []);
 
-  const value: AppContextValue = {
-    activeView,
-    setActiveView,
-    theme,
-    applyTheme,
-    toggleLightDark,
-    connected,
-    backendError,
-    workspace,
-    config,
-    setConfig,
-    initBackend,
-    dataVersion,
-    invalidate,
-    selectedPersonId,
-    setSelectedPersonId,
-    galleryExtraFilters,
-    setGalleryExtraFilters,
-    lightboxPhoto,
-    setLightboxPhoto,
-    toasts,
-    notify,
-    scan,
-    startScanFolder,
-    togglePauseScan,
-    cancelScan,
-    openPersonInGallery,
-    openGroupInGallery,
-  };
+  const value = useMemo<AppContextValue>(
+    () => ({
+      activeView,
+      setActiveView,
+      theme,
+      applyTheme,
+      toggleLightDark,
+      connected,
+      backendError,
+      workspace,
+      config,
+      setConfig,
+      initBackend,
+      dataVersion,
+      invalidate,
+      selectedPersonId,
+      setSelectedPersonId,
+      galleryExtraFilters,
+      setGalleryExtraFilters,
+      lightboxPhoto,
+      setLightboxPhoto,
+      toasts,
+      notify,
+      scan,
+      startScanFolder,
+      togglePauseScan,
+      cancelScan,
+      openPersonInGallery,
+      openGroupInGallery,
+    }),
+    [
+      activeView,
+      theme,
+      applyTheme,
+      toggleLightDark,
+      connected,
+      backendError,
+      workspace,
+      config,
+      initBackend,
+      dataVersion,
+      invalidate,
+      selectedPersonId,
+      galleryExtraFilters,
+      lightboxPhoto,
+      toasts,
+      notify,
+      scan,
+      startScanFolder,
+      togglePauseScan,
+      cancelScan,
+      openPersonInGallery,
+      openGroupInGallery,
+    ]
+  );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

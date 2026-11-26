@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Bookmark,
@@ -80,6 +80,7 @@ export default function GalleryView() {
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const loaderRef = useRef(new LatestTask());
+  const lastMetaVersionRef = useRef<number>(-1);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchText.trim()), 300);
@@ -112,20 +113,26 @@ export default function GalleryView() {
     return f;
   }, [galleryExtraFilters, debouncedSearch, minFaces, selectedPersonId, tagFilter, dupFilter]);
 
-  useEffect(() => {
-    setPage(0);
-  }, [
-    debouncedSearch,
-    minFaces,
-    dupFilter,
-    sortKey,
-    tagFilter,
-    selectedPersonId,
-    galleryExtraFilters,
-  ]);
+  const filtersKey = useMemo(
+    () =>
+      JSON.stringify({
+        debouncedSearch,
+        minFaces,
+        selectedPersonId,
+        tagFilter,
+        dupFilter,
+        galleryExtraFilters,
+      }),
+    [debouncedSearch, minFaces, selectedPersonId, tagFilter, dupFilter, galleryExtraFilters]
+  );
 
   useEffect(() => {
-    if (!connected) return;
+    setPage(0);
+  }, [filtersKey, sortKey]);
+
+  useEffect(() => {
+    if (!connected || lastMetaVersionRef.current === dataVersion) return;
+    lastMetaVersionRef.current = dataVersion;
     rpc<PersonRecord[]>("persons.list")
       .then(res => setPersons(res || []))
       .catch(() => {});
@@ -160,7 +167,7 @@ export default function GalleryView() {
         notify(`Load failed: ${err.message}`, "error");
       }
     );
-  }, [connected, buildFilters, sortKey, page, dataVersion, notify, setSelectedPersonId]);
+  }, [connected, filtersKey, sortKey, page, dataVersion, notify, setSelectedPersonId]);
 
   const openSavedMenu = () => {
     const next = !savedMenuOpen;

@@ -216,11 +216,17 @@ def _process_one_inner(task: _Task) -> _Outcome:
         return False, image_id, f"{type(exc).__name__}: {exc}"
 
 
+_gc_counter = 0
+
+
 def _process_one(task: _Task) -> _Outcome:
     """Process one image, then optionally sleep to honour ``cpu_limit``."""
+    global _gc_counter
     start = time.perf_counter()
     outcome = _process_one_inner(task)
-    gc.collect()
+    _gc_counter += 1
+    if _gc_counter % 50 == 0:
+        gc.collect()
     limit = _settings.cpu_limit if _settings else 1.0
     if 0 < limit < 1.0:
         time.sleep((time.perf_counter() - start) * (1.0 / limit - 1.0))

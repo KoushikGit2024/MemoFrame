@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { ImageOff, ScanFace, Star } from "lucide-react";
 import { mediaUrl } from "../lib/api";
 import { basename, formatDate, formatQuality } from "../lib/utils";
@@ -13,7 +13,7 @@ interface PhotoCardProps {
   className?: string;
 }
 
-export default function PhotoCard({
+export default React.memo(function PhotoCard({
   photo,
   compact = false,
   faceZoom = false,
@@ -109,4 +109,4 @@ export default function PhotoCard({
       </div>
     </div>
   );
-}
+});

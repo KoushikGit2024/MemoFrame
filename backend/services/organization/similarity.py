@@ -24,10 +24,7 @@ def compute_phash(pil: Image.Image) -> str:
     block = cv2.dct(grey)[:8, :8]
     median = float(np.median(block.flatten()[1:]))  # ignore the DC term
     bits = (block > median + 1e-3).flatten()  # epsilon keeps flat images stable
-    value = 0
-    for bit in bits:
-        value = (value << 1) | int(bit)
-    return f"{value:016x}"
+    return np.packbits(bits.astype(np.uint8)).tobytes().hex()
 
 
 def parse_phash(text: str | None) -> int | None:

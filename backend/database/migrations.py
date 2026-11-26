@@ -162,6 +162,10 @@ def _v9(conn: sqlite3.Connection) -> str:
     )
 
 
+def _v10(_conn: sqlite3.Connection) -> str:
+    return "CREATE INDEX IF NOT EXISTS idx_marks_id_kind ON marks(image_id, kind);"
+
+
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], str]]] = [
     (1, lambda c: _SCHEMA_V1.read_text(encoding="utf-8")),
     (2, lambda c: _V2),
@@ -172,6 +176,7 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], str]]] = [
     (7, _v7),
     (8, _v8),
     (9, _v9),
+    (10, _v10),
 ]
 LATEST_VERSION = MIGRATIONS[-1][0]
 
