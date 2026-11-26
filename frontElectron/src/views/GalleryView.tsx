@@ -548,11 +548,13 @@ export default function GalleryView() {
         </div>
       </div>
 
-      <PeopleStrip
-        persons={persons}
-        selectedPersonId={selectedPersonId}
-        onSelectPerson={setSelectedPersonId}
-      />
+      {!unusedFacesOnly && (
+        <PeopleStrip
+          persons={persons}
+          selectedPersonId={selectedPersonId}
+          onSelectPerson={setSelectedPersonId}
+        />
+      )}
 
       {items.length === 0 && !loading ? (
         <EmptyState
