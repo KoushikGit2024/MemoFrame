@@ -39,7 +39,8 @@ web_test/
 
 
 # Electron & PyInstaller build outputs
-frontElectron/build-backend/
-frontElectron/build-backend-work/
-frontElectron/release/
-frontElectron/server.spec
+apps/desktop/build-backend/
+apps/desktop/build-backend-work/
+apps/desktop/release/
+apps/desktop/server.spec
+apps/desktop/release

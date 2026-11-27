@@ -4,10 +4,14 @@ version = "1.0.0"
 
 [tool.pyrefly]
 search-path = [
-    "backend",
-    "frontend",
+    "services/engine",
     "."
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["services/engine/tests"]
+pythonpath = ["services/engine"]
+addopts = -q
 
 [tool.ruff]
 line-length = 100
@@ -21,24 +25,14 @@ exclude = [
     "workspace",
     "ws_*",
     "smoke_*",
-    "frontElectron"
+    "apps/desktop"
 ]
 
 [tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "UP",  # pyupgrade
-    "B",   # flake8-bugbear
-]
-ignore = [
-    "E501",  # line length handled by ruff format / soft enforcement
-    "E402",  # module level import not at top of file (sys.path manipulation required before imports)
-]
+select = ["E", "W", "F", "UP", "B"]
+ignore = ["E501", "E402"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
-

@@ -1,0 +1,678 @@
+@import "tailwindcss";
+
+@theme {
+  --color-app: var(--bg-app);
+  --color-sidebar: var(--bg-sidebar);
+  --color-card: var(--bg-card);
+  --color-elevated: var(--bg-elevated);
+  --color-input: var(--bg-input);
+  --color-hairline: var(--border);
+  --color-subtle: var(--border-subtle);
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-light: var(--accent-light);
+  --color-accent-text: var(--accent-text);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-accent-secondary-hover: var(--accent-secondary-hover);
+  --color-accent-secondary-light: var(--accent-secondary-light);
+  --color-violet: var(--violet);
+  --color-violet-hover: var(--violet-hover);
+  --color-violet-bg: var(--violet-bg);
+  --color-violet-text: var(--violet-text);
+  --color-amber: var(--amber);
+  --color-amber-hover: var(--amber-hover);
+  --color-amber-bg: var(--amber-bg);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-text: var(--danger-text);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-text: var(--success-text);
+  --color-badge: var(--badge-bg);
+
+  /* Controlled, comfortable roundness (not ultra-sharp 2px, not bubbly pills) */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 6px;
+}
+
+/* ==========================================================================
+   1. Studio Graphite — Terracotta · Teal · Cobalt · Marigold
+   ========================================================================== */
+
+:root,
+html[data-theme="Dark Slate"],
+html[data-theme="Nordic Slate Dark"],
+html[data-theme="Studio Graphite Dark"] {
+  --bg-app: #0d1014;
+  --bg-sidebar: #090c10;
+  --bg-card: #151a21;
+  --bg-elevated: #1e2530;
+  --bg-input: #0e1319;
+  --border: #2b3544;
+  --border-subtle: #1f2733;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --accent: #e85d3f;
+  --accent-hover: #f27457;
+  --accent-light: rgba(232, 93, 63, 0.16);
+  --accent-text: #ffffff;
+  --accent-secondary: #14b8a6;
+  --accent-secondary-hover: #2dd4bf;
+  --accent-secondary-light: rgba(20, 184, 166, 0.16);
+  --violet: #818cf8;
+  --violet-hover: #a5b4fc;
+  --violet-bg: rgba(129, 140, 248, 0.16);
+  --violet-text: #ffffff;
+  --amber: #eab308;
+  --amber-hover: #facc15;
+  --amber-bg: rgba(234, 179, 8, 0.16);
+  --danger: #f43f5e;
+  --danger-hover: #fb7185;
+  --danger-bg: rgba(244, 63, 94, 0.16);
+  --danger-text: #ffffff;
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.16);
+  --success-text: #ffffff;
+  --badge-bg: #1c2430;
+}
+
+html[data-theme="Light Canvas"],
+html[data-theme="Nordic Slate Light"],
+html[data-theme="Studio Graphite Light"] {
+  --bg-app: #f4f5f7;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #eceff4;
+  --bg-input: #f8f9fb;
+  --border: #cfd6e0;
+  --border-subtle: #e2e7ee;
+  --text-primary: #111827;
+  --text-secondary: #526071;
+  --accent: #d9482a;
+  --accent-hover: #b8371c;
+  --accent-light: rgba(217, 72, 42, 0.11);
+  --accent-text: #ffffff;
+  --accent-secondary: #0f766e;
+  --accent-secondary-hover: #115e59;
+  --accent-secondary-light: rgba(15, 118, 110, 0.11);
+  --violet: #4f46e5;
+  --violet-hover: #4338ca;
+  --violet-bg: rgba(79, 70, 229, 0.11);
+  --amber: #ca8a04;
+  --amber-hover: #a16207;
+  --amber-bg: rgba(202, 138, 4, 0.12);
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --success: #15803d;
+  --success-bg: rgba(21, 128, 61, 0.1);
+  --badge-bg: #e9edf3;
+}
+
+/* ==========================================================================
+   2. Kyoto Ink — Vermilion Crimson · Jade Matcha · Persimmon · Iris
+   ========================================================================== */
+
+html[data-theme="Obsidian Rose Dark"],
+html[data-theme="Kyoto Ink Dark"] {
+  --bg-app: #121010;
+  --bg-sidebar: #0c0a0a;
+  --bg-card: #1b1817;
+  --bg-elevated: #262220;
+  --bg-input: #141110;
+  --border: #3a3330;
+  --border-subtle: #282321;
+  --text-primary: #f8f4f0;
+  --text-secondary: #b0a39a;
+  --accent: #f43f5e;
+  --accent-hover: #fb7185;
+  --accent-light: rgba(244, 63, 94, 0.16);
+  --accent-text: #ffffff;
+  --accent-secondary: #2dd4bf;
+  --accent-secondary-hover: #5eead4;
+  --accent-secondary-light: rgba(45, 212, 191, 0.15);
+  --violet: #c084fc;
+  --violet-hover: #d8b4fe;
+  --violet-bg: rgba(192, 132, 252, 0.15);
+  --amber: #f59e0b;
+  --amber-hover: #fbbf24;
+  --amber-bg: rgba(245, 158, 11, 0.16);
+  --danger: #ef4444;
+  --danger-hover: #f87171;
+  --danger-bg: rgba(239, 68, 68, 0.16);
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.15);
+  --badge-bg: #26211f;
+}
+
+html[data-theme="Obsidian Rose Light"],
+html[data-theme="Kyoto Ink Light"] {
+  --bg-app: #faf7f4;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #f1eae3;
+  --bg-input: #fdfbf9;
+  --border: #dfd4c9;
+  --border-subtle: #ece4dc;
+  --text-primary: #1f1715;
+  --text-secondary: #685850;
+  --accent: #be123c;
+  --accent-hover: #9f1239;
+  --accent-light: rgba(190, 18, 60, 0.1);
+  --accent-text: #ffffff;
+  --accent-secondary: #0d9488;
+  --accent-secondary-hover: #0f766e;
+  --accent-secondary-light: rgba(13, 148, 136, 0.11);
+  --violet: #7e22ce;
+  --violet-hover: #6b21a8;
+  --violet-bg: rgba(126, 34, 206, 0.1);
+  --amber: #d97706;
+  --amber-hover: #b45309;
+  --amber-bg: rgba(217, 119, 6, 0.11);
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --success: #047857;
+  --success-bg: rgba(4, 120, 87, 0.1);
+  --badge-bg: #f1eae3;
+}
+
+/* ==========================================================================
+   3. Bauhaus Signal — International Cobalt · Signal Vermilion · Cadmium · Emerald
+   ========================================================================== */
+
+html[data-theme="Neon Cyberpunk Dark"],
+html[data-theme="Bauhaus Signal Dark"] {
+  --bg-app: #0f1115;
+  --bg-sidebar: #0a0c0f;
+  --bg-card: #171b22;
+  --bg-elevated: #212732;
+  --bg-input: #11151b;
+  --border: #313a49;
+  --border-subtle: #232a36;
+  --text-primary: #f8fafc;
+  --text-secondary: #9aa5b6;
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-light: rgba(59, 130, 246, 0.17);
+  --accent-text: #ffffff;
+  --accent-secondary: #f97316;
+  --accent-secondary-hover: #fb923c;
+  --accent-secondary-light: rgba(249, 115, 22, 0.16);
+  --violet: #a78bfa;
+  --violet-hover: #c4b5fd;
+  --violet-bg: rgba(167, 139, 250, 0.16);
+  --amber: #facc15;
+  --amber-hover: #fde047;
+  --amber-bg: rgba(250, 204, 21, 0.16);
+  --danger: #fb7185;
+  --danger-hover: #fda4af;
+  --danger-bg: rgba(251, 113, 133, 0.16);
+  --success: #34d399;
+  --success-bg: rgba(52, 211, 153, 0.15);
+  --badge-bg: #202733;
+}
+
+html[data-theme="Neon Cyberpunk Light"],
+html[data-theme="Bauhaus Signal Light"] {
+  --bg-app: #f6f7f9;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #ebedf2;
+  --bg-input: #fafbfc;
+  --border: #cfd5df;
+  --border-subtle: #e3e7ee;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-light: rgba(29, 78, 216, 0.11);
+  --accent-text: #ffffff;
+  --accent-secondary: #ea580c;
+  --accent-secondary-hover: #c2410c;
+  --accent-secondary-light: rgba(234, 88, 12, 0.11);
+  --violet: #6d28d9;
+  --violet-hover: #5b21b6;
+  --violet-bg: rgba(109, 40, 217, 0.1);
+  --amber: #ca8a04;
+  --amber-hover: #a16207;
+  --amber-bg: rgba(202, 138, 4, 0.12);
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --success: #059669;
+  --success-bg: rgba(5, 150, 105, 0.1);
+  --badge-bg: #ebedf2;
+}
+
+/* ==========================================================================
+   4. Botanical Copper — Burnished Copper · Pine Teal · Berry Rose · Sage
+   ========================================================================== */
+
+html[data-theme="Emerald Forest"],
+html[data-theme="Alpine Emerald Dark"],
+html[data-theme="Botanical Copper Dark"] {
+  --bg-app: #0c1210;
+  --bg-sidebar: #080d0b;
+  --bg-card: #131d19;
+  --bg-elevated: #1c2a24;
+  --bg-input: #0e1613;
+  --border: #2a3e35;
+  --border-subtle: #1e2e27;
+  --text-primary: #eef6f2;
+  --text-secondary: #92aba0;
+  --accent: #f59e0b;
+  --accent-hover: #fbbf24;
+  --accent-light: rgba(245, 158, 11, 0.16);
+  --accent-text: #111111;
+  --accent-secondary: #14b8a6;
+  --accent-secondary-hover: #2dd4bf;
+  --accent-secondary-light: rgba(20, 184, 166, 0.16);
+  --violet: #f472b6;
+  --violet-hover: #f9a8d4;
+  --violet-bg: rgba(244, 114, 182, 0.16);
+  --amber: #eab308;
+  --amber-hover: #facc15;
+  --amber-bg: rgba(234, 179, 8, 0.16);
+  --danger: #fb7185;
+  --danger-hover: #fda4af;
+  --danger-bg: rgba(251, 113, 133, 0.16);
+  --success: #4ade80;
+  --success-bg: rgba(74, 222, 128, 0.15);
+  --badge-bg: #192822;
+}
+
+html[data-theme="Alpine Emerald Light"],
+html[data-theme="Botanical Copper Light"] {
+  --bg-app: #f3f7f4;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #e4efe8;
+  --bg-input: #f9fcfa;
+  --border: #bfd6c8;
+  --border-subtle: #dae9df;
+  --text-primary: #0f291c;
+  --text-secondary: #3f6652;
+  --accent: #b45309;
+  --accent-hover: #92400e;
+  --accent-light: rgba(180, 83, 9, 0.11);
+  --accent-text: #ffffff;
+  --accent-secondary: #0f766e;
+  --accent-secondary-hover: #115e59;
+  --accent-secondary-light: rgba(15, 118, 110, 0.11);
+  --violet: #be185d;
+  --violet-hover: #9d174d;
+  --violet-bg: rgba(190, 24, 93, 0.1);
+  --amber: #ca8a04;
+  --amber-hover: #a16207;
+  --amber-bg: rgba(202, 138, 4, 0.12);
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --success: #15803d;
+  --success-bg: rgba(21, 128, 61, 0.11);
+  --badge-bg: #e4efe8;
+}
+
+/* ==========================================================================
+   5. Desert Ochre — Burnt Sienna · Cerulean Sky · Olive Moss · Amber
+   ========================================================================== */
+
+html[data-theme="Cyber Amber"],
+html[data-theme="Solar Flare Dark"],
+html[data-theme="Desert Ochre Dark"] {
+  --bg-app: #14110e;
+  --bg-sidebar: #0e0c0a;
+  --bg-card: #1e1915;
+  --bg-elevated: #2a231d;
+  --bg-input: #16120f;
+  --border: #3f352c;
+  --border-subtle: #2d261f;
+  --text-primary: #faf5ef;
+  --text-secondary: #b4a393;
+  --accent: #f97316;
+  --accent-hover: #fb923c;
+  --accent-light: rgba(249, 115, 22, 0.17);
+  --accent-text: #111111;
+  --accent-secondary: #38bdf8;
+  --accent-secondary-hover: #7dd3fc;
+  --accent-secondary-light: rgba(56, 189, 248, 0.16);
+  --violet: #a3e635;
+  --violet-hover: #bef264;
+  --violet-bg: rgba(163, 230, 53, 0.15);
+  --amber: #fbbf24;
+  --amber-hover: #fcd34d;
+  --amber-bg: rgba(251, 191, 36, 0.16);
+  --danger: #f87171;
+  --danger-hover: #fca5a5;
+  --danger-bg: rgba(248, 113, 113, 0.16);
+  --success: #4ade80;
+  --success-bg: rgba(74, 222, 128, 0.15);
+  --badge-bg: #29221c;
+}
+
+html[data-theme="Solar Flare Light"],
+html[data-theme="Desert Ochre Light"] {
+  --bg-app: #fbf8f3;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #f3eadc;
+  --bg-input: #fdfbf8;
+  --border: #dfd0ba;
+  --border-subtle: #eee4d5;
+  --text-primary: #291c0e;
+  --text-secondary: #6e573e;
+  --accent: #c2410c;
+  --accent-hover: #9a3412;
+  --accent-light: rgba(194, 65, 12, 0.11);
+  --accent-text: #ffffff;
+  --accent-secondary: #0284c7;
+  --accent-secondary-hover: #0369a1;
+  --accent-secondary-light: rgba(2, 132, 199, 0.11);
+  --violet: #4d7c0f;
+  --violet-hover: #3f6212;
+  --violet-bg: rgba(77, 124, 15, 0.11);
+  --amber: #b45309;
+  --amber-hover: #92400e;
+  --amber-bg: rgba(180, 83, 9, 0.11);
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --success: #15803d;
+  --success-bg: rgba(21, 128, 61, 0.1);
+  --badge-bg: #f3eadc;
+}
+
+/* ==========================================================================
+   6. Nordic Fjord — Glacier Blue · Coral Sunset · Honey Amber · Seafoam
+   ========================================================================== */
+
+html[data-theme="Midnight Purple"],
+html[data-theme="Vapor Wave Dark"],
+html[data-theme="Nordic Fjord Dark"] {
+  --bg-app: #0b1218;
+  --bg-sidebar: #070d12;
+  --bg-card: #131e28;
+  --bg-elevated: #1c2b38;
+  --bg-input: #0e1720;
+  --border: #2a3e50;
+  --border-subtle: #1d2d3b;
+  --text-primary: #f0f6fb;
+  --text-secondary: #90a7bc;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --accent-light: rgba(56, 189, 248, 0.16);
+  --accent-text: #061826;
+  --accent-secondary: #fb7185;
+  --accent-secondary-hover: #fda4af;
+  --accent-secondary-light: rgba(251, 113, 133, 0.16);
+  --violet: #fbbf24;
+  --violet-hover: #fcd34d;
+  --violet-bg: rgba(251, 191, 36, 0.16);
+  --amber: #f59e0b;
+  --amber-hover: #fbbf24;
+  --amber-bg: rgba(245, 158, 11, 0.16);
+  --danger: #f43f5e;
+  --danger-hover: #fb7185;
+  --danger-bg: rgba(244, 63, 94, 0.16);
+  --success: #34d399;
+  --success-bg: rgba(52, 211, 153, 0.15);
+  --badge-bg: #1a2835;
+}
+
+html[data-theme="Vapor Wave Light"],
+html[data-theme="Nordic Fjord Light"] {
+  --bg-app: #f3f6fa;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #e5edf5;
+  --bg-input: #f8fafd;
+  --border: #c5d4e4;
+  --border-subtle: #dce6f0;
+  --text-primary: #0f2030;
+  --text-secondary: #4a6278;
+  --accent: #0369a1;
+  --accent-hover: #075985;
+  --accent-light: rgba(3, 105, 161, 0.11);
+  --accent-text: #ffffff;
+  --accent-secondary: #e11d48;
+  --accent-secondary-hover: #be123c;
+  --accent-secondary-light: rgba(225, 29, 72, 0.1);
+  --violet: #b45309;
+  --violet-hover: #92400e;
+  --violet-bg: rgba(180, 83, 9, 0.11);
+  --amber: #d97706;
+  --amber-hover: #b45309;
+  --amber-bg: rgba(217, 119, 6, 0.11);
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --success: #059669;
+  --success-bg: rgba(5, 150, 105, 0.1);
+  --badge-bg: #e5edf5;
+}
+
+/* Scrollbars */
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Shimmer */
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-shimmer::after {
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.06) 35%,
+    rgba(255, 255, 255, 0.13) 50%,
+    rgba(255, 255, 255, 0.06) 65%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.6s infinite ease-in-out;
+  content: "";
+}
+
+/* Semantic Button Components */
+
+@layer components {
+  .btn-primary,
+  .btn-secondary,
+  .btn-neutral,
+  .btn-danger,
+  .btn-success,
+  .btn-warning,
+  .btn-tertiary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-radius: var(--radius-xs);
+    border-width: 1px;
+    border-style: solid;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease, transform 150ms ease;
+  }
+
+  .btn-primary:disabled,
+  .btn-secondary:disabled,
+  .btn-neutral:disabled,
+  .btn-danger:disabled,
+  .btn-success:disabled,
+  .btn-warning:disabled,
+  .btn-tertiary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .btn-primary:focus-visible,
+  .btn-secondary:focus-visible,
+  .btn-neutral:focus-visible,
+  .btn-danger:focus-visible,
+  .btn-success:focus-visible,
+  .btn-warning:focus-visible,
+  .btn-tertiary:focus-visible {
+    outline: 2px solid var(--accent-secondary);
+    outline-offset: 1px;
+  }
+
+  .btn-primary {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+  .btn-primary:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  .btn-secondary {
+    background-color: var(--accent-secondary-light);
+    border-color: var(--accent-secondary);
+    color: var(--accent-secondary);
+  }
+  .btn-secondary:hover {
+    background-color: var(--accent-secondary);
+    color: var(--accent-text);
+  }
+
+  .btn-neutral {
+    background-color: var(--bg-card);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+  .btn-neutral:hover {
+    background-color: var(--bg-elevated);
+    border-color: var(--text-secondary);
+  }
+
+  .btn-danger {
+    background-color: var(--danger-bg);
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .btn-danger:hover {
+    background-color: var(--danger);
+    color: var(--danger-text);
+  }
+
+  .btn-success {
+    background-color: var(--success-bg);
+    border-color: var(--success);
+    color: var(--success);
+  }
+  .btn-success:hover {
+    background-color: var(--success);
+    color: var(--success-text);
+  }
+
+  .btn-warning {
+    background-color: var(--amber-bg);
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+  .btn-warning:hover {
+    background-color: var(--amber);
+    color: #111111;
+  }
+
+  .btn-tertiary {
+    background-color: var(--violet-bg);
+    border-color: var(--violet);
+    color: var(--violet);
+  }
+  .btn-tertiary:hover {
+    background-color: var(--violet);
+    color: var(--violet-text);
+  }
+}
+
+/* Reduced Motion & UI Density Preferences */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+html[data-density="compact"] {
+  font-size: 14.5px;
+}
+
+/* Smooth Onboarding & Modal Entrance Animations */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes introUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 180ms ease-out both;
+}
+
+.animate-modal-in {
+  animation: modalIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-intro-up {
+  animation: introUp 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}

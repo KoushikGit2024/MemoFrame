@@ -1,0 +1,73 @@
+name: Release Windows Installer
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-installer:
+    name: Build & Package MemoFrame Windows .exe (NSIS)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install Python engine & PyInstaller dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r services/engine/requirements-dev.txt pyinstaller
+
+      - name: Run Python test suite gate
+        working-directory: services/engine
+        run: pytest tests -rs
+
+      - name: Install desktop dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Build React/Vite + PyInstaller server.exe + NSIS .exe installer
+        working-directory: apps/desktop
+        run: npm run package
+
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        working-directory: apps/desktop/release
+        run: |
+          Get-ChildItem -Filter "*.exe" | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)"
+          } | Out-File -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+
+      - name: Upload installer build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: memoframe-windows-installer
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/SHA256SUMS.txt
+          retention-days: 30
+
+      - name: Publish GitHub Release (on version tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/SHA256SUMS.txt

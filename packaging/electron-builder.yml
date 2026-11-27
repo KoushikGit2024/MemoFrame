@@ -1,0 +1,31 @@
+appId: com.memoframe.desktop
+productName: MemoFrame
+directories:
+  output: release
+files:
+  - dist/**/*
+  - electron/**/*
+  - public/logo.ico
+  - public/logo.png
+  - package.json
+win:
+  icon: public/logo.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: "${productName}-Setup-${version}-${arch}.${ext}"
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: MemoFrame
+  uninstallDisplayName: MemoFrame
+  deleteAppDataOnUninstall: false
+extraResources:
+  - from: build-backend/server
+    to: bridge-bin
+    filter:
+      - "**/*"
