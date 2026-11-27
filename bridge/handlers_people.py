@@ -125,6 +125,14 @@ def register_people_handlers(registry: dict[str, Any], ctx: Any) -> None:
             count = eng.confirm_person(person_id)
         return {"person_id": person_id, "confirmed": int(count or 0)}
 
+    def persons_set_cover(params: dict[str, Any]) -> dict[str, Any]:
+        person_id = int(params["person_id"])
+        face_id = int(params["face_id"])
+        eng = ctx.require_engine()
+        with ctx.lock:
+            ok = eng.set_person_cover(person_id, face_id)
+        return {"person_id": person_id, "face_id": face_id, "updated": bool(ok)}
+
     def faces_for_person(params: dict[str, Any]) -> list[dict[str, Any]]:
         person_id = params.get("person_id")
         limit = max(1, min(200, int(params.get("limit") or 60)))
@@ -151,6 +159,13 @@ def register_people_handlers(registry: dict[str, Any], ctx: Any) -> None:
         with ctx.lock:
             eng.assign_face(face_id, person_id)
         return {"face_id": face_id, "person_id": person_id}
+
+    def faces_discard(params: dict[str, Any]) -> dict[str, Any]:
+        face_id = int(params["face_id"])
+        eng = ctx.require_engine()
+        with ctx.lock:
+            discarded = eng.discard_face(face_id)
+        return {"face_id": face_id, "discarded": bool(discarded)}
 
     def faces_crop(params: dict[str, Any]) -> dict[str, Any]:
         """Crop a face bounding box from disk via Pillow and return as JPEG data URL."""
@@ -188,9 +203,11 @@ def register_people_handlers(registry: dict[str, Any], ctx: Any) -> None:
             "persons.rename": persons_rename,
             "persons.merge": persons_merge,
             "persons.confirm": persons_confirm,
+            "persons.set_cover": persons_set_cover,
             "faces.list": faces_for_person,
             "faces.name": faces_name,
             "faces.assign": faces_assign,
+            "faces.discard": faces_discard,
             "faces.crop": faces_crop,
         }
     )

@@ -92,7 +92,7 @@ class OrganizationDbMixin:
         return self._query(
             "SELECT f.*, p.name AS person_name FROM faces f "
             "LEFT JOIN persons p ON p.id = f.person_id "
-            "WHERE f.image_id = ? ORDER BY f.id",
+            "WHERE f.image_id = ? AND f.ignored = 0 ORDER BY f.id",
             (image_id,),
         )
 
@@ -109,7 +109,7 @@ class OrganizationDbMixin:
                 "SELECT f.id, f.image_id, f.person_id, f.label, f.x, f.y, f.w, f.h, "
                 "f.confidence, f.crop_path, f.locked, p.name AS person_name "
                 "FROM faces f LEFT JOIN persons p ON p.id = f.person_id "
-                f"WHERE f.image_id IN ({marks}) ORDER BY f.image_id, f.id",
+                f"WHERE f.image_id IN ({marks}) AND f.ignored = 0 ORDER BY f.image_id, f.id",
                 part,
             )
             for r in rows:

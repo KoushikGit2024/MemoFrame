@@ -133,6 +133,29 @@ class PersonEngineMixin:
 
         return _impl()
 
+    def discard_face(self, face_id: int) -> bool:
+        """Mark a detected face as not-a-face (ignored) and update counts."""
+        from engine.api import _translated
+
+        @_translated
+        def _impl():
+            ok = self.db.discard_face(face_id)
+            if ok:
+                self._people_changed()
+            return ok
+
+        return _impl()
+
+    def set_person_cover(self, person_id: int, face_id: int) -> bool:
+        """Set a person's default (cover) face."""
+        from engine.api import _translated
+
+        @_translated
+        def _impl():
+            return self.db.set_person_cover(person_id, face_id)
+
+        return _impl()
+
     def name_face(self, face_id: int, name: str) -> int:
         """Name a single face."""
         from engine.api import _translated

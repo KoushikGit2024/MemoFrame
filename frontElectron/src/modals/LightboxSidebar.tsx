@@ -1,5 +1,7 @@
+import { useState } from "react";
 import {
   Calendar,
+  ChevronDown,
   ExternalLink,
   Eye,
   EyeOff,
@@ -10,8 +12,10 @@ import {
   Sparkles,
   Star,
   Tag,
+  User,
   ZoomIn,
 } from "lucide-react";
+import { mediaUrl } from "../lib/api";
 import { formatDate, formatDims, formatQuality } from "../lib/utils";
 import type { FaceRecord, PersonRecord, PhotoRecord, TagRecord } from "../types/memoframe";
 
@@ -27,12 +31,16 @@ export interface LightboxSidebarProps {
   persons: PersonRecord[];
   savingFaceName: boolean;
   assigningFace: boolean;
+  discardingFace: boolean;
+  settingDefaultFace?: boolean;
   togglingMark: "favourite" | "hidden" | null;
   restoringDate: boolean;
   openingDefaultApp: boolean;
   onZoomToFace: (face: FaceRecord) => void;
   onNameFace: () => void;
   onAssignFace: (personId: number | null) => void;
+  onDiscardFace: (faceId: number) => void;
+  onSetDefaultFace?: (personId: number, faceId: number) => void;
   onCloseActiveFace: () => void;
   onToggleMark: (mark: "favourite" | "hidden") => void;
   onShowDateModal: () => void;
@@ -56,12 +64,16 @@ export default function LightboxSidebar({
   persons,
   savingFaceName,
   assigningFace,
+  discardingFace,
+  settingDefaultFace = false,
   togglingMark,
   restoringDate,
   openingDefaultApp,
   onZoomToFace,
   onNameFace,
   onAssignFace,
+  onDiscardFace,
+  onSetDefaultFace,
   onCloseActiveFace,
   onToggleMark,
   onShowDateModal,
@@ -74,16 +86,34 @@ export default function LightboxSidebar({
 }: LightboxSidebarProps) {
   const isFav = marks.includes("favourite");
   const isHidden = marks.includes("hidden");
+  const [personMenuOpen, setPersonMenuOpen] = useState(false);
 
   return (
-    <aside className="w-[300px] shrink-0 border-l border-subtle bg-card p-3.5 flex flex-col gap-3 overflow-y-auto">
-      <div className="flex flex-col gap-2.5 flex-1">
+    <aside className="w-[300px] shrink-0 border-l border-subtle bg-card p-3.5 flex flex-col gap-3 overflow-hidden">
+      <div className="flex flex-col gap-2.5 flex-1 min-h-0 overflow-y-auto pr-1 pb-1">
         {[
           ["Date Taken", formatDate(photo.effective_ts || photo.exif_ts)],
+          ["Date Source", photo.ts_source || "—"],
           ["Resolution", formatDims(photo.width, photo.height)],
+          [
+            "File Size",
+            photo.size != null
+              ? photo.size >= 1024 * 1024
+                ? `${(photo.size / (1024 * 1024)).toFixed(2)} MB`
+                : `${(photo.size / 1024).toFixed(1)} KB`
+              : "—",
+          ],
           ["Format", String(photo.format || "Unknown").toUpperCase()],
           ["Faces Detected", String(faces.length)],
           ["Quality Score", formatQuality(photo.quality)],
+          ...(photo.sharpness != null ? [["Sharpness", photo.sharpness.toFixed(1)]] : []),
+          ...(photo.brightness != null ? [["Brightness", photo.brightness.toFixed(1)]] : []),
+          ...(photo.duration_s != null ? [["Duration", `${photo.duration_s.toFixed(1)}s`]] : []),
+          ...(photo.place ? [["Place", photo.place]] : []),
+          ...(photo.gps_lat != null && photo.gps_lon != null
+            ? [["GPS", `${photo.gps_lat.toFixed(5)}, ${photo.gps_lon.toFixed(5)}`]]
+            : []),
+          ...(photo.sha256 ? [["SHA-256", `${photo.sha256.slice(0, 16)}…`]] : []),
           ["File Path", photo.path || "—"],
         ].map(([k, v]) => (
           <div key={k}>
@@ -155,32 +185,78 @@ export default function LightboxSidebar({
             </button>
           </div>
           {persons.length > 0 && (
-            <select
-              defaultValue=""
-              disabled={assigningFace}
-              onChange={e => {
-                if (e.target.value) onAssignFace(Number(e.target.value));
-              }}
-              className="h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-violet disabled:opacity-50"
-            >
-              <option value="">
-                {assigningFace ? "Assigning..." : "Assign to existing person..."}
-              </option>
-              {persons.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.image_count || 0})
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <button
+                type="button"
+                disabled={assigningFace}
+                onClick={() => setPersonMenuOpen(o => !o)}
+                className="w-full h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary flex items-center justify-between gap-1.5 hover:border-violet/60 focus:outline-none focus:border-violet disabled:opacity-50 cursor-pointer"
+              >
+                <span className="truncate">
+                  {assigningFace ? "Assigning..." : "Assign to existing person..."}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-secondary shrink-0" />
+              </button>
+              {personMenuOpen && (
+                <div className="absolute left-0 right-0 top-8 z-30 max-h-48 overflow-y-auto bg-card border border-hairline rounded-xs shadow-lg py-1 flex flex-col">
+                  {persons.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setPersonMenuOpen(false);
+                        onAssignFace(p.id);
+                      }}
+                      className="w-full px-2 py-1.5 text-left text-xs text-primary hover:bg-elevated flex items-center gap-2 cursor-pointer"
+                    >
+                      {p.cover_crop_path ? (
+                        <img
+                          src={mediaUrl(p.cover_crop_path)}
+                          alt={p.name}
+                          className="w-5 h-5 rounded-full object-cover shrink-0 border border-subtle"
+                        />
+                      ) : (
+                        <span className="w-5 h-5 rounded-full bg-input border border-subtle flex items-center justify-center shrink-0">
+                          <User className="w-3 h-3 text-secondary" />
+                        </span>
+                      )}
+                      <span className="truncate flex-1">{p.name}</span>
+                      <span className="text-[10.5px] font-mono text-secondary shrink-0">
+                        {p.image_count || 0}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
-          <div className="flex justify-between">
+          {activeFace.person_id != null && onSetDefaultFace && (
             <button
               type="button"
-              disabled={assigningFace}
+              disabled={settingDefaultFace}
+              onClick={() => onSetDefaultFace(activeFace.person_id as number, activeFace.id)}
+              className="w-full h-7 px-2 inline-flex items-center justify-center gap-1.5 rounded-xs border border-violet/50 bg-violet/10 text-xs font-medium text-violet hover:bg-violet/20 disabled:opacity-50 cursor-pointer"
+            >
+              <span>{settingDefaultFace ? "Setting default..." : "Set as Default Face"}</span>
+            </button>
+          )}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              disabled={assigningFace || discardingFace}
               onClick={() => onAssignFace(null)}
               className="text-xs text-danger hover:underline disabled:opacity-50 cursor-pointer"
             >
               {assigningFace ? "Updating..." : "Remove from person"}
+            </button>
+            <button
+              type="button"
+              disabled={assigningFace || discardingFace}
+              onClick={() => onDiscardFace(activeFace.id)}
+              title="Discard this detection completely (not a face)"
+              className="text-xs text-danger font-medium hover:underline disabled:opacity-50 cursor-pointer"
+            >
+              {discardingFace ? "Discarding..." : "Not a Face"}
             </button>
             <button
               type="button"
@@ -198,9 +274,9 @@ export default function LightboxSidebar({
           type="button"
           disabled={togglingMark !== null}
           onClick={() => onToggleMark("favourite")}
-          className={`h-8 px-3 inline-flex items-center justify-center gap-1.5 rounded-xs border text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer ${
+          className={`h-8 px-3 inline-flex items-center justify-center gap-1.5 rounded-xs border text-xs font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer ${
             isFav
-              ? "bg-amber-bg border-amber text-amber font-semibold"
+              ? "bg-amber-bg border-amber text-amber font-semibold hover:bg-amber/20"
               : "bg-elevated border-hairline text-primary hover:border-amber/60 hover:text-amber"
           }`}
         >
@@ -217,7 +293,7 @@ export default function LightboxSidebar({
           type="button"
           disabled={togglingMark !== null}
           onClick={() => onToggleMark("hidden")}
-          className="btn-neutral h-8 px-3 text-xs"
+          className="btn-neutral h-8 px-3 text-xs inline-flex items-center justify-center gap-1.5 transition-all duration-150 hover:bg-elevated hover:border-accent-secondary/50 active:scale-[0.98] cursor-pointer"
         >
           {isHidden ? (
             <Eye className="w-3.5 h-3.5" strokeWidth={1.6} />
@@ -229,30 +305,42 @@ export default function LightboxSidebar({
           </span>
         </button>
         <div className="grid grid-cols-2 gap-1.5">
-          <button type="button" onClick={onShowDateModal} className="btn-neutral h-8 px-2 text-xs">
-            <Calendar className="w-3.5 h-3.5 text-amber" strokeWidth={1.6} />
+          <button
+            type="button"
+            onClick={onShowDateModal}
+            className="btn-neutral h-8 px-2 text-xs inline-flex items-center justify-center gap-1.5 transition-all duration-150 hover:bg-elevated hover:border-amber/50 active:scale-[0.98] cursor-pointer"
+          >
+            <Calendar className="w-3.5 h-3.5 text-amber shrink-0" strokeWidth={1.6} />
             <span>Correct Date</span>
           </button>
           <button
             type="button"
             disabled={restoringDate}
             onClick={onRestoreDate}
-            className="btn-neutral h-8 px-2 text-xs"
+            className="btn-neutral h-8 px-2 text-xs inline-flex items-center justify-center gap-1.5 transition-all duration-150 hover:bg-elevated hover:border-accent-secondary/50 active:scale-[0.98] cursor-pointer"
           >
             <RotateCcw
-              className={`w-3.5 h-3.5 ${restoringDate ? "animate-spin" : ""}`}
+              className={`w-3.5 h-3.5 shrink-0 ${restoringDate ? "animate-spin" : ""}`}
               strokeWidth={1.6}
             />
             <span>{restoringDate ? "Restoring..." : "Restore"}</span>
           </button>
         </div>
-        <button type="button" onClick={onShowSimilar} className="btn-secondary h-8 px-3 text-xs">
-          <Sparkles className="w-3.5 h-3.5" strokeWidth={1.6} />
+        <button
+          type="button"
+          onClick={onShowSimilar}
+          className="btn-secondary h-8 px-3 text-xs inline-flex items-center justify-center gap-1.5 transition-all duration-150 hover:bg-elevated hover:border-accent-secondary/70 hover:text-accent-secondary active:scale-[0.98] cursor-pointer"
+        >
+          <Sparkles className="w-3.5 h-3.5 shrink-0" strokeWidth={1.6} />
           <span>Find Similar</span>
         </button>
         {liveVideo && (
-          <button type="button" onClick={onShowLive} className="btn-primary h-8 px-3 text-xs">
-            <Play className="w-3.5 h-3.5" strokeWidth={1.7} />
+          <button
+            type="button"
+            onClick={onShowLive}
+            className="btn-primary h-8 px-3 text-xs inline-flex items-center justify-center gap-1.5 transition-all duration-150 hover:brightness-110 active:scale-[0.98] cursor-pointer"
+          >
+            <Play className="w-3.5 h-3.5 shrink-0" strokeWidth={1.7} />
             <span>Play Live Photo</span>
           </button>
         )}
@@ -262,21 +350,21 @@ export default function LightboxSidebar({
               type="button"
               disabled={openingDefaultApp}
               onClick={onOpenInDefaultApp}
-              className="btn-neutral h-8 px-2 text-xs"
+              className="btn-neutral h-8 px-2 text-xs inline-flex items-center justify-center gap-1.5 transition-all duration-150 hover:bg-elevated hover:border-accent-secondary/50 active:scale-[0.98] cursor-pointer"
             >
               {openingDefaultApp ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary shrink-0" />
               ) : (
-                <ExternalLink className="w-3.5 h-3.5" strokeWidth={1.6} />
+                <ExternalLink className="w-3.5 h-3.5 shrink-0" strokeWidth={1.6} />
               )}
               <span>Default App</span>
             </button>
             <button
               type="button"
               onClick={() => onRevealInFolder(photo.path as string)}
-              className="btn-neutral h-8 px-2 text-xs text-secondary hover:text-primary"
+              className="btn-neutral h-8 px-2 text-xs text-secondary hover:text-primary inline-flex items-center justify-center gap-1.5 transition-all duration-150 hover:bg-elevated hover:border-accent-secondary/50 active:scale-[0.98] cursor-pointer"
             >
-              <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <FolderOpen className="w-3.5 h-3.5 shrink-0" strokeWidth={1.6} />
               <span>In Folder</span>
             </button>
           </div>

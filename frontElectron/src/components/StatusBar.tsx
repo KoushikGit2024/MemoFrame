@@ -5,7 +5,7 @@ export default function StatusBar() {
   const { scan, startScanFolder, togglePauseScan, cancelScan, workspace, connected } = useApp();
 
   return (
-    <footer className="h-9 shrink-0 bg-sidebar border-t border-subtle px-3 flex items-center justify-between gap-3">
+    <footer className="h-7 shrink-0 bg-sidebar border-t border-subtle px-3 flex items-center justify-between gap-3">
       <div className="flex items-center gap-2 min-w-0">
         <button
           type="button"

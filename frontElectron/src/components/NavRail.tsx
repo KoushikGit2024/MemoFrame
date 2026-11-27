@@ -9,7 +9,6 @@ import {
   Moon,
   Palette,
   PanelLeftClose,
-  PanelLeftOpen,
   Settings,
   Sun,
   Users,
@@ -101,7 +100,7 @@ export default function NavRail() {
       >
         {!compact && (
           <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2 h-2 bg-accent rounded-[1px] shrink-0" />
+            <img src="/logo.svg" alt="MemoFrame" className="w-7 h-7 object-contain shrink-0" />
             <div className="min-w-0">
               <div className="text-xs font-bold tracking-[0.1em] text-primary leading-none">
                 MEMOFRAME
@@ -119,13 +118,12 @@ export default function NavRail() {
             setManualToggle(true);
             setCompact(c => !c);
           }}
-          className="w-7 h-7 flex items-center justify-center rounded-xs text-secondary hover:text-primary hover:bg-elevated transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-secondary"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-secondary hover:text-primary hover:bg-elevated transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-secondary cursor-pointer"
         >
-          {compact ? (
-            <PanelLeftOpen className="w-4 h-4" strokeWidth={1.6} />
-          ) : (
-            <PanelLeftClose className="w-4 h-4" strokeWidth={1.6} />
-          )}
+          <PanelLeftClose
+            className={`w-4 h-4 transition-transform duration-200 ${compact ? "rotate-180" : ""}`}
+            strokeWidth={1.6}
+          />
         </button>
       </div>
 
@@ -135,7 +133,20 @@ export default function NavRail() {
         </div>
       )}
 
-      <nav className="flex flex-col gap-1 w-full">
+      <nav className="relative flex flex-col gap-1 w-full">
+        {(() => {
+          const activeIndex = NAV_ITEMS.findIndex(item => item.key === activeView);
+          if (activeIndex < 0) return null;
+          return (
+            <div
+              aria-hidden="true"
+              style={{ transform: `translateY(${activeIndex * 40}px)` }}
+              className={`pointer-events-none absolute top-0 h-9 rounded-md border transition-all duration-200 ease-out ${
+                compact ? "left-1/2 -translate-x-1/2 w-10" : "left-0 right-0"
+              } ${getActiveStyle(activeView)}`}
+            />
+          );
+        })()}
         {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
           const active = activeView === key;
           return (
@@ -145,16 +156,16 @@ export default function NavRail() {
               aria-current={active ? "page" : undefined}
               title={compact ? label : undefined}
               onClick={() => setActiveView(key)}
-              className={`group h-9 flex items-center rounded-sm border text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-secondary disabled:opacity-45 disabled:cursor-not-allowed ${
+              className={`relative z-10 group h-9 flex items-center rounded-md border border-transparent text-[13px] font-medium transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-secondary disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer ${
                 compact ? "justify-center px-0 w-10 mx-auto" : "gap-2.5 px-2.5 w-full text-left"
               } ${
                 active
-                  ? getActiveStyle(key)
-                  : "bg-transparent text-secondary border-transparent hover:bg-elevated/80 hover:text-primary"
+                  ? "text-primary font-semibold"
+                  : "bg-transparent text-secondary hover:bg-elevated/60 hover:text-primary"
               }`}
             >
               <Icon
-                className={`w-4 h-4 shrink-0 transition-colors ${active ? "" : getInactiveIconHover(key)}`}
+                className={`w-4 h-4 shrink-0 transition-transform duration-150 group-hover:scale-105 ${active ? "" : getInactiveIconHover(key)}`}
                 strokeWidth={active ? 1.8 : 1.6}
               />
               {!compact && <span className="truncate">{label}</span>}
@@ -172,7 +183,7 @@ export default function NavRail() {
         {/* Hidden / Popover Theme Selection Palette Menu */}
         {paletteMenuOpen && (
           <div
-            className={`absolute bottom-full mb-2 z-50 bg-card border border-hairline rounded-sm p-3 shadow-2xl flex flex-col gap-2.5 ${
+            className={`absolute bottom-full mb-2 z-50 bg-card border border-hairline rounded-md p-3 shadow-2xl flex flex-col gap-2.5 ${
               compact ? "left-0 w-64" : "left-0 w-full"
             }`}
           >
@@ -219,16 +230,12 @@ export default function NavRail() {
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: f.previewAccent }}
-                        />
-                        <span
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: f.previewSecondary }}
-                        />
-                      </div>
+                      <span
+                        className="w-3.5 h-3.5 rounded-full shrink-0 border border-hairline"
+                        style={{
+                          background: `conic-gradient(${f.previewAccent} 0deg 180deg, ${f.previewSecondary} 180deg 360deg)`,
+                        }}
+                      />
                       <span className="truncate">{f.label}</span>
                     </div>
                     {active && (
@@ -243,74 +250,45 @@ export default function NavRail() {
 
         {/* Bottom Palette Trigger Button */}
         {compact ? (
-          <div className="flex flex-col gap-1 w-full items-center">
-            <button
-              type="button"
-              title="Change Theme Palette"
-              onClick={() => setPaletteMenuOpen(o => !o)}
-              className={`w-9 h-9 mx-auto flex items-center justify-center rounded-xs border transition-colors ${
-                paletteMenuOpen
-                  ? "border-accent bg-accent-light text-accent"
-                  : "border-subtle bg-card text-secondary hover:text-primary hover:border-hairline"
-              }`}
-            >
-              <Palette className="w-4 h-4" strokeWidth={1.7} />
-            </button>
-            <button
-              type="button"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              onClick={toggleLightDark}
-              className="w-9 h-9 mx-auto flex items-center justify-center rounded-xs border border-subtle bg-card text-secondary hover:text-primary hover:border-hairline transition-colors"
-            >
-              {isDark ? (
-                <Sun className="w-4 h-4 text-amber" strokeWidth={1.6} />
-              ) : (
-                <Moon className="w-4 h-4 text-violet" strokeWidth={1.6} />
-              )}
-            </button>
-          </div>
+          <button
+            type="button"
+            title="Change Theme Palette"
+            onClick={() => setPaletteMenuOpen(o => !o)}
+            className={`w-9 h-9 mx-auto flex items-center justify-center rounded-md border transition-all duration-150 active:scale-95 cursor-pointer ${
+              paletteMenuOpen
+                ? "border-accent bg-accent-light text-accent"
+                : "border-subtle bg-card text-secondary hover:text-primary hover:border-hairline"
+            }`}
+          >
+            <Palette className="w-4 h-4" strokeWidth={1.7} />
+          </button>
         ) : (
-          <div className="flex items-center gap-1.5 w-full">
-            <button
-              type="button"
-              onClick={() => setPaletteMenuOpen(o => !o)}
-              className={`flex-1 h-8 px-2.5 rounded-xs border text-xs font-medium flex items-center justify-between transition-colors ${
-                paletteMenuOpen
-                  ? "border-accent bg-accent-light text-primary"
-                  : "border-subtle bg-card text-secondary hover:text-primary hover:border-hairline"
-              }`}
-            >
-              <div className="flex items-center gap-2 truncate">
-                <Palette className="w-3.5 h-3.5 text-accent shrink-0" strokeWidth={1.8} />
-                <span className="truncate text-primary">
-                  {theme.replace(" Dark", "").replace(" Light", "")}
-                </span>
-              </div>
-              <div className="flex items-center gap-0.5 shrink-0 pl-1">
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{
-                    backgroundColor:
-                      THEME_FAMILIES.find(f => theme.includes(f.label))?.previewAccent ||
-                      "var(--accent)",
-                  }}
-                />
-              </div>
-            </button>
-
-            <button
-              type="button"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              onClick={toggleLightDark}
-              className="w-8 h-8 shrink-0 flex items-center justify-center rounded-xs border border-subtle bg-card text-secondary hover:text-primary hover:border-hairline transition-colors"
-            >
-              {isDark ? (
-                <Sun className="w-3.5 h-3.5 text-amber" strokeWidth={1.8} />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-violet" strokeWidth={1.8} />
-              )}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setPaletteMenuOpen(o => !o)}
+            className={`w-full h-8 px-2.5 rounded-md border text-xs font-medium flex items-center justify-between transition-all duration-150 active:scale-[0.98] cursor-pointer ${
+              paletteMenuOpen
+                ? "border-accent bg-accent-light text-primary"
+                : "border-subtle bg-card text-secondary hover:text-primary hover:border-hairline"
+            }`}
+          >
+            <div className="flex items-center gap-2 truncate">
+              <Palette className="w-3.5 h-3.5 text-accent shrink-0" strokeWidth={1.8} />
+              <span className="truncate text-primary">
+                {theme.replace(" Dark", "").replace(" Light", "")}
+              </span>
+            </div>
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0"
+              style={{
+                background: `conic-gradient(${
+                  THEME_FAMILIES.find(f => theme.includes(f.label))?.previewAccent || "var(--accent)"
+                } 0deg 180deg, ${
+                  THEME_FAMILIES.find(f => theme.includes(f.label))?.previewSecondary || "var(--accent)"
+                } 180deg 360deg)`,
+              }}
+            />
+          </button>
         )}
       </div>
     </aside>

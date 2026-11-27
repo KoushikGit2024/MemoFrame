@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 300" width="240" height="300" role="img" aria-label="MemoFrame logo" xmlns:c2pa="http://c2pa.org/manifest">
+  <!-- symmetrical wavy outer edge, sharp corners -->
+  <path d="M10 20 L30 20
+           Q40 14 50 20 Q60 26 70 20 Q80 14 90 20 Q100 26 110 20 Q120 14 130 20 Q140 26 150 20 Q160 14 170 20 Q180 26 190 20 Q200 14 210 20
+           L230 20 L230 40
+           Q236 50 230 60 Q224 70 230 80 Q236 90 230 100 Q224 110 230 120 Q236 130 230 140 Q224 150 230 160 Q236 170 230 180 Q224 190 230 200 Q236 210 230 220 Q224 230 230 240 Q236 250 230 260
+           L230 280 L210 280
+           Q200 286 190 280 Q180 274 170 280 Q160 286 150 280 Q140 274 130 280 Q120 286 110 280 Q100 274 90 280 Q80 286 70 280 Q60 274 50 280 Q40 286 30 280
+           L10 280 L10 260
+           Q4 250 10 240 Q16 230 10 220 Q4 210 10 200 Q16 190 10 180 Q4 170 10 160 Q16 150 10 140 Q4 130 10 120 Q16 110 10 100 Q4 90 10 80 Q16 70 10 60 Q4 50 10 40
+           L10 20 Z"
+        fill="#9f8b0cff" stroke="#edbc0bff" stroke-width="3" stroke-linejoin="miter"/>
+
+  <!-- double frame -->
+  <rect x="34" y="44" width="172" height="212" fill="#cabb14ff" stroke="#565d6aff" stroke-width="7"/>
+  <rect x="52" y="62" width="136" height="176" fill="#1d2024ff" stroke="#595959" stroke-width="7"/>
+
+  <!-- centre: head + crop-mark shoulders (the crop marks are the body) -->
+  <circle cx="120" cy="122" r="22" fill="#b7aa97ff"/>
+  <g fill="none" stroke="#489994ff" stroke-width="5" stroke-linecap="butt" stroke-linejoin="miter">
+    <path d="M70 192 L70 180 L84 166 L104 166"/>
+    <path d="M136 166 L156 166 L170 180 L170 192"/>
+    <path d="M70 216 L70 234.5"/>
+    <path d="M170 216 L170 234.5"/>
+  </g>
+</svg>

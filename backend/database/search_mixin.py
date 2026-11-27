@@ -38,6 +38,9 @@ FIND_FILTERS = frozenset(
         "include_hidden",
         "tag",
         "person_id",
+        "person_ids",
+        "only_selected_persons",
+        "any_selected_persons",
     }
 )
 MARK_KINDS = ("keep", "reviewed", "favourite", "hidden")
@@ -122,11 +125,40 @@ class SearchDbMixin:
             add("i.burst_id = ?", f["burst_id"])
         if f.get("person_id") is not None:
             add(
-                "EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id AND fc.person_id = ?)",
+                "EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id AND fc.person_id = ? AND fc.ignored = 0)",
                 f["person_id"],
             )
+        if f.get("person_ids"):
+            pids_list = [int(pid) for pid in f["person_ids"]]
+            if f.get("any_selected_persons"):
+                marks = ",".join("?" for _ in pids_list)
+                add(
+                    f"EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id AND fc.person_id IN ({marks}) AND fc.ignored = 0)",
+                    *pids_list,
+                )
+            else:
+                for pid in pids_list:
+                    add(
+                        "EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id AND fc.person_id = ? AND fc.ignored = 0)",
+                        pid,
+                    )
+        if f.get("only_selected_persons"):
+            pids = [int(pid) for pid in (f.get("person_ids") or [])]
+            if f.get("person_id") is not None:
+                pids.append(int(f["person_id"]))
+            if pids:
+                marks = ",".join("?" for _ in pids)
+                add(
+                    "NOT EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id "
+                    "AND fc.ignored = 0 "
+                    "AND NOT (fc.person_id IS NULL AND fc.locked = 1) "
+                    f"AND (fc.person_id IS NULL OR fc.person_id NOT IN ({marks})))",
+                    *pids,
+                )
         if f.get("unassigned_faces"):
-            add("EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id AND fc.person_id IS NULL)")
+            add(
+                "EXISTS (SELECT 1 FROM faces fc WHERE fc.image_id = i.id AND fc.person_id IS NULL AND fc.locked = 0 AND fc.ignored = 0)"
+            )
         if f.get("in_burst") is not None:
             add("i.burst_id IS NOT NULL" if f["in_burst"] else "i.burst_id IS NULL")
         dup = f.get("duplicate")
@@ -153,7 +185,9 @@ class SearchDbMixin:
             raise ValueError(f"sort must be one of: {', '.join(_SORTS)}")
         where, params = self._find_where(filters)
         return self._query(
-            f"SELECT i.*, {_EFF} AS effective_ts{self._FROM}{where} "
+            f"SELECT i.*, {_EFF} AS effective_ts, "
+            "EXISTS (SELECT 1 FROM marks m WHERE m.image_id = i.id AND m.kind = 'favourite') AS is_favourite"
+            f"{self._FROM}{where} "
             f"ORDER BY {_SORTS[sort]} LIMIT ? OFFSET ?",
             (*params, int(limit), int(offset)),
         )

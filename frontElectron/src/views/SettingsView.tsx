@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  FolderSearch,
   AlertTriangle,
   CheckCircle2,
   FolderOpen,
@@ -37,6 +38,8 @@ export default function SettingsView() {
     invalidate,
     notify,
     setSelectedPersonId,
+    startScanFolder,
+    scan,
   } = useApp();
   const [stats, setStats] = useState<WorkspaceStats>({});
   const [doctor, setDoctor] = useState<DoctorReport | null>(null);
@@ -189,11 +192,22 @@ export default function SettingsView() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col px-5 pt-4 pb-3 gap-3 overflow-hidden">
-      <div className="shrink-0">
-        <h1 className="text-[17px] font-semibold text-primary">Workspace &amp; System Settings</h1>
-        <p className="text-xs text-secondary mt-0.5">
-          Configure studio palette, inspect workspace health, and run library maintenance.
-        </p>
+      <div className="shrink-0 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-[17px] font-semibold text-primary">Workspace &amp; System Settings</h1>
+          <p className="text-xs text-secondary mt-0.5">
+            Configure studio palette, inspect workspace health, and run library maintenance.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={!connected || scan.running}
+          onClick={startScanFolder}
+          className="btn-secondary h-8 px-3 text-xs inline-flex items-center gap-1.5 rounded-md cursor-pointer disabled:opacity-50"
+        >
+          <FolderSearch className="w-3.5 h-3.5" strokeWidth={1.7} />
+          <span>Scan Folder...</span>
+        </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
@@ -250,16 +264,12 @@ export default function SettingsView() {
                     }`}
                   >
                     <span className="truncate">{family.label}</span>
-                    <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: family.previewAccent }}
-                      />
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: family.previewSecondary }}
-                      />
-                    </div>
+                    <span
+                      className="w-3.5 h-3.5 rounded-full shrink-0 ml-1.5 border border-hairline"
+                      style={{
+                        background: `conic-gradient(${family.previewAccent} 0deg 180deg, ${family.previewSecondary} 180deg 360deg)`,
+                      }}
+                    />
                   </button>
                 );
               })}

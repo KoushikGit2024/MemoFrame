@@ -33,9 +33,12 @@ export interface AppContextValue {
   setGalleryExtraFilters: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
   lightboxPhoto: PhotoRecord | null;
   setLightboxPhoto: (photo: PhotoRecord | null) => void;
+  lightboxList: PhotoRecord[];
+  setLightboxList: (photos: PhotoRecord[]) => void;
   toasts: ToastItem[];
   notify: (message: string, kind?: ToastKind) => void;
   scan: ScanState;
+  scanLogs: string[];
   startScanFolder: () => Promise<void>;
   togglePauseScan: () => Promise<void>;
   cancelScan: () => Promise<void>;
@@ -60,6 +63,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [galleryExtraFilters, setGalleryExtraFilters] = useState<Record<string, unknown>>({});
   const [lightboxPhoto, setLightboxPhoto] = useState<PhotoRecord | null>(null);
+  const [lightboxList, setLightboxList] = useState<PhotoRecord[]>([]);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [scan, setScan] = useState<ScanState>({
     running: false,
@@ -67,6 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     percent: 0,
     label: "Ready",
   });
+  const [scanLogs, setScanLogs] = useState<string[]>([]);
   const toastIdRef = useRef(1);
 
   const notify = useCallback((message: string, kind: ToastKind = "info") => {
@@ -92,6 +97,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       rpc("prefs.set", { key: "theme", value: name }).catch(() => {});
     }
   }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "memoframe_theme" && e.newValue) {
+        applyTheme(e.newValue, false);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [applyTheme]);
 
   const toggleLightDark = useCallback(() => {
     const currentMeta = THEME_MAP[theme];
@@ -128,15 +143,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (event === "bridge.ready") initBackend();
       if (event === "scan.progress") {
         const payloadData = (data || {}) as Record<string, unknown>;
+        const pct = Number(payloadData.percent || 0);
+        const label = String(payloadData.label || "Scanning...");
         setScan(s => ({
           ...s,
           running: true,
-          percent: Number(payloadData.percent || 0),
-          label: String(payloadData.label || "Scanning..."),
+          percent: pct,
+          label,
           stage: String(payloadData.stage || ""),
           done: Number(payloadData.done || 0),
           total: Number(payloadData.total || 0),
         }));
+        setScanLogs(prev => [...prev.slice(-199), `[${pct}%] ${label}`]);
       }
       if (event === "scan.finished") {
         setScan({ running: false, paused: false, percent: 100, label: "Scan completed." });
@@ -145,6 +163,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       if (event === "scan.error") {
         const msg = String(data.message || "Unknown error");
+        setScanLogs(prev => [...prev.slice(-199), `[ERROR] ${msg}`]);
         setScan({ running: false, paused: false, percent: 0, label: `Scan failed: ${msg}` });
         notify(`Scan failed: ${msg}`, "error");
       }
@@ -226,9 +245,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setGalleryExtraFilters,
       lightboxPhoto,
       setLightboxPhoto,
+      lightboxList,
+      setLightboxList,
       toasts,
       notify,
       scan,
+      scanLogs,
       startScanFolder,
       togglePauseScan,
       cancelScan,
@@ -250,9 +272,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       selectedPersonId,
       galleryExtraFilters,
       lightboxPhoto,
+      lightboxList,
       toasts,
       notify,
       scan,
+      scanLogs,
       startScanFolder,
       togglePauseScan,
       cancelScan,

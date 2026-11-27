@@ -16,23 +16,28 @@ class PersonDbMixin:
         return self._query(
             "SELECT f.id, f.image_id, f.w, f.h, f.confidence, f.embedding, f.person_id, f.locked "
             "FROM faces f JOIN images i ON i.id = f.image_id "
-            "WHERE f.embedding IS NOT NULL AND i.state != 'missing' AND i.pair_id IS NULL "
+            "WHERE f.embedding IS NOT NULL AND f.ignored = 0 "
+            "AND i.state != 'missing' AND i.pair_id IS NULL "
             "ORDER BY f.id"
         )
 
     @staticmethod
     def _refresh_person_stats(conn: sqlite3.Connection) -> None:
-        """Recompute cover face and photo count; drop people that have no faces left."""
+        """Recompute cover face (preserving valid existing cover) and photo count; drop empty people."""
         conn.execute(
             "UPDATE persons SET "
-            "cover_face_id = (SELECT f.id FROM faces f WHERE f.person_id = persons.id "
-            "                 ORDER BY f.confidence * f.w * f.h DESC, f.id LIMIT 1), "
+            "cover_face_id = COALESCE("
+            "  (SELECT f.id FROM faces f WHERE f.id = persons.cover_face_id "
+            "   AND f.person_id = persons.id AND f.ignored = 0), "
+            "  (SELECT f.id FROM faces f WHERE f.person_id = persons.id AND f.ignored = 0 "
+            "   ORDER BY f.confidence * f.w * f.h DESC, f.id LIMIT 1)"
+            "), "
             "image_count = (SELECT COUNT(DISTINCT image_id) FROM faces "
-            "               WHERE person_id = persons.id)"
+            "               WHERE person_id = persons.id AND ignored = 0)"
         )
         conn.execute(
             "DELETE FROM persons WHERE NOT EXISTS "
-            "(SELECT 1 FROM faces WHERE faces.person_id = persons.id)"
+            "(SELECT 1 FROM faces WHERE faces.person_id = persons.id AND faces.ignored = 0)"
         )
 
     def replace_person_clusters(
@@ -217,6 +222,46 @@ class PersonDbMixin:
                 self._bump_persons(conn)
             return changed
 
+    def discard_face(self, face_id: int) -> bool:
+        """Mark a face as ignored ('not a face'), detach from any person, and update image face_count."""
+        with self._tx() as conn:
+            row = conn.execute(
+                "SELECT image_id FROM faces WHERE id = ? AND ignored = 0",
+                (face_id,),
+            ).fetchone()
+            if row is None:
+                return False
+            image_id = row[0]
+            conn.execute(
+                "UPDATE faces SET ignored = 1, person_id = NULL, locked = 0 WHERE id = ?",
+                (face_id,),
+            )
+            conn.execute(
+                "UPDATE images SET face_count = "
+                "(SELECT COUNT(*) FROM faces WHERE image_id = ? AND ignored = 0) "
+                "WHERE id = ?",
+                (image_id, image_id),
+            )
+            self._refresh_person_stats(conn)
+            self._bump_persons(conn)
+            return True
+
+    def set_person_cover(self, person_id: int, face_id: int) -> bool:
+        """Set a person's cover (default) face to the given face_id."""
+        with self._tx() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM faces WHERE id = ? AND person_id = ? AND ignored = 0",
+                (face_id, person_id),
+            ).fetchone()
+            if row is None:
+                return False
+            conn.execute(
+                "UPDATE persons SET cover_face_id = ? WHERE id = ?",
+                (face_id, person_id),
+            )
+            self._bump_persons(conn)
+            return True
+
     def person_faces(self, person_id: int, limit: int = 200, offset: int = 0) -> list[sqlite3.Row]:
         """Face boxes of one person."""
         return self._query(
@@ -232,7 +277,7 @@ class PersonDbMixin:
         return self._query(
             "SELECT f.id, f.image_id, f.person_id, f.x, f.y, f.w, f.h, f.confidence, "
             "f.crop_path, f.locked, i.path FROM faces f JOIN images i ON i.id = f.image_id "
-            "WHERE f.person_id IS NULL AND i.state != 'missing' "
+            "WHERE f.person_id IS NULL AND f.ignored = 0 AND i.state != 'missing' "
             "ORDER BY f.locked DESC, f.confidence * f.w * f.h DESC, f.id LIMIT ? OFFSET ?",
             (limit, offset),
         )

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent, PointerEvent } from "react";
 import {
+  AppWindow,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
-  Fullscreen,
   Loader2,
   Maximize,
-  Minimize,
   Minimize2,
   ScanFace,
   ZoomIn,
@@ -34,8 +35,24 @@ interface LightboxModalProps {
   onClose?: () => void;
 }
 
+interface RenderedDims {
+  /** On-screen size of the image box (fit to viewport, aspect from the displayed image). */
+  width: number;
+  height: number;
+  /** Coordinate space that face x/y/w/h are expressed in (original photo pixels). */
+  faceW: number;
+  faceH: number;
+}
+
 export default function LightboxModal({ photo: initialPhoto, onClose }: LightboxModalProps) {
-  const { invalidate, notify, setLightboxPhoto, setGalleryExtraFilters, setActiveView } = useApp();
+  const {
+    invalidate,
+    notify,
+    lightboxList,
+    setLightboxPhoto,
+    setGalleryExtraFilters,
+    setActiveView,
+  } = useApp();
   const [photo, setPhoto] = useState<PhotoRecord>(initialPhoto);
   const [faces, setFaces] = useState<FaceRecord[]>(initialPhoto.faces || []);
   const [tags, setTags] = useState<TagRecord[]>([]);
@@ -59,7 +76,11 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
     lastY: 0,
   });
   const transformContainerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const dirtyRef = useRef(false);
+
+  const [renderedDims, setRenderedDims] = useState<RenderedDims | null>(null);
 
   const [activeFace, setActiveFace] = useState<FaceRecord | null>(null);
   const [faceNameInput, setFaceNameInput] = useState("");
@@ -68,12 +89,31 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
   const [showDateModal, setShowDateModal] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
   const [showLive, setShowLive] = useState(false);
-  const [modalMode, setModalMode] = useState<"normal" | "maximized" | "fullscreen">("normal");
+  const isStandaloneWindow = Boolean(new URLSearchParams(window.location.search).get("lightbox"));
+  const [modalMode, setModalMode] = useState<"normal" | "maximized" | "fullscreen">(
+    isStandaloneWindow ? "fullscreen" : "normal"
+  );
   const [openingDefaultApp, setOpeningDefaultApp] = useState(false);
 
-  const toggleMaximize = () => {
-    setModalMode(prev => (prev === "maximized" ? "normal" : "maximized"));
-  };
+  const currentIndex = lightboxList.findIndex(p => p.id === photo.id);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex >= 0 && currentIndex < lightboxList.length - 1;
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName || "").toUpperCase();
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "ArrowLeft" && hasPrev) {
+        e.preventDefault();
+        setLightboxPhoto(lightboxList[currentIndex - 1]);
+      } else if (e.key === "ArrowRight" && hasNext) {
+        e.preventDefault();
+        setLightboxPhoto(lightboxList[currentIndex + 1]);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [currentIndex, hasPrev, hasNext, lightboxList, setLightboxPhoto]);
 
   const toggleFullscreen = () => {
     setModalMode(prev => (prev === "fullscreen" ? "normal" : "fullscreen"));
@@ -98,6 +138,8 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
 
   const [savingFaceName, setSavingFaceName] = useState(false);
   const [assigningFace, setAssigningFace] = useState(false);
+  const [discardingFace, setDiscardingFace] = useState(false);
+  const [settingDefaultFace, setSettingDefaultFace] = useState(false);
   const [togglingMark, setTogglingMark] = useState<"favourite" | "hidden" | null>(null);
   const [restoringDate, setRestoringDate] = useState(false);
 
@@ -155,6 +197,85 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
     setZoom(1);
     setPan({ x: 0, y: 0 });
   };
+
+  // Single source of truth for sizing. The on-screen box takes its aspect ratio from the
+  // image actually displayed (thumbnail or decoded), so object-fill never distorts it.
+  // Face coordinates live in the original photo's pixel space (photo.width/height),
+  // swapped if the displayed image is rotated relative to the DB dimensions.
+  const computeDims = useCallback(() => {
+    const vp = viewportRef.current;
+    const img = imgRef.current;
+    if (!vp) return;
+    const vw = vp.clientWidth - 16; // subtract padding
+    const vh = vp.clientHeight - 16;
+
+    const iw = img?.naturalWidth || 0;
+    const ih = img?.naturalHeight || 0;
+    let fw = Number(photo.width || 0);
+    let fh = Number(photo.height || 0);
+
+    const boxW = iw || fw || 1;
+    const boxH = ih || fh || 1;
+
+    if (fw && fh && iw && ih) {
+      const dbRatio = fw / fh;
+      // If the displayed image is rotated vs. the DB dims, swap the face space.
+      if (Math.abs(dbRatio - ih / iw) < Math.abs(dbRatio - iw / ih)) {
+        [fw, fh] = [fh, fw];
+      }
+    } else if (!fw || !fh) {
+      fw = boxW;
+      fh = boxH;
+    }
+
+    if (vw > 0 && vh > 0) {
+      const scale = Math.min(vw / boxW, vh / boxH);
+      setRenderedDims({
+        width: Math.max(1, Math.round(boxW * scale)),
+        height: Math.max(1, Math.round(boxH * scale)),
+        faceW: fw,
+        faceH: fh,
+      });
+    }
+  }, [photo.width, photo.height]);
+
+  // Observe viewport size so the image fits without circular collapse.
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    computeDims();
+    const observer = new ResizeObserver(computeDims);
+    observer.observe(vp);
+    return () => observer.disconnect();
+  }, [computeDims, imgSrc, modalMode]);
+
+  const zoomToFace = useCallback(
+    (face: FaceRecord) => {
+      const origW = renderedDims?.faceW || Number(photo.width || 1);
+      const origH = renderedDims?.faceH || Number(photo.height || 1);
+      const faceW = Number(face.w || 0);
+      const faceH = Number(face.h || 0);
+      if (!origW || !origH || !faceW || !faceH) return;
+
+      const faceCx = Number(face.x || 0) + faceW / 2;
+      const faceCy = Number(face.y || 0) + faceH / 2;
+      const normX = faceCx / origW - 0.5;
+      const normY = faceCy / origH - 0.5;
+
+      const faceFraction = Math.max(faceW / origW, faceH / origH);
+      const targetZoom = Math.max(1.8, Math.min(5, 0.4 / Math.max(0.05, faceFraction)));
+
+      const imgW = renderedDims?.width || 800;
+      const imgH = renderedDims?.height || 600;
+
+      const panX = -normX * imgW * targetZoom;
+      const panY = -normY * imgH * targetZoom;
+
+      setZoom(Number(targetZoom.toFixed(2)));
+      setPan({ x: Math.round(panX), y: Math.round(panY) });
+    },
+    [renderedDims, photo.width, photo.height]
+  );
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -250,6 +371,38 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
     }
   };
 
+  const handleDiscardFace = async (faceId: number) => {
+    if (discardingFace) return;
+    setDiscardingFace(true);
+    try {
+      await rpc("faces.discard", { face_id: faceId });
+      personsCacheRef.current = null;
+      dirtyRef.current = true;
+      setActiveFace(null);
+      notify("Discarded false face detection.", "success");
+      loadDetail();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : String(err), "error");
+    } finally {
+      setDiscardingFace(false);
+    }
+  };
+
+  const handleSetDefaultFace = async (personId: number, faceId: number) => {
+    if (settingDefaultFace) return;
+    setSettingDefaultFace(true);
+    try {
+      await rpc("persons.set_cover", { person_id: personId, face_id: faceId });
+      personsCacheRef.current = null;
+      dirtyRef.current = true;
+      notify("Updated person's default face.", "success");
+    } catch (err) {
+      notify(err instanceof Error ? err.message : String(err), "error");
+    } finally {
+      setSettingDefaultFace(false);
+    }
+  };
+
   const toggleMark = async (kind: "favourite" | "hidden") => {
     if (togglingMark) return;
     setTogglingMark(kind);
@@ -310,76 +463,9 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
     };
   }, [stepZoom]);
 
-  const [renderedDims, setRenderedDims] = useState<{
-    width: number;
-    height: number;
-    naturalWidth: number;
-    naturalHeight: number;
-  } | null>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
-
-  // Observe viewportRef size so image naturally calculates fit and renderedDims without circular collapse
-  useEffect(() => {
-    const vp = viewportRef.current;
-    if (!vp) return;
-
-    const updateDims = () => {
-      const vw = vp.clientWidth - 16; // subtract padding
-      const vh = vp.clientHeight - 16;
-      const naturalW = imgRef.current?.naturalWidth || Number(photo.width || 1);
-      const naturalH = imgRef.current?.naturalHeight || Number(photo.height || 1);
-
-      if (vw > 0 && vh > 0 && naturalW > 0 && naturalH > 0) {
-        // Fit within viewport preserving aspect ratio
-        const scale = Math.min(vw / naturalW, vh / naturalH);
-        const w = Math.round(naturalW * scale);
-        const h = Math.round(naturalH * scale);
-        setRenderedDims({
-          width: Math.max(1, w),
-          height: Math.max(1, h),
-          naturalWidth: naturalW,
-          naturalHeight: naturalH,
-        });
-      }
-    };
-
-    updateDims();
-    const observer = new ResizeObserver(updateDims);
-    observer.observe(vp);
-    return () => observer.disconnect();
-  }, [photo.width, photo.height, imgSrc, modalMode]);
-
-  const zoomToFace = useCallback(
-    (face: FaceRecord) => {
-      const origW = renderedDims?.naturalWidth || Number(photo.width || 1);
-      const origH = renderedDims?.naturalHeight || Number(photo.height || 1);
-      const faceW = Number(face.w || 0);
-      const faceH = Number(face.h || 0);
-      if (!origW || !origH || !faceW || !faceH) return;
-
-      const faceCx = Number(face.x || 0) + faceW / 2;
-      const faceCy = Number(face.y || 0) + faceH / 2;
-      const normX = faceCx / origW - 0.5;
-      const normY = faceCy / origH - 0.5;
-
-      const faceFraction = Math.max(faceW / origW, faceH / origH);
-      const targetZoom = Math.max(1.8, Math.min(5, 0.4 / Math.max(0.05, faceFraction)));
-
-      const imgW = renderedDims?.width || 800;
-      const imgH = renderedDims?.height || 600;
-
-      const panX = -normX * imgW * targetZoom;
-      const panY = -normY * imgH * targetZoom;
-
-      setZoom(Number(targetZoom.toFixed(2)));
-      setPan({ x: Math.round(panX), y: Math.round(panY) });
-    },
-    [renderedDims, photo.width, photo.height]
-  );
-
-  const origW = renderedDims?.naturalWidth || Number(photo.width || 1);
-  const origH = renderedDims?.naturalHeight || Number(photo.height || 1);
+  // Face boxes are expressed in this coordinate space; percentages are relative to the box.
+  const origW = renderedDims?.faceW || Number(photo.width || 1);
+  const origH = renderedDims?.faceH || Number(photo.height || 1);
 
   const modalContainerClass =
     modalMode === "fullscreen"
@@ -390,24 +476,205 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
 
   const modalBackdropClass = modalMode === "fullscreen" ? "p-0" : "p-3 md:p-5";
 
+  const bodyContent = (
+    <div className="flex-1 min-h-0 flex overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col bg-app">
+        <div className="px-3 py-2 bg-sidebar border-b border-subtle flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              title="Zoom Out"
+              onClick={() => stepZoom(1 / 1.2)}
+              className="btn-neutral h-7 w-7"
+            >
+              <ZoomOut className="w-3.5 h-3.5" strokeWidth={1.6} />
+            </button>
+            <span className="font-mono text-xs text-secondary w-11 text-center tabular-nums">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              type="button"
+              title="Zoom In"
+              onClick={() => stepZoom(1.2)}
+              className="btn-neutral h-7 w-7"
+            >
+              <ZoomIn className="w-3.5 h-3.5" strokeWidth={1.6} />
+            </button>
+            <button type="button" onClick={resetView} className="btn-neutral h-7 px-2 text-xs">
+              <Maximize className="w-3 h-3" strokeWidth={1.6} />
+              <span>Fit</span>
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFaces(v => !v)}
+            className={`h-7 px-2.5 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium transition-colors ${
+              showFaces
+                ? "bg-violet-bg border-violet text-violet"
+                : "bg-card border-hairline text-secondary hover:text-primary hover:bg-elevated"
+            }`}
+          >
+            <ScanFace className="w-3.5 h-3.5" strokeWidth={1.6} />
+            <span>Face Boxes ({faces.length})</span>
+          </button>
+        </div>
+
+        <div
+          ref={viewportRef}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
+          className="flex-1 min-h-0 relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing p-2"
+        >
+          {lightboxList.length > 1 && (
+            <>
+              <button
+                type="button"
+                title="Previous photo (Left Arrow)"
+                disabled={!hasPrev}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation();
+                  if (hasPrev) setLightboxPhoto(lightboxList[currentIndex - 1]);
+                }}
+                className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-sidebar/80 border border-subtle text-primary hover:bg-elevated hover:border-accent-secondary/60 flex items-center justify-center transition-all disabled:opacity-20 cursor-pointer"
+              >
+                <ChevronLeft className="w-5 h-5" strokeWidth={1.8} />
+              </button>
+              <button
+                type="button"
+                title="Next photo (Right Arrow)"
+                disabled={!hasNext}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation();
+                  if (hasNext) setLightboxPhoto(lightboxList[currentIndex + 1]);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-sidebar/80 border border-subtle text-primary hover:bg-elevated hover:border-accent-secondary/60 flex items-center justify-center transition-all disabled:opacity-20 cursor-pointer"
+              >
+                <ChevronRight className="w-5 h-5" strokeWidth={1.8} />
+              </button>
+            </>
+          )}
+          <div
+            ref={transformContainerRef}
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              width: renderedDims ? `${renderedDims.width}px` : "auto",
+              height: renderedDims ? `${renderedDims.height}px` : "auto",
+            }}
+            className="relative inline-flex items-center justify-center origin-center shrink-0 transition-transform duration-200 ease-out"
+          >
+            <img
+              ref={imgRef}
+              src={imgSrc}
+              alt={basename(photo.path)}
+              draggable={false}
+              onLoad={computeDims}
+              style={{ width: "100%", height: "100%" }}
+              className="w-full h-full object-fill select-none pointer-events-none"
+            />
+            {showFaces && renderedDims && (
+              <div className="absolute inset-0 pointer-events-none">
+                {faces.map(f => {
+                  const label = faceDisplayName(f);
+                  const isLocked = Boolean(f.locked);
+                  const style = {
+                    left: `${(Number(f.x || 0) / origW) * 100}%`,
+                    top: `${(Number(f.y || 0) / origH) * 100}%`,
+                    width: `${(Number(f.w || 0) / origW) * 100}%`,
+                    height: `${(Number(f.h || 0) / origH) * 100}%`,
+                  };
+                  const boxClass =
+                    isLocked && label
+                      ? "border-solid border-success bg-success/10 hover:bg-success/15"
+                      : label
+                        ? "border-solid border-violet bg-violet/15 hover:bg-violet/20"
+                        : isLocked
+                          ? "border-dashed border-subtle/60 bg-transparent hover:border-amber/60"
+                          : "border-dashed border-amber/85 bg-transparent hover:bg-amber/15";
+
+                  return (
+                    <div
+                      key={f.id}
+                      style={style}
+                      title={label ? `${label} (Click to manage)` : "Click to name this face"}
+                      onClick={e => onFaceClick(e, f)}
+                      className={`absolute pointer-events-auto cursor-pointer border-2 transition-colors ${boxClass}`}
+                    >
+                      {label && (
+                        <span
+                          className={`absolute left-1/2 bottom-full mb-1 -translate-x-1/2 px-1.5 py-0.5 bg-sidebar/95 border rounded-[2px] text-[10.5px] font-semibold text-primary whitespace-nowrap pointer-events-none ${
+                            isLocked ? "border-success/75" : "border-violet/75"
+                          }`}
+                        >
+                          {label}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <LightboxSidebar
+        photo={photo}
+        faces={faces}
+        tags={tags}
+        marks={marks}
+        liveVideo={liveVideo}
+        activeFace={activeFace}
+        faceNameInput={faceNameInput}
+        setFaceNameInput={setFaceNameInput}
+        persons={persons}
+        savingFaceName={savingFaceName}
+        assigningFace={assigningFace}
+        discardingFace={discardingFace}
+        settingDefaultFace={settingDefaultFace}
+        togglingMark={togglingMark}
+        restoringDate={restoringDate}
+        openingDefaultApp={openingDefaultApp}
+        onZoomToFace={zoomToFace}
+        onNameFace={handleNameFace}
+        onAssignFace={handleAssignFace}
+        onDiscardFace={handleDiscardFace}
+        onSetDefaultFace={handleSetDefaultFace}
+        onCloseActiveFace={() => setActiveFace(null)}
+        onToggleMark={toggleMark}
+        onShowDateModal={() => setShowDateModal(true)}
+        onRestoreDate={handleRestoreDate}
+        onShowSimilar={() => setShowSimilar(true)}
+        onShowLive={() => setShowLive(true)}
+        onOpenInDefaultApp={handleOpenInDefaultApp}
+        onRevealInFolder={p => revealFile(p)}
+        onFilterByTag={tag => {
+          setGalleryExtraFilters(prev => ({ ...prev, tag }));
+          setActiveView("photos");
+          setLightboxPhoto(null);
+        }}
+      />
+    </div>
+  );
+
   return (
     <>
-      <ModalShell
-        title={basename(photo.path) || `Photo #${photo.id}`}
-        subtitle={photo.path}
-        noPadding
-        className={modalContainerClass}
-        backdropClassName={modalBackdropClass}
-        onClose={handleClose}
-        headerExtra={
-          <div className="flex items-center gap-1 border-r border-subtle pr-1.5 mr-0.5">
+      {isStandaloneWindow ? (
+        <div className="h-screen w-screen flex flex-col bg-app text-primary overflow-hidden">
+          <div className="h-10 px-3.5 border-b border-subtle bg-card flex items-center justify-between shrink-0">
+            <span className="text-xs font-semibold text-primary truncate">
+              {basename(photo.path) || `Photo #${photo.id}`}
+            </span>
             {photo.path && (
               <button
                 type="button"
                 title="Open in Default Application"
                 disabled={openingDefaultApp}
                 onClick={handleOpenInDefaultApp}
-                className="w-7 h-7 flex items-center justify-center rounded-xs text-secondary hover:text-primary hover:bg-elevated transition-colors disabled:opacity-50"
+                className="w-7 h-7 flex items-center justify-center rounded-xs text-secondary hover:text-primary hover:bg-elevated transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {openingDefaultApp ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary" />
@@ -416,202 +683,82 @@ export default function LightboxModal({ photo: initialPhoto, onClose }: Lightbox
                 )}
               </button>
             )}
-            <button
-              type="button"
-              title={modalMode === "maximized" ? "Restore window size" : "Maximize modal window"}
-              onClick={toggleMaximize}
-              className={`w-7 h-7 flex items-center justify-center rounded-xs transition-colors ${
-                modalMode === "maximized"
-                  ? "bg-accent-secondary-light text-accent-secondary border border-accent-secondary/55"
-                  : "text-secondary hover:text-primary hover:bg-elevated"
-              }`}
-            >
-              {modalMode === "maximized" ? (
-                <Minimize className="w-3.5 h-3.5" strokeWidth={1.6} />
-              ) : (
-                <Maximize className="w-3.5 h-3.5" strokeWidth={1.6} />
-              )}
-            </button>
-            <button
-              type="button"
-              title={modalMode === "fullscreen" ? "Exit fullscreen (Esc)" : "Enter fullscreen view"}
-              onClick={toggleFullscreen}
-              className={`w-7 h-7 flex items-center justify-center rounded-xs transition-colors ${
-                modalMode === "fullscreen"
-                  ? "bg-accent-secondary-light text-accent-secondary border border-accent-secondary/55"
-                  : "text-secondary hover:text-primary hover:bg-elevated"
-              }`}
-            >
-              {modalMode === "fullscreen" ? (
-                <Minimize2 className="w-3.5 h-3.5" strokeWidth={1.6} />
-              ) : (
-                <Fullscreen className="w-3.5 h-3.5" strokeWidth={1.6} />
-              )}
-            </button>
           </div>
-        }
-      >
-        <div className="flex-1 min-h-0 flex overflow-hidden">
-          <div className="flex-1 min-w-0 flex flex-col bg-app">
-            <div className="px-3 py-2 bg-sidebar border-b border-subtle flex items-center justify-between gap-2 shrink-0">
-              <div className="flex items-center gap-1.5">
+          {bodyContent}
+        </div>
+      ) : (
+        <ModalShell
+          title={basename(photo.path) || `Photo #${photo.id}`}
+          subtitle={photo.path}
+          noPadding
+          className={modalContainerClass}
+          backdropClassName={modalBackdropClass}
+          onClose={handleClose}
+          headerExtra={
+            <div className="flex items-center gap-1 border-r border-subtle pr-1.5 mr-0.5">
+              {(window as unknown as { memoframe?: { openLightboxWindow?: (id: number) => void } })
+                .memoframe?.openLightboxWindow && (
                 <button
                   type="button"
-                  title="Zoom Out"
-                  onClick={() => stepZoom(1 / 1.2)}
-                  className="btn-neutral h-7 w-7"
+                  title="Open in New Window"
+                  onClick={() => {
+                    try {
+                      localStorage.setItem(
+                        "memoframe_lightbox_ids",
+                        JSON.stringify(lightboxList.map(p => p.id))
+                      );
+                    } catch {
+                      /* ignore storage errors */
+                    }
+                    (
+                      window as unknown as {
+                        memoframe?: { openLightboxWindow?: (id: number) => void };
+                      }
+                    ).memoframe?.openLightboxWindow?.(photo.id);
+                    onClose?.();
+                  }}
+                  className="w-7 h-7 flex items-center justify-center rounded-xs text-secondary hover:text-primary hover:bg-elevated transition-colors cursor-pointer"
                 >
-                  <ZoomOut className="w-3.5 h-3.5" strokeWidth={1.6} />
+                  <AppWindow className="w-3.5 h-3.5" strokeWidth={1.6} />
                 </button>
-                <span className="font-mono text-xs text-secondary w-11 text-center tabular-nums">
-                  {Math.round(zoom * 100)}%
-                </span>
+              )}
+              {photo.path && (
                 <button
                   type="button"
-                  title="Zoom In"
-                  onClick={() => stepZoom(1.2)}
-                  className="btn-neutral h-7 w-7"
+                  title="Open in Default Application"
+                  disabled={openingDefaultApp}
+                  onClick={handleOpenInDefaultApp}
+                  className="w-7 h-7 flex items-center justify-center rounded-xs text-secondary hover:text-primary hover:bg-elevated transition-colors disabled:opacity-50"
                 >
-                  <ZoomIn className="w-3.5 h-3.5" strokeWidth={1.6} />
+                  {openingDefaultApp ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-secondary" />
+                  ) : (
+                    <ExternalLink className="w-3.5 h-3.5" strokeWidth={1.6} />
+                  )}
                 </button>
-                <button type="button" onClick={resetView} className="btn-neutral h-7 px-2 text-xs">
-                  <Maximize className="w-3 h-3" strokeWidth={1.6} />
-                  <span>Fit</span>
-                </button>
-              </div>
+              )}
               <button
                 type="button"
-                onClick={() => setShowFaces(v => !v)}
-                className={`h-7 px-2.5 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium transition-colors ${
-                  showFaces
-                    ? "bg-violet-bg border-violet text-violet"
-                    : "bg-card border-hairline text-secondary hover:text-primary hover:bg-elevated"
+                title={modalMode === "fullscreen" ? "Restore window size" : "Maximize"}
+                onClick={toggleFullscreen}
+                className={`w-7 h-7 flex items-center justify-center rounded-xs transition-colors ${
+                  modalMode === "fullscreen"
+                    ? "bg-accent-secondary-light text-accent-secondary border border-accent-secondary/55"
+                    : "text-secondary hover:text-primary hover:bg-elevated"
                 }`}
               >
-                <ScanFace className="w-3.5 h-3.5" strokeWidth={1.6} />
-                <span>Face Boxes ({faces.length})</span>
+                {modalMode === "fullscreen" ? (
+                  <Minimize2 className="w-3.5 h-3.5" strokeWidth={1.6} />
+                ) : (
+                  <Maximize className="w-3.5 h-3.5" strokeWidth={1.6} />
+                )}
               </button>
             </div>
-
-            <div
-              ref={viewportRef}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerLeave={onPointerUp}
-              className="flex-1 min-h-0 relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing p-2"
-            >
-              <div
-                ref={transformContainerRef}
-                style={{
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                  width: renderedDims ? `${renderedDims.width}px` : "auto",
-                  height: renderedDims ? `${renderedDims.height}px` : "auto",
-                }}
-                className="relative inline-flex items-center justify-center origin-center shrink-0 transition-transform duration-200 ease-out"
-              >
-                <img
-                  ref={imgRef}
-                  src={imgSrc}
-                  alt={basename(photo.path)}
-                  draggable={false}
-                  onLoad={() => {
-                    const vp = viewportRef.current;
-                    const img = imgRef.current;
-                    if (!vp || !img) return;
-                    const vw = vp.clientWidth - 16;
-                    const vh = vp.clientHeight - 16;
-                    const naturalW = img.naturalWidth || Number(photo.width || 1);
-                    const naturalH = img.naturalHeight || Number(photo.height || 1);
-                    if (vw > 0 && vh > 0 && naturalW > 0 && naturalH > 0) {
-                      const scale = Math.min(vw / naturalW, vh / naturalH);
-                      setRenderedDims({
-                        width: Math.round(naturalW * scale),
-                        height: Math.round(naturalH * scale),
-                        naturalWidth: naturalW,
-                        naturalHeight: naturalH,
-                      });
-                    }
-                  }}
-                  className="w-full h-full object-contain select-none pointer-events-none"
-                />
-                {showFaces && renderedDims && (
-                  <div className="absolute inset-0 pointer-events-none">
-                    {faces.map(f => {
-                      const label = faceDisplayName(f);
-                      const isLocked = Boolean(f.locked);
-                      const style = {
-                        left: `${(Number(f.x || 0) / origW) * 100}%`,
-                        top: `${(Number(f.y || 0) / origH) * 100}%`,
-                        width: `${(Number(f.w || 0) / origW) * 100}%`,
-                        height: `${(Number(f.h || 0) / origH) * 100}%`,
-                      };
-                      const boxClass = isLocked
-                        ? "border-solid border-success bg-success/10 hover:bg-success/15"
-                        : label
-                          ? "border-solid border-violet bg-violet/15 hover:bg-violet/20"
-                          : "border-dashed border-amber/85 bg-transparent hover:bg-amber/15";
-
-                      return (
-                        <div
-                          key={f.id}
-                          style={style}
-                          title={label ? `${label} (Click to manage)` : "Click to name this face"}
-                          onClick={e => onFaceClick(e, f)}
-                          className={`absolute pointer-events-auto cursor-pointer border-2 transition-colors ${boxClass}`}
-                        >
-                          {label && (
-                            <span
-                              className={`absolute left-1/2 bottom-full mb-1 -translate-x-1/2 px-1.5 py-0.5 bg-sidebar/95 border rounded-[2px] text-[10.5px] font-semibold text-primary whitespace-nowrap pointer-events-none ${
-                                isLocked ? "border-success/75" : "border-violet/75"
-                              }`}
-                            >
-                              {label}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <LightboxSidebar
-            photo={photo}
-            faces={faces}
-            tags={tags}
-            marks={marks}
-            liveVideo={liveVideo}
-            activeFace={activeFace}
-            faceNameInput={faceNameInput}
-            setFaceNameInput={setFaceNameInput}
-            persons={persons}
-            savingFaceName={savingFaceName}
-            assigningFace={assigningFace}
-            togglingMark={togglingMark}
-            restoringDate={restoringDate}
-            openingDefaultApp={openingDefaultApp}
-            onZoomToFace={zoomToFace}
-            onNameFace={handleNameFace}
-            onAssignFace={handleAssignFace}
-            onCloseActiveFace={() => setActiveFace(null)}
-            onToggleMark={toggleMark}
-            onShowDateModal={() => setShowDateModal(true)}
-            onRestoreDate={handleRestoreDate}
-            onShowSimilar={() => setShowSimilar(true)}
-            onShowLive={() => setShowLive(true)}
-            onOpenInDefaultApp={handleOpenInDefaultApp}
-            onRevealInFolder={p => revealFile(p)}
-            onFilterByTag={tag => {
-              setGalleryExtraFilters(prev => ({ ...prev, tag }));
-              setActiveView("photos");
-              setLightboxPhoto(null);
-            }}
-          />
-        </div>
-      </ModalShell>
+          }
+        >
+          {bodyContent}
+        </ModalShell>
+      )}
 
       {showDateModal && (
         <DateOverrideModal

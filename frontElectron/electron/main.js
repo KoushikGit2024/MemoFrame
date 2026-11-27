@@ -99,6 +99,7 @@ function createWindow() {
     minWidth: 820,
     minHeight: 540,
     title: "MemoFrame — Local Photo & Face Intelligence",
+    icon: path.join(APP_ROOT, "public", process.platform === "win32" ? "logo.ico" : "logo.png"),
     backgroundColor: "#0f1216",
     show: false,
     autoHideMenuBar: true,
@@ -135,6 +136,7 @@ app.whenReady().then(() => {
   });
   backendClient.start();
   registerIpcHandlers(backendClient, () => mainWindow);
+  if (process.platform === "win32") app.setAppUserModelId("com.memoframe.app");
   createWindow();
 
   app.on("activate", () => {

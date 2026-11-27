@@ -91,6 +91,10 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
   const [confirmingAll, setConfirmingAll] = useState(false);
   const [submittingName, setSubmittingName] = useState(false);
   const [assigningFaceId, setAssigningFaceId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkMoveQuery, setBulkMoveQuery] = useState("");
 
   const loadFaces = useCallback(
     async (offset = 0, append = false) => {
@@ -162,6 +166,31 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
       notify(err instanceof Error ? err.message : String(err), "error");
     } finally {
       setAssigningFaceId(null);
+    }
+  };
+
+  const handleBulkAssign = async (targetPersonId: number | null) => {
+    if (selectedIds.length === 0 || bulkBusy) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        selectedIds.map(id => rpc("faces.assign", { face_id: id, person_id: targetPersonId }))
+      );
+      dirtyRef.current = true;
+      const count = selectedIds.length;
+      setSelectedIds([]);
+      setBulkMoveOpen(false);
+      notify(
+        targetPersonId === null
+          ? `Removed ${count} face(s) from person.`
+          : `Moved ${count} face(s).`,
+        "success"
+      );
+      loadFaces(0, false);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : String(err), "error");
+    } finally {
+      setBulkBusy(false);
     }
   };
 
@@ -296,23 +325,117 @@ export default function FaceReviewModal({ personId, onClose }: FaceReviewModalPr
         </div>
       )}
 
+      {faces.length > 0 && (
+        <div className="sticky top-0 z-20 flex items-center justify-between gap-2 flex-wrap bg-card border border-subtle rounded-xs px-2.5 py-1.5 shadow-sm shrink-0">
+          <div className="flex items-center gap-2 text-xs">
+            <button
+              type="button"
+              onClick={() =>
+                setSelectedIds(selectedIds.length === faces.length ? [] : faces.map(f => f.id))
+              }
+              className="text-accent-secondary hover:underline cursor-pointer"
+            >
+              {selectedIds.length === faces.length ? "Clear all" : `Select all (${faces.length})`}
+            </button>
+            {selectedIds.length > 0 && (
+              <span className="font-mono text-violet font-semibold">
+                {selectedIds.length} selected
+              </span>
+            )}
+          </div>
+          {selectedIds.length > 0 && (
+            <div className="flex items-center gap-1.5 relative">
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => {
+                  setBulkMoveOpen(o => !o);
+                  setBulkMoveQuery("");
+                }}
+                className="btn-neutral h-7 px-2.5 text-xs cursor-pointer"
+              >
+                Move Selected...
+              </button>
+              {personId !== null && (
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={() => handleBulkAssign(null)}
+                  className="btn-danger h-7 px-2.5 text-xs cursor-pointer"
+                >
+                  {bulkBusy ? "Updating..." : "Remove Selected"}
+                </button>
+              )}
+              {bulkMoveOpen && (
+                <div className="absolute right-0 top-8 z-30 w-60 bg-card border border-hairline rounded-sm p-2 shadow-lg flex flex-col gap-1.5">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={bulkMoveQuery}
+                    onChange={e => setBulkMoveQuery(e.target.value)}
+                    placeholder="Search person..."
+                    className="h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-violet"
+                  />
+                  <div className="max-h-40 overflow-y-auto flex flex-col gap-0.5">
+                    {persons
+                      .filter(
+                        p =>
+                          p.id !== personId &&
+                          String(p.name || "")
+                            .toLowerCase()
+                            .includes(bulkMoveQuery.trim().toLowerCase())
+                      )
+                      .map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          disabled={bulkBusy}
+                          onClick={() => handleBulkAssign(p.id)}
+                          className="shrink-0 text-left px-2 py-1 text-xs text-primary hover:bg-elevated rounded-xs truncate cursor-pointer"
+                        >
+                          {p.name} ({p.image_count || 0})
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {faces.length === 0 ? (
         <div className="py-12 text-center text-xs text-secondary">No faces here.</div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(124px,1fr))] gap-2.5">
           {faces.map(f => {
             const isConfirmed = Boolean(f.locked);
+            const isSelected = selectedIds.includes(f.id);
             return (
               <div
                 key={f.id}
-                className={`bg-elevated border rounded-xs p-2 flex flex-col items-center gap-1.5 transition-colors ${
-                  isConfirmed
-                    ? "border-success/50 bg-success-bg/25"
-                    : personId === null
-                      ? "border-amber/35 border-dashed"
-                      : "border-subtle"
+                onClick={() =>
+                  setSelectedIds(prev =>
+                    prev.includes(f.id) ? prev.filter(id => id !== f.id) : [...prev, f.id]
+                  )
+                }
+                className={`relative bg-elevated border rounded-xs p-2 flex flex-col items-center gap-1.5 transition-colors cursor-pointer ${
+                  isSelected
+                    ? "border-violet ring-1 ring-violet/60 bg-violet-bg/25"
+                    : isConfirmed
+                      ? "border-success/50 bg-success-bg/25"
+                      : personId === null
+                        ? "border-amber/35 border-dashed"
+                        : "border-subtle"
                 }`}
               >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => {}}
+                  onClick={e => e.stopPropagation()}
+                  className="absolute top-1.5 left-1.5 accent-violet cursor-pointer"
+                />
                 <FaceThumb face={f} />
                 <div className="text-[11px] font-mono text-secondary flex items-center gap-1">
                   <span>{Math.round(Number(f.confidence || 0) * 100)}%</span>

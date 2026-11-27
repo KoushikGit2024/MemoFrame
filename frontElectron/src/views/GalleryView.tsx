@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  Bookmark,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  Columns3,
+  FileText,
   Grid2x2,
   Grid3x3,
   Images,
   Loader2,
   ScanFace,
   Search,
+  Shuffle,
+  SlidersHorizontal,
+  Star,
   Table2,
   Tag,
-  Trash2,
+  UserRoundSearch,
   X,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
@@ -22,7 +28,6 @@ import type {
   LayoutMode,
   PersonRecord,
   PhotoRecord,
-  SavedSearchRecord,
   TagRecord,
 } from "../types/memoframe";
 import EmptyState from "../components/EmptyState";
@@ -30,7 +35,7 @@ import PeopleStrip from "../components/PeopleStrip";
 import PhotoCard from "../components/PhotoCard";
 import PhotoTable from "../components/PhotoTable";
 
-const PAGE_SIZE = 40;
+
 
 interface PhotosQueryResult {
   items: PhotoRecord[];
@@ -50,12 +55,14 @@ export default function GalleryView() {
   const {
     connected,
     dataVersion,
+    invalidate,
     notify,
     selectedPersonId,
     setSelectedPersonId,
     galleryExtraFilters,
     setGalleryExtraFilters,
     setLightboxPhoto,
+    setLightboxList,
   } = useApp();
 
   const [searchText, setSearchText] = useState("");
@@ -68,6 +75,23 @@ export default function GalleryView() {
   const [faceZoom, setFaceZoom] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
   const [page, setPage] = useState(0);
+  const [showInfo, setShowInfo] = useState(true);
+  const [customCols, setCustomCols] = useState<number | null>(null);
+  const [customPageSize, setCustomPageSize] = useState(40);
+  const [controlsCollapsed, setControlsCollapsed] = useState(false);
+  const [shuffleSeed, setShuffleSeed] = useState<number | null>(null);
+  const [selectedPersonIds, setSelectedPersonIds] = useState<number[]>(
+    selectedPersonId !== null ? [selectedPersonId] : []
+  );
+  const [onlySelectedPersons, setOnlySelectedPersons] = useState(false);
+  const [anySelectedPersons, setAnySelectedPersons] = useState(false);
+  const [favouritesOnly, setFavouritesOnly] = useState(false);
+
+  useEffect(() => {
+    if (selectedPersonId !== null) {
+      setSelectedPersonIds([selectedPersonId]);
+    }
+  }, [selectedPersonId]);
 
   const [items, setItems] = useState<PhotoRecord[]>([]);
   const [total, setTotal] = useState(0);
@@ -75,10 +99,8 @@ export default function GalleryView() {
   const [loading, setLoading] = useState(false);
 
   const [persons, setPersons] = useState<PersonRecord[]>([]);
+  const [loadingPersons, setLoadingPersons] = useState(false);
   const [tags, setTags] = useState<TagRecord[]>([]);
-  const [savedSearches, setSavedSearches] = useState<SavedSearchRecord[]>([]);
-  const [savedMenuOpen, setSavedMenuOpen] = useState(false);
-  const [savingName, setSavingName] = useState("");
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const loaderRef = useRef(new LatestTask());
@@ -107,21 +129,32 @@ export default function GalleryView() {
     }
     if (debouncedSearch) f.text = debouncedSearch;
     if (minFaces > 0) f.min_faces = minFaces;
-    if (selectedPersonId !== null) f.person_id = selectedPersonId;
+    if (selectedPersonIds.length === 1) f.person_id = selectedPersonIds[0];
+    else if (selectedPersonIds.length > 1) f.person_ids = selectedPersonIds;
+    if (selectedPersonIds.length > 0 && onlySelectedPersons) {
+      f.only_selected_persons = true;
+    }
+    if (selectedPersonIds.length > 1 && anySelectedPersons) {
+      f.any_selected_persons = true;
+    }
     if (unusedFacesOnly) f.unassigned_faces = true;
     if (tagFilter) f.tag = tagFilter;
     if (dupFilter === "unique") f.duplicate = "none";
     else if (dupFilter === "duplicates") f.duplicate = "any";
     else if (dupFilter === "hidden") f.mark = "hidden";
+    if (favouritesOnly) f.mark = "favourite";
     return f;
   }, [
     galleryExtraFilters,
     debouncedSearch,
     minFaces,
-    selectedPersonId,
+    selectedPersonIds,
+    onlySelectedPersons,
+    anySelectedPersons,
     unusedFacesOnly,
     tagFilter,
     dupFilter,
+    favouritesOnly,
   ]);
 
   const filtersKey = useMemo(
@@ -129,19 +162,25 @@ export default function GalleryView() {
       JSON.stringify({
         debouncedSearch,
         minFaces,
-        selectedPersonId,
+        selectedPersonIds,
+        onlySelectedPersons,
+        anySelectedPersons,
         unusedFacesOnly,
         tagFilter,
         dupFilter,
+        favouritesOnly,
         galleryExtraFilters,
       }),
     [
       debouncedSearch,
       minFaces,
-      selectedPersonId,
+      selectedPersonIds,
+      onlySelectedPersons,
+      anySelectedPersons,
       unusedFacesOnly,
       tagFilter,
       dupFilter,
+      favouritesOnly,
       galleryExtraFilters,
     ]
   );
@@ -151,11 +190,17 @@ export default function GalleryView() {
   }, [filtersKey, sortKey]);
 
   useEffect(() => {
+    setPage(0);
+  }, [customPageSize]);
+
+  useEffect(() => {
     if (!connected || lastMetaVersionRef.current === dataVersion) return;
     lastMetaVersionRef.current = dataVersion;
+    setLoadingPersons(true);
     rpc<PersonRecord[]>("persons.list")
       .then(res => setPersons(res || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingPersons(false));
     rpc<TagRecord[]>("tags.list", { limit: 80 })
       .then(res => setTags(res || []))
       .catch(() => {});
@@ -171,7 +216,7 @@ export default function GalleryView() {
           filters,
           sort: sortKey,
           page,
-          page_size: PAGE_SIZE,
+          page_size: customPageSize,
         }),
       res => {
         setLoading(false);
@@ -187,73 +232,13 @@ export default function GalleryView() {
         notify(`Load failed: ${err.message}`, "error");
       }
     );
-  }, [connected, filtersKey, sortKey, page, dataVersion, notify, setSelectedPersonId]);
+  }, [connected, filtersKey, sortKey, page, customPageSize, dataVersion, notify, setSelectedPersonId]);
 
-  const openSavedMenu = () => {
-    const next = !savedMenuOpen;
-    setSavedMenuOpen(next);
-    if (next && connected) {
-      rpc<SavedSearchRecord[]>("saved_searches.list")
-        .then(res => setSavedSearches(res || []))
-        .catch(() => {});
-    }
-  };
-
-  const applySavedFilters = (saved: Record<string, unknown>) => {
-    const f: Record<string, unknown> = { ...(saved || {}) };
-    const nextSort = typeof f.sort === "string" ? f.sort : "date_desc";
-    delete f.sort;
-    let nextDup: "all" | "unique" | "duplicates" | "hidden" = "all";
-    if (f.mark === "hidden") {
-      delete f.mark;
-      nextDup = "hidden";
-    } else if (f.duplicate === "none") {
-      delete f.duplicate;
-      nextDup = "unique";
-    } else if (f.duplicate === "any") {
-      delete f.duplicate;
-      nextDup = "duplicates";
-    }
-
-    const nextTag = typeof f.tag === "string" ? f.tag : "";
-    delete f.tag;
-    const nextPid = typeof f.person_id === "number" ? f.person_id : null;
-    delete f.person_id;
-    const nextText = String(f.text || f.path_contains || "");
-    delete f.text;
-    delete f.path_contains;
-    const nextMinFaces = Number(f.min_faces || 0);
-    delete f.min_faces;
-
-    setSearchText(nextText);
-    setDebouncedSearch(nextText);
-    setMinFaces(nextMinFaces);
-    setDupFilter(nextDup);
-    setSortKey(nextSort);
-    setTagFilter(nextTag);
-    setSelectedPersonId(nextPid);
-    setGalleryExtraFilters(f);
-    setSavedMenuOpen(false);
-  };
-
-  const handleSaveCurrent = async () => {
-    const name = savingName.trim();
-    if (!name) return;
+  const handleSetDefaultFace = async (personId: number, faceId: number) => {
     try {
-      await rpc("saved_searches.save", { name, filters: { ...buildFilters(), sort: sortKey } });
-      setSavingName("");
-      const list = await rpc<SavedSearchRecord[]>("saved_searches.list");
-      setSavedSearches(list || []);
-      notify(`Saved search "${name}".`, "success");
-    } catch (err) {
-      notify(err instanceof Error ? err.message : String(err), "error");
-    }
-  };
-
-  const handleDeleteSaved = async (name: string) => {
-    try {
-      await rpc("saved_searches.delete", { name });
-      setSavedSearches(prev => prev.filter(s => s.name !== name));
+      await rpc("persons.set_cover", { person_id: personId, face_id: faceId });
+      invalidate();
+      notify("Updated person's default face.", "success");
     } catch (err) {
       notify(err instanceof Error ? err.message : String(err), "error");
     }
@@ -262,13 +247,26 @@ export default function GalleryView() {
   const extraChipEntries = Object.entries(galleryExtraFilters || {}).filter(
     ([k]) => !k.startsWith("_")
   );
-  const offset = page * PAGE_SIZE;
+  const displayedItems = useMemo(() => {
+    if (shuffleSeed === null || items.length <= 1) return items;
+    const arr = [...items];
+    let s = Math.floor(shuffleSeed * 2147483647) || 1;
+    for (let i = arr.length - 1; i > 0; i--) {
+      s = (s * 16807) % 2147483647;
+      const j = s % (i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [items, shuffleSeed]);
+
+  const offset = page * customPageSize;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col px-5 pt-4 pb-3 gap-3 overflow-hidden">
-      <div className="bg-card border border-subtle rounded-sm p-2.5 flex flex-col gap-2 shrink-0">
+      <div className="bg-card border border-subtle rounded-[6px] p-2.5 flex flex-col gap-2 shrink-0">
+        {/* Row 1: Search + Primary Mode + Layout */}
         <div className="flex items-center flex-wrap gap-2">
-          <div className="group relative flex-1 min-w-[200px]">
+          <div className="group relative flex-1 min-w-[180px]">
             <Search
               className="w-3.5 h-3.5 text-secondary group-focus-within:text-accent-secondary absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors"
               strokeWidth={1.6}
@@ -279,7 +277,7 @@ export default function GalleryView() {
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               placeholder="Search filename, person, place, date... (Ctrl+K)"
-              className="w-full h-8 pl-8 pr-7 bg-input border border-hairline rounded-xs text-xs text-primary placeholder:text-secondary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30 transition-colors"
+              className="w-full h-8 pl-8 pr-7 bg-input border border-hairline rounded-lg text-xs text-primary placeholder:text-secondary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30 transition-colors"
             />
             {searchText && (
               <button
@@ -296,16 +294,16 @@ export default function GalleryView() {
           <div
             role="tablist"
             aria-label="Gallery view mode"
-            className="inline-flex bg-input border border-hairline rounded-xs p-0.5 gap-0.5"
+            className="inline-flex items-center bg-input border border-hairline h-8 rounded-lg px-0.5 gap-0.5 shrink-0"
           >
             <button
               type="button"
               role="tab"
               aria-selected={!unusedFacesOnly}
               onClick={() => setUnusedFacesOnly(false)}
-              className={`h-6 px-2.5 inline-flex items-center gap-1 rounded-[2px] text-xs transition-colors cursor-pointer ${
+              className={`h-6 px-2.5 inline-flex items-center gap-1 text-xs transition-colors cursor-pointer ${
                 !unusedFacesOnly
-                  ? "bg-accent-secondary-light text-accent-secondary border border-accent-secondary/55 font-semibold"
+                  ? "bg-accent-secondary-light text-accent-secondary rounded-l-md border border-accent-secondary/55 font-semibold"
                   : "text-secondary hover:text-primary hover:bg-elevated/60 border border-transparent font-medium"
               }`}
             >
@@ -318,241 +316,343 @@ export default function GalleryView() {
               onClick={() => {
                 setUnusedFacesOnly(true);
                 setSelectedPersonId(null);
+                setSelectedPersonIds([]);
+                setOnlySelectedPersons(false);
+                setTagFilter("");
+                setGalleryExtraFilters({});
               }}
               title="Show photos with unassigned / unidentified faces"
-              className={`h-6 px-2.5 inline-flex items-center gap-1 rounded-[2px] text-xs transition-colors cursor-pointer ${
+              className={`h-6 px-2.5 inline-flex items-center gap-1 text-xs transition-colors cursor-pointer ${
                 unusedFacesOnly
-                  ? "bg-violet-bg text-violet border border-violet/60 font-semibold"
+                  ? "bg-violet-bg text-violet border border-violet/60 font-semibold rounded-r-md"
                   : "text-secondary hover:text-primary hover:bg-elevated/60 border border-transparent font-medium"
               }`}
             >
-              <ScanFace className="w-3.5 h-3.5" strokeWidth={unusedFacesOnly ? 1.8 : 1.6} />
+              <UserRoundSearch className="w-3.5 h-3.5" strokeWidth={unusedFacesOnly ? 1.8 : 1.6} />
               <span>Unused Faces</span>
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setFaceZoom(z => !z)}
-            title="Crop each card to the largest detected face"
-            className={`h-8 px-2.5 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium transition-colors ${
-              faceZoom
-                ? "bg-violet-bg border-violet text-violet font-semibold"
-                : "bg-card border-hairline text-secondary hover:text-primary hover:border-violet/50 hover:bg-elevated"
-            }`}
-          >
-            <ScanFace
-              className={`w-3.5 h-3.5 ${faceZoom ? "text-violet" : ""}`}
-              strokeWidth={1.6}
-            />
-            <span>Face Zoom</span>
-          </button>
-
           <div
             role="group"
             aria-label="Gallery layout"
-            className="inline-flex bg-input border border-hairline rounded-xs p-0.5 gap-0.5"
+            className="inline-flex items-center bg-input border border-hairline rounded-lg h-8 px-0.5 gap-0.5 shrink-0"
           >
             {LAYOUT_BUTTONS.map(({ id, label, icon: Icon }) => {
-              const active = layoutMode === id;
+              const active = layoutMode === id && customCols == null;
               return (
                 <button
                   key={id}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => setLayoutMode(id)}
-                  className={`h-6 px-2 inline-flex items-center gap-1 rounded-[2px] text-xs transition-colors ${
-                    active
+                  onClick={() => { setLayoutMode(id); setCustomCols(null); }}
+                  className={`h-6 px-2 inline-flex items-center gap-1 rounded-[2px] text-xs transition-colors 
+                    ${
+                      (active
                       ? "bg-accent-secondary-light text-accent-secondary border border-accent-secondary/55 font-semibold"
-                      : "text-secondary hover:text-primary hover:bg-elevated/60 border border-transparent font-medium"
-                  }`}
+                      : "text-secondary hover:text-primary hover:bg-elevated/60 border border-transparent font-medium")
+                      + (layoutMode== "grid" ? " rounded-l-md" : layoutMode=="compact"? " rounded-none" : " rounded-r-md")     
+                    }
+                  `}
                 >
                   <Icon className="w-3.5 h-3.5" strokeWidth={active ? 1.8 : 1.6} />
-                  <span>{label}</span>
+                  <span className="hidden sm:inline">{label}</span>
                 </button>
               );
             })}
           </div>
-        </div>
 
-        <div className="flex items-center flex-wrap gap-2">
-          <label className="inline-flex items-center gap-1.5 text-xs text-secondary">
-            <span>Min Faces</span>
-            <input
-              type="number"
-              min={0}
-              max={20}
-              value={minFaces}
-              onChange={e => setMinFaces(Math.max(0, Math.min(20, Number(e.target.value) || 0)))}
-              className={`w-14 h-7 px-2 bg-input border rounded-xs text-xs font-mono text-primary focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 ${
-                minFaces > 0 ? "border-violet/70 bg-violet-bg/40" : "border-hairline"
-              }`}
-            />
-          </label>
-
-          <select
-            value={dupFilter}
-            onChange={e =>
-              setDupFilter(e.target.value as "all" | "unique" | "duplicates" | "hidden")
-            }
-            className={`h-7 px-2 bg-input border rounded-xs text-xs text-primary focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber/30 ${
-              dupFilter !== "all" ? "border-amber/70 text-amber" : "border-hairline"
+          <button
+            type="button"
+            onClick={() => setControlsCollapsed(c => !c)}
+            title={controlsCollapsed ? "Show filters, display & people controls" : "Collapse controls for more grid space"}
+            className={`h-8 px-2.5 inline-flex items-center gap-1 rounded-lg border text-xs font-medium transition-colors shrink-0 cursor-pointer ${
+              controlsCollapsed
+                ? "bg-input border-hairline text-secondary hover:text-primary"
+                : "bg-accent-secondary-light border-accent-secondary/55 text-accent-secondary"
             }`}
           >
-            <option value="all">All Photos</option>
-            <option value="unique">Unique Only</option>
-            <option value="duplicates">Duplicates Only</option>
-            <option value="hidden">Hidden Only</option>
-          </select>
+            <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={1.6} />
+            {controlsCollapsed ? (
+              <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.6} />
+            ) : (
+              <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.6} />
+            )}
+          </button>
+        </div>
 
-          <select
-            value={sortKey}
-            onChange={e => setSortKey(e.target.value)}
-            className="h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30"
-          >
-            {SORTS.map(s => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-
-          {tags.length > 0 && (
+        {/* Row 2: Filters (left) + Display Controls (right) */}
+        {!controlsCollapsed && (
+        <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-2 pt-1.5 border-t border-subtle/60">
+          <div className="flex items-center flex-wrap gap-1.5">
             <select
-              value={tagFilter}
-              onChange={e => setTagFilter(e.target.value)}
+              value={dupFilter}
+              onChange={e =>
+                setDupFilter(e.target.value as "all" | "unique" | "duplicates" | "hidden")
+              }
               className={`h-7 px-2 bg-input border rounded-xs text-xs text-primary focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber/30 ${
-                tagFilter ? "border-amber/70 text-amber font-medium" : "border-hairline"
+                dupFilter !== "all" ? "border-amber/70 text-amber" : "border-hairline"
               }`}
             >
-              <option value="">Any Tag</option>
-              {tags.map(t => (
-                <option key={t.label} value={t.label}>
-                  {t.label} ({t.count ?? 0})
+              <option value="all">All Photos</option>
+              <option value="unique">Unique Only</option>
+              <option value="duplicates">Duplicates Only</option>
+              <option value="hidden">Hidden Only</option>
+            </select>
+
+            <select
+              value={sortKey}
+              onChange={e => {
+                setSortKey(e.target.value);
+                setShuffleSeed(null);
+              }}
+              className="h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30"
+            >
+              {SORTS.map(s => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
                 </option>
               ))}
             </select>
-          )}
 
-          <div className="relative">
-            <button
-              type="button"
-              onClick={openSavedMenu}
-              className={`h-7 px-2.5 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium transition-colors ${
-                savedMenuOpen
-                  ? "border-amber bg-amber text-amber-text"
-                  : "border-amber/45 bg-amber-bg text-amber hover:border-amber"
-              }`}
-            >
-              <Bookmark className="w-3.5 h-3.5" strokeWidth={1.6} />
-              <span>Saved</span>
-            </button>
-            {savedMenuOpen && (
-              <div className="absolute left-0 top-8 z-30 w-64 bg-card border border-hairline rounded-sm p-2 flex flex-col gap-1.5 shadow-lg">
-                {savedSearches.map(s => (
-                  <div key={s.name} className="flex items-center justify-between gap-1">
-                    <button
-                      type="button"
-                      onClick={() => applySavedFilters(s.filters)}
-                      className="flex-1 text-left px-2 py-1 text-xs text-primary hover:bg-elevated rounded-xs truncate inline-flex items-center gap-1.5"
-                    >
-                      <Bookmark className="w-3 h-3 text-amber shrink-0" strokeWidth={1.6} />
-                      <span className="truncate">{s.name}</span>
-                    </button>
-                    <button
-                      type="button"
-                      title="Delete saved search"
-                      onClick={() => handleDeleteSaved(s.name)}
-                      className="p-1 text-secondary hover:text-danger transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" strokeWidth={1.6} />
-                    </button>
-                  </div>
+            {tags.length > 0 && (
+              <select
+                value={tagFilter}
+                onChange={e => setTagFilter(e.target.value)}
+                className={`h-7 px-2 bg-input border rounded-xs text-xs text-primary focus:outline-none focus:border-amber focus:ring-1 focus:ring-amber/30 max-w-[150px] ${
+                  tagFilter ? "border-amber/70 text-amber font-medium" : "border-hairline"
+                }`}
+              >
+                <option value="">Any Tag</option>
+                {tags.map(t => (
+                  <option key={t.label} value={t.label}>
+                    {t.label} ({t.count ?? 0})
+                  </option>
                 ))}
-                {savedSearches.length > 0 && <div className="h-px bg-subtle my-0.5" />}
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={savingName}
-                    onChange={e => setSavingName(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter") handleSaveCurrent();
-                    }}
-                    placeholder="Save current as..."
-                    className="flex-1 h-7 px-2 bg-input border border-hairline rounded-xs text-xs text-primary focus:outline-none focus:border-amber"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveCurrent}
-                    className="btn-warning h-7 px-2 text-xs"
-                  >
-                    Save
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => applySavedFilters({})}
-                  className="text-left px-2 py-1 text-xs text-secondary hover:text-primary hover:bg-elevated rounded-xs transition-colors"
-                >
-                  Reset all filters
-                </button>
-              </div>
+              </select>
             )}
+
+            <label className="inline-flex items-center gap-1.5 text-xs text-secondary pl-1">
+              <span>Faces ≥</span>
+              <input
+                type="number"
+                min={0}
+                max={20}
+                value={minFaces}
+                onChange={e => setMinFaces(Math.max(0, Math.min(20, Number(e.target.value) || 0)))}
+                className={`w-12 h-7 px-1.5 bg-input border rounded-xs text-xs font-mono text-primary focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 ${
+                  minFaces > 0 ? "border-violet/70 bg-violet-bg/40" : "border-hairline"
+                }`}
+              />
+            </label>
           </div>
 
-          {tagFilter && (
-            <span className="h-6 px-2 inline-flex items-center gap-1.5 rounded-xs bg-amber-bg border border-amber/50 text-xs text-amber font-medium">
-              <Tag className="w-3 h-3 shrink-0" strokeWidth={1.8} />
-              <span>tag: {tagFilter}</span>
-              <button
-                type="button"
-                aria-label="Clear tag filter"
-                onClick={() => setTagFilter("")}
-                className="text-amber hover:text-primary transition-colors cursor-pointer"
-              >
-                <X className="w-3 h-3" strokeWidth={1.8} />
-              </button>
-            </span>
-          )}
-
-          {extraChipEntries.map(([k, v]) => (
-            <span
-              key={k}
-              className={`h-6 px-2 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium ${
-                k === "tag"
-                  ? "bg-amber-bg border-amber/50 text-amber"
-                  : "bg-accent-light border-accent/50 text-accent"
+          <div className="flex items-center flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setFavouritesOnly(v => !v)}
+              title="Show favourite photos only"
+              className={`h-7 px-2.5 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium transition-colors cursor-pointer ${
+                favouritesOnly
+                  ? "bg-amber-bg border-amber text-amber font-semibold"
+                  : "bg-input border-hairline text-secondary hover:text-primary hover:border-amber/50"
               }`}
             >
-              {k === "tag" && <Tag className="w-3 h-3 shrink-0" strokeWidth={1.8} />}
-              <span>
-                {k === "group_id"
-                  ? String(galleryExtraFilters._group_label || `Event #${v}`)
-                  : `${k}: ${String(v)}`}
+              <Star className={`w-3.5 h-3.5 ${favouritesOnly ? "fill-current" : ""}`} strokeWidth={1.6} />
+              <span>Favourites</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShuffleSeed(Math.random())}
+              title="Shuffle photos on this page (change sort to restore order)"
+              className={`h-7 px-2.5 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium transition-colors cursor-pointer ${
+                shuffleSeed !== null
+                  ? "bg-accent-secondary-light border-accent-secondary/55 text-accent-secondary"
+                  : "bg-input border-hairline text-secondary hover:text-primary hover:border-accent-secondary/40"
+              }`}
+            >
+              <Shuffle className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Shuffle</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFaceZoom(z => !z)}
+              title="Crop each card to the largest detected face"
+              className={`h-7 px-2.5 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium transition-colors ${
+                faceZoom
+                  ? "bg-violet-bg border-violet text-violet font-semibold"
+                  : "bg-input border-hairline text-secondary hover:text-primary hover:border-violet/50"
+              }`}
+            >
+              <ScanFace
+                className={`w-3.5 h-3.5 ${faceZoom ? "text-violet" : ""}`}
+                strokeWidth={1.6}
+              />
+              <span>Face Zoom</span>
+            </button>
+
+            <button
+              type="button"
+              title={showInfo ? "Hide file info" : "Show file info"}
+              onClick={() => setShowInfo(v => !v)}
+              className={`h-7 px-2.5 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium transition-colors ${
+                showInfo
+                  ? "bg-accent-secondary-light border-accent-secondary/55 text-accent-secondary"
+                  : "bg-input border-hairline text-secondary hover:text-primary hover:border-accent-secondary/40"
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Info</span>
+            </button>
+
+            <div className="h-4 w-px bg-subtle mx-0.5 hidden sm:block" />
+
+            <div
+              className="inline-flex items-center h-7 bg-input border border-hairline rounded-xs overflow-hidden text-xs"
+              title="Columns per row (overrides Grid/Compact)"
+            >
+              <span className="px-1.5 text-secondary inline-flex items-center">
+                <Columns3 className="w-3.5 h-3.5" strokeWidth={1.6} />
               </span>
               <button
                 type="button"
-                aria-label="Remove filter"
+                aria-label="Fewer columns"
                 onClick={() => {
-                  const next = { ...galleryExtraFilters };
-                  delete next[k];
-                  if (k === "group_id") delete next._group_label;
-                  setGalleryExtraFilters(next);
+                  const cur = customCols ?? (layoutMode === "compact" ? 7 : 4);
+                  setCustomCols(Math.max(2, cur - 1));
                 }}
-                className={`${k === "tag" ? "text-amber" : "text-accent"} hover:text-primary transition-colors cursor-pointer`}
+                className="w-6 h-full flex items-center justify-center text-secondary hover:text-primary hover:bg-elevated transition-colors cursor-pointer"
               >
-                <X className="w-3 h-3" strokeWidth={1.8} />
+                −
               </button>
-            </span>
-          ))}
+              <span
+                className={`px-1.5 font-mono text-[11px] tabular-nums select-none ${
+                  customCols != null ? "text-accent-secondary font-semibold" : "text-secondary"
+                }`}
+              >
+                {customCols != null ? `${customCols} col` : "Auto"}
+              </span>
+              <button
+                type="button"
+                aria-label="More columns"
+                onClick={() => {
+                  const cur = customCols ?? (layoutMode === "compact" ? 7 : 4);
+                  setCustomCols(Math.min(12, cur + 1));
+                }}
+                className="w-6 h-full flex items-center justify-center text-secondary hover:text-primary hover:bg-elevated transition-colors cursor-pointer"
+              >
+                +
+              </button>
+              {customCols != null && (
+                <button
+                  type="button"
+                  title="Reset to auto"
+                  onClick={() => setCustomCols(null)}
+                  className="w-6 h-full flex items-center justify-center text-secondary hover:text-accent-secondary border-l border-subtle hover:bg-elevated transition-colors cursor-pointer"
+                >
+                  <X className="w-3 h-3" strokeWidth={1.8} />
+                </button>
+              )}
+            </div>
+
+            <label className="inline-flex items-center gap-1 text-xs text-secondary" title="Photos per page">
+              <span className="hidden md:inline">Per page</span>
+              <input
+                type="number"
+                min={10}
+                max={200}
+                step={10}
+                value={customPageSize}
+                onChange={e => {
+                  const v = Math.max(10, Math.min(200, Number(e.target.value) || 40));
+                  setCustomPageSize(v);
+                }}
+                className="w-14 h-7 px-1.5 bg-input border border-hairline rounded-xs text-xs font-mono text-primary focus:outline-none focus:border-accent-secondary focus:ring-1 focus:ring-accent-secondary/30"
+              />
+            </label>
+          </div>
         </div>
+        )}
+
+        {/* Row 3: Active Filter Chips (only shown when active) */}
+        {(tagFilter || extraChipEntries.length > 0) && (
+          <div className="flex items-center flex-wrap gap-1.5 pt-1 border-t border-subtle/40">
+            {tagFilter && (
+              <span className="h-6 px-2 inline-flex items-center gap-1.5 rounded-xs bg-amber-bg border border-amber/50 text-xs text-amber font-medium">
+                <Tag className="w-3 h-3 shrink-0" strokeWidth={1.8} />
+                <span>tag: {tagFilter}</span>
+                <button
+                  type="button"
+                  aria-label="Clear tag filter"
+                  onClick={() => setTagFilter("")}
+                  className="text-amber hover:text-primary transition-colors cursor-pointer"
+                >
+                  <X className="w-3 h-3" strokeWidth={1.8} />
+                </button>
+              </span>
+            )}
+
+            {extraChipEntries.map(([k, v]) => (
+              <span
+                key={k}
+                className={`h-6 px-2 inline-flex items-center gap-1.5 rounded-xs border text-xs font-medium ${
+                  k === "tag"
+                    ? "bg-amber-bg border-amber/50 text-amber"
+                    : "bg-accent-light border-accent/50 text-accent"
+                }`}
+              >
+                {k === "tag" && <Tag className="w-3 h-3 shrink-0" strokeWidth={1.8} />}
+                <span>
+                  {k === "group_id"
+                    ? String(galleryExtraFilters._group_label || `Event #${v}`)
+                    : `${k}: ${String(v)}`}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Remove filter"
+                  onClick={() => {
+                    const next = { ...galleryExtraFilters };
+                    delete next[k];
+                    if (k === "group_id") delete next._group_label;
+                    setGalleryExtraFilters(next);
+                  }}
+                  className={`${k === "tag" ? "text-amber" : "text-accent"} hover:text-primary transition-colors cursor-pointer`}
+                >
+                  <X className="w-3 h-3" strokeWidth={1.8} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      {!unusedFacesOnly && (
+      {!controlsCollapsed && !unusedFacesOnly && (
         <PeopleStrip
           persons={persons}
-          selectedPersonId={selectedPersonId}
-          onSelectPerson={setSelectedPersonId}
+          loading={loadingPersons}
+          selectedPersonIds={selectedPersonIds}
+          onTogglePerson={pid => {
+            const next = selectedPersonIds.includes(pid)
+              ? selectedPersonIds.filter(id => id !== pid)
+              : [...selectedPersonIds, pid];
+            setSelectedPersonIds(next);
+            setSelectedPersonId(next.length === 1 ? next[0] : null);
+          }}
+          onSelectSinglePerson={pid => {
+            setSelectedPersonIds([pid]);
+            setSelectedPersonId(pid);
+          }}
+          onClearPersons={() => {
+            setSelectedPersonIds([]);
+            setSelectedPersonId(null);
+            setOnlySelectedPersons(false);
+          }}
+          onlySelectedPersons={onlySelectedPersons}
+          onToggleOnlySelected={() => setOnlySelectedPersons(v => !v)}
+          anySelectedPersons={anySelectedPersons}
+          onToggleAnySelected={() => setAnySelectedPersons(v => !v)}
         />
       )}
 
@@ -567,21 +667,41 @@ export default function GalleryView() {
           }
         />
       ) : layoutMode === "table" ? (
-        <PhotoTable photos={items} onOpen={setLightboxPhoto} />
+        <PhotoTable
+          photos={displayedItems}
+          onOpen={p => {
+            setLightboxList(displayedItems);
+            setLightboxPhoto(p);
+          }}
+        />
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
           <div
-            className={`grid ${layoutMode === "compact" ? "grid-cols-[repeat(auto-fill,minmax(154px,1fr))] gap-2" : "grid-cols-[repeat(auto-fill,minmax(204px,1fr))] gap-3"}`}
+            className={`grid items-start ${
+              customCols != null
+                ? "gap-2"
+                : layoutMode === "compact"
+                  ? "grid-cols-[repeat(auto-fill,minmax(154px,1fr))] gap-2"
+                  : "grid-cols-[repeat(auto-fill,minmax(204px,1fr))] gap-3"
+            }`}
+            style={customCols != null ? { gridTemplateColumns: `repeat(${customCols}, minmax(0, 1fr))` } : undefined}
           >
-            {items.map(item => (
+            {displayedItems.map(item => (
               <PhotoCard
                 key={item.id}
                 photo={item}
-                compact={layoutMode === "compact"}
+                compact={customCols != null ? false : layoutMode === "compact"}
                 faceZoom={faceZoom}
-                targetPersonId={selectedPersonId}
+                targetPersonId={selectedPersonIds.length === 1 ? selectedPersonIds[0] : null}
                 unassignedOnly={unusedFacesOnly}
-                onOpen={setLightboxPhoto}
+                showInfo={showInfo}
+                onOpen={p => {
+                  setLightboxList(displayedItems);
+                  setLightboxPhoto(p);
+                }}
+                onSetDefaultFace={
+                  selectedPersonIds.length === 1 && !unusedFacesOnly ? handleSetDefaultFace : undefined
+                }
               />
             ))}
           </div>

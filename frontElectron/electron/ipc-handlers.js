@@ -55,6 +55,36 @@ function registerIpcHandlers(backendClient, getMainWindow) {
     }
     return false;
   });
+
+  ipcMain.handle("memoframe:open-lightbox-window", async (_event, photoId) => {
+    const { BrowserWindow } = require("electron");
+    const win = new BrowserWindow({
+      width: 1180,
+      height: 780,
+      minWidth: 720,
+      minHeight: 480,
+      title: "MemoFrame — Photo Viewer",
+      icon: path.join(__dirname, "..", "public", process.platform === "win32" ? "logo.ico" : "logo.png"),
+      backgroundColor: "#0f1216",
+      autoHideMenuBar: true,
+      webPreferences: {
+        preload: path.join(__dirname, "preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        spellcheck: false,
+      },
+    });
+    const devUrl = process.env.VITE_DEV_SERVER_URL;
+    if (devUrl) {
+      win.loadURL(`${devUrl}?lightbox=${encodeURIComponent(String(photoId))}`);
+    } else {
+      win.loadFile(path.join(__dirname, "..", "dist", "index.html"), {
+        query: { lightbox: String(photoId) },
+      });
+    }
+    return true;
+  });
 }
 
 module.exports = { registerIpcHandlers };

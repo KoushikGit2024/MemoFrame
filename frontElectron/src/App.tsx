@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useApp } from "./context/AppContext";
 import { rpc } from "./lib/api";
+import type { PhotoRecord } from "./types/memoframe";
 import NavRail from "./components/NavRail";
-import StatusBar from "./components/StatusBar";
 import ToastContainer from "./components/ToastContainer";
 import ModelDownloadScreen from "./components/ModelDownloadScreen";
 import GalleryView from "./views/GalleryView";
@@ -13,6 +13,7 @@ import BurstsView from "./views/BurstsView";
 import TimelineView from "./views/TimelineView";
 import SettingsView from "./views/SettingsView";
 import LightboxModal from "./modals/LightboxModal";
+import ScanProgressModal from "./modals/ScanProgressModal";
 
 function WorkspaceShell() {
   const { activeView, connected, backendError, initBackend, lightboxPhoto, setLightboxPhoto } =
@@ -59,8 +60,6 @@ function WorkspaceShell() {
         )}
 
         <main className="flex-1 min-h-0 flex flex-col overflow-hidden">{renderView()}</main>
-
-        <StatusBar />
       </div>
 
       {lightboxPhoto && (
@@ -71,13 +70,55 @@ function WorkspaceShell() {
         />
       )}
 
+      <ScanProgressModal />
       <ToastContainer />
     </div>
   );
 }
 
 export default function App() {
-  const { connected } = useApp();
+  const { connected, lightboxPhoto, setLightboxPhoto, setLightboxList } = useApp();
+  const lightboxParam = new URLSearchParams(window.location.search).get("lightbox");
+  const lightboxPhotoId = lightboxParam ? Number(lightboxParam) : null;
+
+  useEffect(() => {
+    if (!connected || !lightboxPhotoId) return;
+    try {
+      const raw = localStorage.getItem("memoframe_lightbox_ids");
+      if (raw) {
+        const ids = JSON.parse(raw) as number[];
+        if (Array.isArray(ids) && ids.length > 0) {
+          setLightboxList(ids.map(id => ({ id })));
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    rpc<{ photo: PhotoRecord }>("photos.detail", { image_id: lightboxPhotoId })
+      .then(res => {
+        if (res?.photo) setLightboxPhoto(res.photo);
+      })
+      .catch(() => {});
+  }, [connected, lightboxPhotoId, setLightboxList, setLightboxPhoto]);
+
+  if (lightboxPhotoId) {
+    return (
+      <div className="h-screen w-screen bg-app text-primary overflow-hidden">
+        {lightboxPhoto ? (
+          <LightboxModal
+            key={lightboxPhoto.id}
+            photo={lightboxPhoto}
+            onClose={() => window.close()}
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center text-xs text-secondary">
+            Loading photo...
+          </div>
+        )}
+        <ToastContainer />
+      </div>
+    );
+  }
   const [checkingModels, setCheckingModels] = useState(true);
   const [modelsReady, setModelsReady] = useState(false);
 

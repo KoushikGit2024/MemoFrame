@@ -20,6 +20,7 @@ export interface FaceRecord {
   w: number;
   h: number;
   locked?: number | boolean;
+  ignored?: number;
   confidence?: number;
   person_id?: number | null;
   person_name?: string | null;
@@ -42,10 +43,20 @@ export interface PhotoRecord {
   faces?: FaceRecord[];
   suggested?: boolean;
   suggested_keep?: boolean;
+  is_favourite?: boolean | number;
   similarity?: number;
   error?: string;
   kind?: string;
   state?: string;
+  size?: number;
+  place?: string | null;
+  gps_lat?: number | null;
+  gps_lon?: number | null;
+  ts_source?: string | null;
+  sharpness?: number | null;
+  brightness?: number | null;
+  sha256?: string | null;
+  duration_s?: number | null;
 }
 
 export interface PersonRecord {

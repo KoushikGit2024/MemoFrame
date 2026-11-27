@@ -166,6 +166,16 @@ def _v10(_conn: sqlite3.Connection) -> str:
     return "CREATE INDEX IF NOT EXISTS idx_marks_id_kind ON marks(image_id, kind);"
 
 
+def _v11(conn: sqlite3.Connection) -> str:
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(faces)")}
+    alter = (
+        ""
+        if "ignored" in cols
+        else "ALTER TABLE faces ADD COLUMN ignored INTEGER NOT NULL DEFAULT 0;"
+    )
+    return alter
+
+
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], str]]] = [
     (1, lambda c: _SCHEMA_V1.read_text(encoding="utf-8")),
     (2, lambda c: _V2),
@@ -177,6 +187,7 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], str]]] = [
     (8, _v8),
     (9, _v9),
     (10, _v10),
+    (11, _v11),
 ]
 LATEST_VERSION = MIGRATIONS[-1][0]
 
