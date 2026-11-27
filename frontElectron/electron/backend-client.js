@@ -60,6 +60,14 @@ class BackendClient {
 
   start() {
     if (this.proc) return;
+    if (app.isPackaged && process.resourcesPath) {
+      const exeName = process.platform === "win32" ? "server.exe" : "server";
+      const packagedExe = path.join(process.resourcesPath, "bridge-bin", exeName);
+      if (fs.existsSync(packagedExe)) {
+        this._spawnWithFallback([packagedExe], 0);
+        return;
+      }
+    }
     this._spawnWithFallback(this._pythonCandidates(), 0);
   }
 
@@ -70,12 +78,15 @@ class BackendClient {
       ...process.env,
       PYTHONUNBUFFERED: "1",
       MEMOFRAME_BACKEND_DIR: backendDir,
+      MEMOFRAME_MODELS_DIR:
+        app.isPackaged && process.resourcesPath ? path.join(process.resourcesPath, "models") : "",
       PYTHONPATH: [this.repoRoot, backendDir, process.env.PYTHONPATH || ""]
         .filter(Boolean)
         .join(path.delimiter),
     };
 
-    const child = spawn(exe, ["-m", "bridge.server"], {
+    const isFrozenExe = exe.endsWith("server.exe") || path.basename(exe) === "server";
+    const child = spawn(exe, isFrozenExe ? [] : ["-m", "bridge.server"], {
       cwd: this.repoRoot,
       env,
       stdio: ["pipe", "pipe", "pipe"],

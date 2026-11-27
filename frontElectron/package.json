@@ -1,6 +1,6 @@
 {
   "name": "memoframe-desktop",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "description": "MemoFrame — Local Photo & Face Intelligence (Electron + React + TypeScript + Vite + Tailwind CSS)",
   "private": true,
   "main": "electron/main.js",
@@ -10,6 +10,7 @@
     "dev": "concurrently -k \"npm run dev:vite\" \"npm run dev:electron\"",
     "typecheck": "tsc --noEmit",
     "build:web": "tsc --noEmit && vite build",
+    "build:backend": "python -m PyInstaller --noconfirm --onedir --name server --paths ../backend --paths .. --distpath build-backend --workpath build-backend-work ../bridge/server.py",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\" \"electron/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\" \"electron/**/*.js\"",
     "start": "npm run build:web && electron .",
@@ -50,8 +51,16 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "public/logo.ico",
+      "public/logo.png",
       "package.json"
     ],
+    "win": {
+      "icon": "public/logo.ico",
+      "target": [
+        "nsis"
+      ]
+    },
     "directories": {
       "output": "release"
     },
@@ -63,6 +72,29 @@
           "**/*",
           "!**/__pycache__/**",
           "!tests/**"
+        ]
+      },
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!tests/**"
+        ]
+      },
+      {
+        "from": "build-backend/server",
+        "to": "bridge-bin",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../workspace/models",
+        "to": "models",
+        "filter": [
+          "**/*"
         ]
       }
     ]

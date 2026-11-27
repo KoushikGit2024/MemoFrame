@@ -151,6 +151,11 @@ class Settings:
 
     @property
     def models_dir(self) -> Path:
+        env_dir = os.environ.get("MEMOFRAME_MODELS_DIR", "").strip()
+        if env_dir:
+            p = Path(env_dir)
+            if p.is_dir():
+                return p
         return self.workspace / "models"
 
     @property

@@ -37,3 +37,9 @@ Thumbs.db
 test_server.py
 web_test/
 
+
+# Electron & PyInstaller build outputs
+frontElectron/build-backend/
+frontElectron/build-backend-work/
+frontElectron/release/
+frontElectron/server.spec
